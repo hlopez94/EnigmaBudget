@@ -28,7 +28,7 @@ jobs:
           envkey_SQL_PASSWORD: ${{secrets.DOCKER_SQL_PASSWORD}}
           envkey_SQL_PORT: ${{secrets.DOCKER_SQL_PORT}}
           envkey_SQL_UI_PORT: ${{secrets.DOCKER_UI_PORT}}
-          directory: ./home/runner/work/EnigmaBudget/EnigmaBudget/docker-compose
+          directory: docker-compose
           file_name: .env
           fail_on_empty: false
 
