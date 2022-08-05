@@ -13,6 +13,7 @@ on:
 jobs:
 
   generate-env:
+    environment: production
 
     runs-on: ubuntu-latest
 
@@ -30,12 +31,15 @@ jobs:
           envkey_SQL_UI_PORT: ${{secrets.DOCKER_UI_PORT}}
           directory: docker-compose
           file_name: .env
-          fail_on_empty: false
+          fail_on_empty: true
 
   build-angular:
 
     runs-on: ubuntu-latest
 
+    defaults:
+      run:
+        working-directory: webui/enigma-ui
     steps:
      - uses: actions/checkout@v3
      - name: Usar Node.js 16.x
@@ -65,15 +69,17 @@ jobs:
  
      - name: Instalar dependencias Angular
        run: pnpm install
-       working-directory: ./webui/enigma-ui
  
      - name: Compilar Angular
        run: pnpm run build
-       working-directory: ./webui/enigma-ui
       
   build-api:
 
     runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: webapi/EnigmaBudget-ui
 
     steps:
       - uses: actions/checkout@v3
@@ -84,11 +90,9 @@ jobs:
 
       - name: Install dependencies
         run: dotnet restore
-        working-directory: webapi/EnigmaBudget
 
       - name: Build
         run: dotnet build --configuration Release --no-restore
-        working-directory: ./webapi/EnigmaBudget/
 
   deploy-to-server:
     needs: [generate-env, build-angular, build-api]
