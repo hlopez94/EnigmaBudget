@@ -75,7 +75,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Setup .NET Core SDK ${{ matrix.dotnet-version }}
+      - uses: actions/checkout@v3
+      - name: Setup .NET Core SDK 6.x
         uses: actions/setup-dotnet@v2
         with:
           dotnet-version: '6.x'
@@ -86,7 +87,7 @@ jobs:
 
       - name: Build
         run: dotnet build --configuration Release --no-restore
-        working-directory: ./webapi/EnigmaBudget
+        working-directory: ./webapi/EnigmaBudget/
 
   prepare-deploy-server:
 
