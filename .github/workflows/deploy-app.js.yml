@@ -138,7 +138,7 @@ jobs:
           name: dist-angular
 
       - name: Copiar archivos de UI con rsync
-        run: rsync -avz -e "ssh -p ${{secrets.SSH_PORT}}" webui/enigma-ui/dist ${{secrets.SSH_USER}}@${{secrets.SSH_HOST}}:${{secrets.DEPLOY_PATH}}/www/ui
+        run: rsync -avz -e "ssh -p ${{secrets.SSH_PORT}}" dist-angular ${{secrets.SSH_USER}}@${{secrets.SSH_HOST}}:${{secrets.DEPLOY_PATH}}/www/ui
   
       - name: Copiar archivos de API con rsync
         run: rsync -avz -e "ssh -p ${{secrets.SSH_PORT}}" webapi/EnigmaBudget/EnigmaBudget.WebApi/bin/Release/net6.0/ ${{secrets.SSH_USER}}@${{secrets.SSH_HOST}}:${{secrets.DEPLOY_PATH}}/api/bin
