@@ -27,7 +27,7 @@ jobs:
           envkey_SQL_PASSWORD: ${{secrets.DOCKER_SQL_PASSWORD}}
           envkey_SQL_PORT: ${{secrets.DOCKER_SQL_PORT}}
           envkey_SQL_UI_PORT: ${{secrets.DOCKER_UI_PORT}}
-          directory: docker-compose/
+          directory: ./docker-compose
           file_name: .env
           fail_on_empty: false
 
@@ -89,8 +89,8 @@ jobs:
         run: dotnet build --configuration Release --no-restore
         working-directory: ./webapi/EnigmaBudget/
 
-  prepare-deploy-server:
-
+  deploy-to-server:
+    needs: [build-angular, build-api]
     runs-on: ubuntu-latest
 
     steps:
