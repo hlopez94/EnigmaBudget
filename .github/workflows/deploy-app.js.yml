@@ -170,3 +170,14 @@ jobs:
 
       - name: Copiar archivos de API con rsync
         run: rsync -avz -e "ssh -p ${{secrets.SSH_PORT}}" dist-netcore/ ${{secrets.SSH_USER}}@${{secrets.SSH_HOST}}:${{secrets.DEPLOY_PATH}}/api/bin
+
+      - name: Volver a ejecutar docker-compose
+        uses: D3rHase/ssh-command-action@v0.2.1
+        with:
+          HOST: ${{secrets.SSH_HOST}}
+          PORT: ${{secrets.SSH_PORT}}
+          USER: ${{secrets.SSH_USER}}
+          PRIVATE_SSH_KEY: ${{secrets.SSH_PRIVATE_KEY}}
+          COMMAND: |
+            cd ${{secrets.DEPLOY_PATH}}
+            docker-compose up -d
