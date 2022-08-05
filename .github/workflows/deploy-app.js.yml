@@ -111,10 +111,12 @@ jobs:
        uses: actions/upload-artifact@v2
        with:
          name: dist-netcore
-         path: webapi/EnigmaBudget/EnigmaBudget.WebApi/bin/Release/net6.0/
+         path: webapi/EnigmaBudget/EnigmaBudget.WebApi/bin/Release/net6.0
 
   deploy-to-server:
+
     needs: [generate-env, build-angular, build-api]
+
     runs-on: ubuntu-latest
 
     steps:
