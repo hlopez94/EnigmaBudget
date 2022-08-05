@@ -27,9 +27,9 @@ jobs:
           envkey_API_ENV: ${{secrets.DOCKER_API_ENVIRONMENT}}
           envkey_SQL_ROOT_PASS: ${{secrets.DOCKER_SQL_ROOT_PASS}}
           envkey_SQL_USER: ${{secrets.DOCKER_SQL_USER}}
-          envkey_SQL_PASSWORD: ${{secrets.DOCKER_SQL_PASSWORD}}
+          envkey_SQL_USER_PASS: ${{secrets.DOCKER_SQL_PASSWORD}}
           envkey_SQL_PORT: ${{secrets.DOCKER_SQL_PORT}}
-          envkey_SQL_UI_PORT: ${{secrets.DOCKER_UI_PORT}}
+          envkey_UI_PORT: ${{secrets.DOCKER_UI_PORT}}
           directory: docker-compose
           file_name: .env
           fail_on_empty: true
