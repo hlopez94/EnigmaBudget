@@ -10,7 +10,25 @@ on:
     branches: [ "main" ]
   workflow_dispatch:
 jobs:
-  build:
+
+  generate-env:
+    runs-on: ubuntu-latest
+    steps:
+      -name: Generar environment docker-compose
+      uses: SpicyPizza/create-envfile@v1.3
+      with:
+        envkey_API_PORT: ${{secrets.DOCKER_API_PORT}}
+        envkey_API_ENV: ${{secrets.DOCKER_API_ENVIRONMENT}}
+        envkey_SQL_ROOT_PASS: ${{secrets.DOCKER_SQL_ROOT_PASS}}
+        envkey_SQL_USER: ${{secrets.DOCKER_SQL_USER}}
+        envkey_SQL_PASSWORD: ${{secrets.DOCKER_SQL_PASSWORD}}
+        envkey_SQL_PORT: ${{secrets.DOCKER_SQL_PORT}}
+        envkey_SQL_UI_PORT: ${{secrets.DOCKER_UI_PORT}}
+        directory: docker-compose/
+        file_name: .env
+        fail_on_empty: true
+
+  build-angular:
 
     runs-on: ubuntu-latest
 
@@ -53,6 +71,11 @@ jobs:
       run: pnpm run build
       working-directory: ./webui/enigma-ui
       
+  build-api:
+
+    runs-on: ubuntu-latest
+
+    steps:
     - name: Setup .NET Core SDK ${{ matrix.dotnet-version }}
       uses: actions/setup-dotnet@v2
       with:
@@ -65,6 +88,11 @@ jobs:
       run: dotnet build --configuration Release --no-restore
       working-directory: ./webapi/EnigmaBudget
 
+  prepare-deploy-server:
+
+    runs-on: ubuntu-latest
+
+    steps:
     - name: Configurar Clave SSH
       uses: shimataro/ssh-key-action@v2
       with:
