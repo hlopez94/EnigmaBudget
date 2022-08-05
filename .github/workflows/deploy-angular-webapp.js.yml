@@ -49,6 +49,9 @@ jobs:
       run: pnpm install
       working-directory: ./webui/enigma-ui
 
+    - name: Build Angular
+      run: pnpm run build
+      working-directory: ./webui/enigma-ui
       
     - name: Install SSH Key
       uses: shimataro/ssh-key-action@v2
@@ -60,4 +63,4 @@ jobs:
       run: ssh-keyscan -p ${{secrets.SSH_PORT}} -H ${{secrets.SSH_HOST}}  >> ~/.ssh/known_hosts
 
     - name: Deploy with rsync
-      run: rsync -avz -e "ssh -p ${{secrets.SSH_PORT}}" ./webui/enigma-ui/dist/ ${{secrets.SSH_USER}}@${{secrets.SSH_HOST}}:/var/www/enigma.devher.com/
+      run: rsync -avz -e "ssh -p ${{secrets.SSH_PORT}}" ./webui/enigma-ui/dist/enigma-ui/ ${{secrets.SSH_USER}}@${{secrets.SSH_HOST}}:{{secrets.UI_DEPLOY_PATH}}
