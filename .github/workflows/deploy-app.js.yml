@@ -86,7 +86,7 @@ jobs:
 
       - name: Build
         run: dotnet build --configuration Release --no-restore
-        working-directory: webapi/EnigmaBudget
+        working-directory: ./webapi/EnigmaBudget
 
   prepare-deploy-server:
 
