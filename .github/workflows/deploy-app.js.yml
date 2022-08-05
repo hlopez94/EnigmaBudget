@@ -136,6 +136,7 @@ jobs:
         uses: actions/download-artifact@v2
         with:
           name: dist-angular
+          path: dist-angular
 
       - name: Copiar archivos de UI con rsync
         run: rsync -avz -e "ssh -p ${{secrets.SSH_PORT}}" dist-angular ${{secrets.SSH_USER}}@${{secrets.SSH_HOST}}:${{secrets.DEPLOY_PATH}}/www/ui
