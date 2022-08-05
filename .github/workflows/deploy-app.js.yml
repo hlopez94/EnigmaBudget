@@ -14,35 +14,32 @@ jobs:
   generate-env:
     runs-on: ubuntu-latest
     steps:
-      -name: Generar environment docker-compose
-      uses: SpicyPizza/create-envfile@v1.3
-      with:
-        envkey_API_PORT: ${{secrets.DOCKER_API_PORT}}
-        envkey_API_ENV: ${{secrets.DOCKER_API_ENVIRONMENT}}
-        envkey_SQL_ROOT_PASS: ${{secrets.DOCKER_SQL_ROOT_PASS}}
-        envkey_SQL_USER: ${{secrets.DOCKER_SQL_USER}}
-        envkey_SQL_PASSWORD: ${{secrets.DOCKER_SQL_PASSWORD}}
-        envkey_SQL_PORT: ${{secrets.DOCKER_SQL_PORT}}
-        envkey_SQL_UI_PORT: ${{secrets.DOCKER_UI_PORT}}
-        directory: docker-compose/
-        file_name: .env
-        fail_on_empty: true
+      - uses: actions/checkout@v3
+      - name: Generar environment docker-compose
+        uses: SpicyPizza/create-envfile@v1.3
+        with:
+          envkey_API_PORT: ${{secrets.DOCKER_API_PORT}}
+          envkey_API_ENV: ${{secrets.DOCKER_API_ENVIRONMENT}}
+          envkey_SQL_ROOT_PASS: ${{secrets.DOCKER_SQL_ROOT_PASS}}
+          envkey_SQL_USER: ${{secrets.DOCKER_SQL_USER}}
+          envkey_SQL_PASSWORD: ${{secrets.DOCKER_SQL_PASSWORD}}
+          envkey_SQL_PORT: ${{secrets.DOCKER_SQL_PORT}}
+          envkey_SQL_UI_PORT: ${{secrets.DOCKER_UI_PORT}}
+          directory: docker-compose/
+          file_name: .env
+          fail_on_empty: false
 
   build-angular:
-
     runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        node-version: [14.x, 16.x]
 
     steps:
 
     - uses: actions/checkout@v3
-    - name: Usar Node.js ${{ matrix.node-version }}
+    - name: Usar Node.js 16.x
       uses: actions/setup-node@v3
       with:
-        node-version: ${{ matrix.node-version }}
+        node-version: 16.x
+
     - uses: pnpm/action-setup@v2.0.1
       name: Instalar pnpm
       id: pnpm-install
@@ -76,50 +73,49 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Setup .NET Core SDK ${{ matrix.dotnet-version }}
-      uses: actions/setup-dotnet@v2
-      with:
-        dotnet-version: '6.x'
+      - name: Setup .NET Core SDK ${{ matrix.dotnet-version }}
+        uses: actions/setup-dotnet@v2
+        with:
+          dotnet-version: '6.x'
 
-    - name: Install dependencies
-      run: dotnet restore
-      working-directory: ./webapi/EnigmaBudget
-    - name: Build
-      run: dotnet build --configuration Release --no-restore
-      working-directory: ./webapi/EnigmaBudget
+      - name: Install dependencies
+        run: dotnet restore
+        working-directory: ./webapi/EnigmaBudget
+      - name: Build
+        run: dotnet build --configuration Release --no-restore
+        working-directory: ./webapi/EnigmaBudget
 
   prepare-deploy-server:
 
     runs-on: ubuntu-latest
 
     steps:
+      - uses: shimataro/ssh-key-action@v2
       - name: Configurar Clave SSH
-      uses: shimataro/ssh-key-action@v2
-      with:
-        key: ${{ secrets.SSH_PRIVATE_KEY }} 
-        known_hosts: unnecessary
-        
-    - name: Agregar Clientes Conocidos
-      run: ssh-keyscan -p ${{secrets.SSH_PORT}} -H ${{secrets.SSH_HOST}}  >> ~/.ssh/known_hosts
-
-    - name: Crear carpetas para despliegue si no existen 
-      uses: D3rHase/ssh-command-action@v0.2.1
-      with:
-        HOST: ${{secrets.SSH_HOST}}
-        PORT: ${{secrets.SSH_PORT}}
-        USER: ${{secrets.SSH_USER}}
-        PRIVATE_SSH_KEY: ${{secrets.SSH_PRIVATE_KEY}}
-        COMMAND: |
-          mkdir -p ${{secrets.DEPLOY_PATH}}
-          mkdir -p ${{secrets.DEPLOY_PATH}}/www/ui
-          mkdir -p ${{secrets.DEPLOY_PATH}}/api/bin
-
-    - name: Copiar docker-compose
-      run: rsync -avz -e "ssh -p ${{secrets.SSH_PORT}}" ./docker-compose/ ${{secrets.SSH_USER}}@${{secrets.SSH_HOST}}:${{secrets.DEPLOY_PATH}}
-
-    - name: Copiar archivos de UI con rsync
-      run: rsync -avz -e "ssh -p ${{secrets.SSH_PORT}}" ./webui/enigma-ui/dist/enigma-ui/ ${{secrets.SSH_USER}}@${{secrets.SSH_HOST}}:${{secrets.DEPLOY_PATH}}/www/ui
-
-    - name: Copiar archivos de API con rsync
-      run: rsync -avz -e "ssh -p ${{secrets.SSH_PORT}}" ./webapi/EnigmaBudget/EnigmaBudget.WebApi/bin/Release/net6.0/ ${{secrets.SSH_USER}}@${{secrets.SSH_HOST}}:${{secrets.DEPLOY_PATH}}/api/bin
-
+        with:
+          key: ${{ secrets.SSH_PRIVATE_KEY }} 
+          known_hosts: unnecessary
+          
+      - name: Agregar Clientes Conocidos
+        run: ssh-keyscan -p ${{secrets.SSH_PORT}} -H ${{secrets.SSH_HOST}}  >> ~/.ssh/known_hosts
+  
+      - name: Crear carpetas para despliegue si no existen 
+        uses: D3rHase/ssh-command-action@v0.2.1
+        with:
+          HOST: ${{secrets.SSH_HOST}}
+          PORT: ${{secrets.SSH_PORT}}
+          USER: ${{secrets.SSH_USER}}
+          PRIVATE_SSH_KEY: ${{secrets.SSH_PRIVATE_KEY}}
+          COMMAND: |
+            mkdir -p ${{secrets.DEPLOY_PATH}}
+            mkdir -p ${{secrets.DEPLOY_PATH}}/www/ui
+            mkdir -p ${{secrets.DEPLOY_PATH}}/api/bin
+  
+      - name: Copiar docker-compose
+        run: rsync -avz -e "ssh -p ${{secrets.SSH_PORT}}" ./docker-compose/ ${{secrets.SSH_USER}}@${{secrets.SSH_HOST}}:${{secrets.DEPLOY_PATH}}
+  
+      - name: Copiar archivos de UI con rsync
+        run: rsync -avz -e "ssh -p ${{secrets.SSH_PORT}}" ./webui/enigma-ui/dist/enigma-ui/ ${{secrets.SSH_USER}}@${{secrets.SSH_HOST}}:${{secrets.DEPLOY_PATH}}/www/ui
+  
+      - name: Copiar archivos de API con rsync
+        run: rsync -avz -e "ssh -p ${{secrets.SSH_PORT}}" ./webapi/EnigmaBudget/EnigmaBudget.WebApi/bin/Release/net6.0/ ${{secrets.SSH_USER}}@${{secrets.SSH_HOST}}:${{secrets.DEPLOY_PATH}}/api/bin
