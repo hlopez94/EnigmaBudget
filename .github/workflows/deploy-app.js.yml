@@ -54,8 +54,8 @@ jobs:
        run: |
          echo "::set-output name=pnpm_cache_dir::$(pnpm store path)"
  
-     - uses: actions/cache@v3
-       name: Configurar cache pnpm
+     - name: Configurar cache pnpm
+       uses: actions/cache@v3
        with:
          path: ${{ steps.pnpm-cache.outputs.pnpm_cache_dir }}
          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
@@ -93,8 +93,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: shimataro/ssh-key-action@v2
       - name: Configurar Clave SSH
+        uses: shimataro/ssh-key-action@v2
         with:
           key: ${{ secrets.SSH_PRIVATE_KEY }} 
           known_hosts: unnecessary
