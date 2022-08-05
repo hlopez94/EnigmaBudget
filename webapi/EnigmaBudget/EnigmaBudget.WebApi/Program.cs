@@ -1,33 +1,91 @@
-var builder = WebApplication.CreateBuilder(args);
-var configuration = builder.Configuration;
+using EnigmaBudget.Infrastructure.Auth;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
+using MySqlConnector;
+using System.Text;
 
-var corsOrigins = configuration["Cors:Origins"];
-
-builder.Services.AddCors(options =>
+internal class Program
 {
-    options.AddPolicy(name: "CorsPolicy",
-                      policy =>
-                      {
-                          policy.WithOrigins(corsOrigins);
-                      });
-});
-// Add services to the container.
-builder.Services.AddControllers();
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+    private static void Main(string[] args)
+    {
+        var builder = WebApplication.CreateBuilder(args);
 
-var app = builder.Build();
-app.UseCors("CorsPolicy");
+        var configuration = builder.Configuration;
 
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
-  app.UseSwagger();
-  app.UseSwaggerUI();
+        var corsOrigins = configuration["Cors:Origins"];
+
+        builder.Services.AddCors(options =>
+        {
+            options.AddPolicy(name: "CorsPolicy",
+                              policy =>
+                              {
+                                  policy.WithOrigins(corsOrigins);
+                              });
+        });
+        // Add services to the container.
+
+        builder.Services.AddControllers();
+        // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+        builder.Services.AddEndpointsApiExplorer();
+        builder.Services.AddSwaggerGen();
+        builder.Services.AddHttpContextAccessor();
+        RegisterServices(builder);
+
+        
+        var app = builder.Build();
+        app.UseCors("CorsPolicy");
+
+        // Configure the HTTP request pipeline.
+        if (app.Environment.IsDevelopment())
+        {
+            app.UseSwagger();
+            app.UseSwaggerUI();
+        }
+
+
+        app.UseHttpsRedirection();
+
+        app.UseAuthentication();
+        app.UseAuthorization();
+
+        app.MapControllers();
+
+        app.UseCors(x => x.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
+
+        app.Run();
+    }
+
+    private static void RegisterServices(WebApplicationBuilder builder)
+    {
+        builder.Services.AddTransient(_ => new MySqlConnection(builder.Configuration["MariaDB:ConnectionString"]));
+
+        builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
+        {
+            options.RequireHttpsMetadata = false;
+            options.SaveToken = true;
+            options.TokenValidationParameters = new TokenValidationParameters()
+            {
+                ValidateIssuer = true,
+                ValidateAudience = true,
+                ValidateLifetime = true,
+                ValidateIssuerSigningKey = true,
+                ValidAudience = builder.Configuration["Jwt:Audience"],
+                ValidIssuer = builder.Configuration["Jwt:Issuer"],
+                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]))
+            };
+            
+        });
+
+
+        builder.Services.AddSingleton<AuthServiceOptions>(_ => new AuthServiceOptions(
+            builder.Configuration["Jwt:Issuer"],
+            builder.Configuration["Jwt:Audience"],
+            builder.Configuration["Jwt:Subject"],
+            builder.Configuration["Jwt:Key"])
+            );
+
+        builder.Services.AddTransient<IAuthService, AuthService>();
+    }
 }
-
-app.UseAuthorization();
-app.MapControllers();
-
-app.Run();
