@@ -24,13 +24,7 @@ services:
     volumes: 
       - ./db/mysql:/var/lib/mysql
     ports:
-      - ${SQL_PORT}:3306
-  adminer:
-    image: adminer
-    container_name: enigma_dbadmin
-    restart: always
-    ports:
-      - ${ADMINER_PORT}:8080
+      - ${SQL_PORT}:3306  
   nginx:
     image: nginx
     ports:
