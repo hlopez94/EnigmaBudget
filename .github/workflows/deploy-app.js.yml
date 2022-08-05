@@ -17,11 +17,6 @@ jobs:
 
     runs-on: ubuntu-latest
 
-
-    defaults:
-      uses:
-        working-directory: webapi/EnigmaBudget
-
     steps:
       - uses: actions/checkout@v3
       - name: Generar environment docker-compose
