@@ -17,6 +17,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - uses: actions/checkout@v3
       - name: Generar environment docker-compose
         uses: SpicyPizza/create-envfile@v1.3
         with:
@@ -27,7 +28,7 @@ jobs:
           envkey_SQL_PASSWORD: ${{secrets.DOCKER_SQL_PASSWORD}}
           envkey_SQL_PORT: ${{secrets.DOCKER_SQL_PORT}}
           envkey_SQL_UI_PORT: ${{secrets.DOCKER_UI_PORT}}
-          directory: ./docker-compose
+          directory: docker-compose
           file_name: .env
           fail_on_empty: false
 
