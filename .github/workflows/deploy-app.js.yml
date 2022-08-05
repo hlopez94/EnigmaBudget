@@ -14,9 +14,8 @@ jobs:
   generate-env:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
       - name: Generar environment docker-compose
-        uses: SpicyPizza/create-envfile@v1.3
+      - uses: SpicyPizza/create-envfile@v1.3
         with:
           envkey_API_PORT: ${{secrets.DOCKER_API_PORT}}
           envkey_API_ENV: ${{secrets.DOCKER_API_ENVIRONMENT}}
