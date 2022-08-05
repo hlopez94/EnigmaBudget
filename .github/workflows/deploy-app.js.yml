@@ -33,6 +33,12 @@ jobs:
           file_name: .env
           fail_on_empty: true
 
+     - name: Cachear .env docker-compose
+       uses: actions/upload-artifact@v2
+       with:
+         name: dist-env-docker
+         path: docker-compose
+
   build-angular:
 
     runs-on: ubuntu-latest
@@ -101,6 +107,12 @@ jobs:
       - name: Build
         run: dotnet build --configuration Release --no-restore
 
+     - name: Cachear distribuibles .NET Core
+       uses: actions/upload-artifact@v2
+       with:
+         name: dist-netcore
+         path: webapi/EnigmaBudget/EnigmaBudget.WebApi/bin/Release/net6.0/
+
   deploy-to-server:
     needs: [generate-env, build-angular, build-api]
     runs-on: ubuntu-latest
@@ -128,6 +140,11 @@ jobs:
             mkdir -p ${{secrets.DEPLOY_PATH}}/www/ui
             mkdir -p ${{secrets.DEPLOY_PATH}}/api/bin
   
+      - name: Restaurar environment docker-compose
+        uses: actions/download-artifact@v2
+        with:
+          name: dist-env-docker
+          path: docker-compose
 
       - name: Copiar docker-compose
         run: rsync -avz -e "ssh -p ${{secrets.SSH_PORT}}" docker-compose ${{secrets.SSH_USER}}@${{secrets.SSH_HOST}}:${{secrets.DEPLOY_PATH}}
@@ -141,5 +158,11 @@ jobs:
       - name: Copiar archivos de UI con rsync
         run: rsync -avz -e "ssh -p ${{secrets.SSH_PORT}}" dist-angular ${{secrets.SSH_USER}}@${{secrets.SSH_HOST}}:${{secrets.DEPLOY_PATH}}/www/ui
   
+      - name: Restaurar distribuibles .NET
+        uses: actions/download-artifact@v2
+        with:
+          name: dist-netcore
+          path: dist-netcore
+
       - name: Copiar archivos de API con rsync
-        run: rsync -avz -e "ssh -p ${{secrets.SSH_PORT}}" webapi/EnigmaBudget/EnigmaBudget.WebApi/bin/Release/net6.0/ ${{secrets.SSH_USER}}@${{secrets.SSH_HOST}}:${{secrets.DEPLOY_PATH}}/api/bin
+        run: rsync -avz -e "ssh -p ${{secrets.SSH_PORT}}" dist-netcore ${{secrets.SSH_USER}}@${{secrets.SSH_HOST}}:${{secrets.DEPLOY_PATH}}/api/bin
