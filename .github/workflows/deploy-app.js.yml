@@ -1,7 +1,7 @@
 # This workflow will do a clean installation of node dependencies, cache/restore them, build the source code and run tests across different versions of node
 # For more information see: https://help.github.com/actions/language-and-framework-guides/using-nodejs-with-github-actions
 
-name: Node.js CI
+name: Despliegue a Server
 
 on:
   push:
@@ -9,13 +9,16 @@ on:
   pull_request:
     branches: [ "main" ]
   workflow_dispatch:
+
 jobs:
 
   generate-env:
+
     runs-on: ubuntu-latest
+
     steps:
       - name: Generar environment docker-compose
-      - uses: SpicyPizza/create-envfile@v1.3
+        uses: SpicyPizza/create-envfile@v1.3
         with:
           envkey_API_PORT: ${{secrets.DOCKER_API_PORT}}
           envkey_API_ENV: ${{secrets.DOCKER_API_ENVIRONMENT}}
@@ -29,43 +32,43 @@ jobs:
           fail_on_empty: false
 
   build-angular:
+
     runs-on: ubuntu-latest
 
     steps:
-
-    - uses: actions/checkout@v3
-    - name: Usar Node.js 16.x
-      uses: actions/setup-node@v3
-      with:
-        node-version: 16.x
-
-    - uses: pnpm/action-setup@v2.0.1
-      name: Instalar pnpm
-      id: pnpm-install
-      with:
-        version: 7
-        run_install: false
-
-    - name: Obtener directorio de almacenamiento pnpm
-      id: pnpm-cache
-      run: |
-        echo "::set-output name=pnpm_cache_dir::$(pnpm store path)"
-
-    - uses: actions/cache@v3
-      name: Configurar cache pnpm
-      with:
-        path: ${{ steps.pnpm-cache.outputs.pnpm_cache_dir }}
-        key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-        restore-keys: |
-          ${{ runner.os }}-pnpm-store-
-
-    - name: Instalar dependencias Angular
-      run: pnpm install
-      working-directory: ./webui/enigma-ui
-
-    - name: Compilar Angular
-      run: pnpm run build
-      working-directory: ./webui/enigma-ui
+     - uses: actions/checkout@v3
+     - name: Usar Node.js 16.x
+       uses: actions/setup-node@v3
+       with:
+         node-version: 16.x
+ 
+     - name: Instalar pnpm
+     - uses: pnpm/action-setup@v2.0.1
+       id: pnpm-install
+       with:
+         version: 7
+         run_install: false
+ 
+     - name: Obtener directorio de almacenamiento pnpm
+       id: pnpm-cache
+       run: |
+         echo "::set-output name=pnpm_cache_dir::$(pnpm store path)"
+ 
+     - uses: actions/cache@v3
+       name: Configurar cache pnpm
+       with:
+         path: ${{ steps.pnpm-cache.outputs.pnpm_cache_dir }}
+         key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+         restore-keys: |
+           ${{ runner.os }}-pnpm-store-
+ 
+     - name: Instalar dependencias Angular
+       run: pnpm install
+       working-directory: ./webui/enigma-ui
+ 
+     - name: Compilar Angular
+       run: pnpm run build
+       working-directory: ./webui/enigma-ui
       
   build-api:
 
@@ -80,6 +83,7 @@ jobs:
       - name: Install dependencies
         run: dotnet restore
         working-directory: ./webapi/EnigmaBudget
+
       - name: Build
         run: dotnet build --configuration Release --no-restore
         working-directory: ./webapi/EnigmaBudget
