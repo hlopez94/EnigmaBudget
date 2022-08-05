@@ -74,8 +74,6 @@ jobs:
     - name: Agregar Clientes Conocidos
       run: ssh-keyscan -p ${{secrets.SSH_PORT}} -H ${{secrets.SSH_HOST}}  >> ~/.ssh/known_hosts
 
-    - name: Copiar docker-compose
-      run: rsync -avz -e "ssh -p ${{secrets.SSH_PORT}}" ./docker-compose/ ${{secrets.SSH_USER}}@${{secrets.SSH_HOST}}:${{secrets.DEPLOY_PATH}}
 
     - name: Crear carpetas para despliegue si no existen 
       uses: D3rHase/ssh-command-action@{version}
@@ -89,6 +87,9 @@ jobs:
           mkdir -p ${{secrets.DEPLOY_PATH}}/www/ui
           mkdir -p ${{secrets.DEPLOY_PATH}}/api/bin
 
+    - name: Copiar docker-compose
+      run: rsync -avz -e "ssh -p ${{secrets.SSH_PORT}}" ./docker-compose/ ${{secrets.SSH_USER}}@${{secrets.SSH_HOST}}:${{secrets.DEPLOY_PATH}}
+      
     - name: Copiar archivos de UI con rsync
       run: rsync -avz -e "ssh -p ${{secrets.SSH_PORT}}" ./webui/enigma-ui/dist/enigma-ui/ ${{secrets.SSH_USER}}@${{secrets.SSH_HOST}}:${{secrets.DEPLOY_PATH}}/www/ui
 
