@@ -76,7 +76,7 @@ jobs:
 
 
     - name: Crear carpetas para despliegue si no existen 
-      uses: D3rHase/ssh-command-action@{version}
+      uses: D3rHase/ssh-command-action@0.2.1
       with:
         HOST: ${{secrets.SSH_HOST}}
         PORT: ${{secrets.SSH_PORT}}
@@ -89,7 +89,7 @@ jobs:
 
     - name: Copiar docker-compose
       run: rsync -avz -e "ssh -p ${{secrets.SSH_PORT}}" ./docker-compose/ ${{secrets.SSH_USER}}@${{secrets.SSH_HOST}}:${{secrets.DEPLOY_PATH}}
-      
+
     - name: Copiar archivos de UI con rsync
       run: rsync -avz -e "ssh -p ${{secrets.SSH_PORT}}" ./webui/enigma-ui/dist/enigma-ui/ ${{secrets.SSH_USER}}@${{secrets.SSH_HOST}}:${{secrets.DEPLOY_PATH}}/www/ui
 
