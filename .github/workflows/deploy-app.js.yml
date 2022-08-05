@@ -42,11 +42,12 @@ jobs:
         working-directory: webui/enigma-ui
     steps:
      - uses: actions/checkout@v3
+
      - name: Usar Node.js 16.x
        uses: actions/setup-node@v3
        with:
          node-version: 16.x
- 
+
      - name: Instalar pnpm
        uses: pnpm/action-setup@v2.0.1
        id: pnpm-install
@@ -73,6 +74,12 @@ jobs:
      - name: Compilar Angular
        run: pnpm run build
       
+     - name: Cachear distribuibles Angular
+       uses: actions/upload-artifact@v2
+       with:
+         name: dist-angular
+         path: webui/enigma-ui/dist
+
   build-api:
 
     runs-on: ubuntu-latest
@@ -121,9 +128,15 @@ jobs:
             mkdir -p ${{secrets.DEPLOY_PATH}}/www/ui
             mkdir -p ${{secrets.DEPLOY_PATH}}/api/bin
   
+
       - name: Copiar docker-compose
         run: rsync -avz -e "ssh -p ${{secrets.SSH_PORT}}" docker-compose ${{secrets.SSH_USER}}@${{secrets.SSH_HOST}}:${{secrets.DEPLOY_PATH}}
-  
+
+      - name: Restaurar distribuibles Angular
+        uses: actions/download-artifact@v2
+        with:
+          name: dist-angular
+
       - name: Copiar archivos de UI con rsync
         run: rsync -avz -e "ssh -p ${{secrets.SSH_PORT}}" webui/enigma-ui/dist ${{secrets.SSH_USER}}@${{secrets.SSH_HOST}}:${{secrets.DEPLOY_PATH}}/www/ui
   
