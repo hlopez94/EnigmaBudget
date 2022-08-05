@@ -86,7 +86,7 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: dist-angular
-          path: webui/enigma-ui/dist
+          path: webui/enigma-ui/dist/enigma-ui/
 
   build-api:
 
@@ -160,7 +160,7 @@ jobs:
           path: dist-angular
 
       - name: Copiar archivos de UI con rsync
-        run: rsync -avz -e "ssh -p ${{secrets.SSH_PORT}}" dist-angular ${{secrets.SSH_USER}}@${{secrets.SSH_HOST}}:${{secrets.DEPLOY_PATH}}/www/ui
+        run: rsync -avz -e "ssh -p ${{secrets.SSH_PORT}}" dist-angular/ ${{secrets.SSH_USER}}@${{secrets.SSH_HOST}}:${{secrets.DEPLOY_PATH}}/www/ui
   
       - name: Restaurar distribuibles .NET
         uses: actions/download-artifact@v2
@@ -169,4 +169,4 @@ jobs:
           path: dist-netcore
 
       - name: Copiar archivos de API con rsync
-        run: rsync -avz -e "ssh -p ${{secrets.SSH_PORT}}" dist-netcore ${{secrets.SSH_USER}}@${{secrets.SSH_HOST}}:${{secrets.DEPLOY_PATH}}/api/bin
+        run: rsync -avz -e "ssh -p ${{secrets.SSH_PORT}}" dist-netcore/ ${{secrets.SSH_USER}}@${{secrets.SSH_HOST}}:${{secrets.DEPLOY_PATH}}/api/bin
