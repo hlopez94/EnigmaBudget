@@ -74,5 +74,12 @@ jobs:
     - name: Agregar Clientes Conocidos
       run: ssh-keyscan -p ${{secrets.SSH_PORT}} -H ${{secrets.SSH_HOST}}  >> ~/.ssh/known_hosts
 
+    - name: Copiar docker-compose
+      run: rsync -avz -e "ssh -p ${{secrets.SSH_PORT}}" ./docker-compose/ ${{secrets.SSH_USER}}@${{secrets.SSH_HOST}}:${{secrets.DEPLOY_PATH}}
+      
     - name: Copiar archivos de UI con rsync
-      run: rsync -avz -e "ssh -p ${{secrets.SSH_PORT}}" ./webui/enigma-ui/dist/enigma-ui/ ${{secrets.SSH_USER}}@${{secrets.SSH_HOST}}:${{secrets.UI_DEPLOY_PATH}}
+      run: rsync -avz -e "ssh -p ${{secrets.SSH_PORT}}" ./webui/enigma-ui/dist/enigma-ui/ ${{secrets.SSH_USER}}@${{secrets.SSH_HOST}}:${{secrets.DEPLOY_PATH}}/www/ui
+
+    - name: Copiar archivos de API con rsync
+      run: rsync -avz -e "ssh -p ${{secrets.SSH_PORT}}" ./webapi/EnigmaBudget/EnigmaBudget.WebApi/bin/Release/net6.0/ ${{secrets.SSH_USER}}@${{secrets.SSH_HOST}}:${{secrets.DEPLOY_PATH}}/api/bin
+
