@@ -33,11 +33,11 @@ jobs:
           file_name: .env
           fail_on_empty: true
 
-     - name: Cachear .env docker-compose
-       uses: actions/upload-artifact@v2
-       with:
-         name: dist-env-docker
-         path: docker-compose
+      - name: Cachear .env docker-compose
+        uses: actions/upload-artifact@v2
+        with:
+          name: dist-env-docker
+          path: docker-compose
 
   build-angular:
 
