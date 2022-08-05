@@ -13,6 +13,7 @@ on:
 jobs:
 
   generate-env:
+
     environment: production
 
     runs-on: ubuntu-latest
@@ -46,45 +47,46 @@ jobs:
     defaults:
       run:
         working-directory: webui/enigma-ui
+
     steps:
-     - uses: actions/checkout@v3
-
-     - name: Usar Node.js 16.x
-       uses: actions/setup-node@v3
-       with:
-         node-version: 16.x
-
-     - name: Instalar pnpm
-       uses: pnpm/action-setup@v2.0.1
-       id: pnpm-install
-       with:
-         version: 7
-         run_install: false
+      - uses: actions/checkout@v3
  
-     - name: Obtener directorio de almacenamiento pnpm
-       id: pnpm-cache
-       run: |
-         echo "::set-output name=pnpm_cache_dir::$(pnpm store path)"
+      - name: Usar Node.js 16.x
+        uses: actions/setup-node@v3
+        with:
+          node-version: 16.x
  
-     - name: Configurar cache pnpm
-       uses: actions/cache@v3
-       with:
-         path: ${{ steps.pnpm-cache.outputs.pnpm_cache_dir }}
-         key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-         restore-keys: |
-           ${{ runner.os }}-pnpm-store-
- 
-     - name: Instalar dependencias Angular
-       run: pnpm install
- 
-     - name: Compilar Angular
-       run: pnpm run build
-      
-     - name: Cachear distribuibles Angular
-       uses: actions/upload-artifact@v2
-       with:
-         name: dist-angular
-         path: webui/enigma-ui/dist
+      - name: Instalar pnpm
+        uses: pnpm/action-setup@v2.0.1
+        id: pnpm-install
+        with:
+          version: 7
+          run_install: false
+  
+      - name: Obtener directorio de almacenamiento pnpm
+        id: pnpm-cache
+        run: |
+          echo "::set-output name=pnpm_cache_dir::$(pnpm store path)"
+  
+      - name: Configurar cache pnpm
+        uses: actions/cache@v3
+        with:
+          path: ${{ steps.pnpm-cache.outputs.pnpm_cache_dir }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+  
+      - name: Instalar dependencias Angular
+        run: pnpm install
+  
+      - name: Compilar Angular
+        run: pnpm run build
+       
+      - name: Cachear distribuibles Angular
+        uses: actions/upload-artifact@v2
+        with:
+          name: dist-angular
+          path: webui/enigma-ui/dist
 
   build-api:
 
@@ -107,11 +109,11 @@ jobs:
       - name: Build
         run: dotnet build --configuration Release --no-restore
 
-     - name: Cachear distribuibles .NET Core
-       uses: actions/upload-artifact@v2
-       with:
-         name: dist-netcore
-         path: webapi/EnigmaBudget/EnigmaBudget.WebApi/bin/Release/net6.0
+      - name: Cachear distribuibles .NET Core
+        uses: actions/upload-artifact@v2
+        with:
+          name: dist-netcore
+          path: webapi/EnigmaBudget/EnigmaBudget.WebApi/bin/Release/net6.0
 
   deploy-to-server:
 
