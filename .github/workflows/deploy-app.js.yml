@@ -82,11 +82,11 @@ jobs:
 
       - name: Install dependencies
         run: dotnet restore
-        working-directory: ./webapi/EnigmaBudget
+        working-directory: webapi/EnigmaBudget
 
       - name: Build
         run: dotnet build --configuration Release --no-restore
-        working-directory: ./webapi/EnigmaBudget
+        working-directory: webapi/EnigmaBudget
 
   prepare-deploy-server:
 
@@ -115,10 +115,10 @@ jobs:
             mkdir -p ${{secrets.DEPLOY_PATH}}/api/bin
   
       - name: Copiar docker-compose
-        run: rsync -avz -e "ssh -p ${{secrets.SSH_PORT}}" ./docker-compose/ ${{secrets.SSH_USER}}@${{secrets.SSH_HOST}}:${{secrets.DEPLOY_PATH}}
+        run: rsync -avz -e "ssh -p ${{secrets.SSH_PORT}}" docker-compose/ ${{secrets.SSH_USER}}@${{secrets.SSH_HOST}}:${{secrets.DEPLOY_PATH}}
   
       - name: Copiar archivos de UI con rsync
-        run: rsync -avz -e "ssh -p ${{secrets.SSH_PORT}}" ./webui/enigma-ui/dist/enigma-ui/ ${{secrets.SSH_USER}}@${{secrets.SSH_HOST}}:${{secrets.DEPLOY_PATH}}/www/ui
+        run: rsync -avz -e "ssh -p ${{secrets.SSH_PORT}}" webui/enigma-ui/dist/enigma-ui/ ${{secrets.SSH_USER}}@${{secrets.SSH_HOST}}:${{secrets.DEPLOY_PATH}}/www/ui
   
       - name: Copiar archivos de API con rsync
-        run: rsync -avz -e "ssh -p ${{secrets.SSH_PORT}}" ./webapi/EnigmaBudget/EnigmaBudget.WebApi/bin/Release/net6.0/ ${{secrets.SSH_USER}}@${{secrets.SSH_HOST}}:${{secrets.DEPLOY_PATH}}/api/bin
+        run: rsync -avz -e "ssh -p ${{secrets.SSH_PORT}}" webapi/EnigmaBudget/EnigmaBudget.WebApi/bin/Release/net6.0/ ${{secrets.SSH_USER}}@${{secrets.SSH_HOST}}:${{secrets.DEPLOY_PATH}}/api/bin
