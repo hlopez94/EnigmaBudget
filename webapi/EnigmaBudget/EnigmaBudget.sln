@@ -5,6 +5,8 @@ VisualStudioVersion = 17.3.32721.290
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EnigmaBudget.WebApi", "EnigmaBudget.WebApi\EnigmaBudget.WebApi.csproj", "{84186A58-96E0-4AFA-A533-B50036E2199E}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EnigmaBudget.Infrastructure", "EnigmaBudget.Infrastructure\EnigmaBudget.Infrastructure.csproj", "{C6826186-5B97-4B91-A958-295D0F36152C}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -15,6 +17,10 @@ Global
 		{84186A58-96E0-4AFA-A533-B50036E2199E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{84186A58-96E0-4AFA-A533-B50036E2199E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{84186A58-96E0-4AFA-A533-B50036E2199E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C6826186-5B97-4B91-A958-295D0F36152C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C6826186-5B97-4B91-A958-295D0F36152C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C6826186-5B97-4B91-A958-295D0F36152C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C6826186-5B97-4B91-A958-295D0F36152C}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
