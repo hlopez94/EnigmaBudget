@@ -110,7 +110,7 @@ jobs:
         run: openssl x509 -req -days 365 -extfile https.config -extensions v3_req -in csr.pem -signkey key.pem -out EnigmaBudget.WebApi.crt
 
       - name: Generar certificado en formato PFX
-        run: openssl pkcs12 -export -out EnigmaBudget.WebApi.pfx -inkey key.pem -in EnigmaBudget.WebApi.crt -password pass:${{API_CERT_PASS}}
+        run: openssl pkcs12 -export -out EnigmaBudget.WebApi.pfx -inkey key.pem -in EnigmaBudget.WebApi.crt -password pass:${{secrets.API_CERT_PASS}}
 
       - name: Cachear distribuibles .NET Core
         uses: actions/upload-artifact@v2
