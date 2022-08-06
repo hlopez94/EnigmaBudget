@@ -24,7 +24,7 @@ jobs:
         uses: SpicyPizza/create-envfile@v1.3
         with:
           envkey_API_PORT: ${{secrets.DOCKER_API_PORT}}
-          envkey_API_PORT: ${{secrets.DOCKER_API_HTTPS_PORT}}
+          envkey_API_HTTPS_PORT: ${{secrets.DOCKER_API_HTTPS_PORT}}
           envkey_API_ENV: ${{secrets.DOCKER_API_ENVIRONMENT}}
           envkey_API_CERT_PASS: ${{secrets.API_CERT_PASS}}
           envkey_SQL_ROOT_PASS: ${{secrets.DOCKER_SQL_ROOT_PASS}}
