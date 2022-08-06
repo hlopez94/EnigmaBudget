@@ -24,7 +24,9 @@ jobs:
         uses: SpicyPizza/create-envfile@v1.3
         with:
           envkey_API_PORT: ${{secrets.DOCKER_API_PORT}}
+          envkey_API_PORT: ${{secrets.DOCKER_API_HTTPS_PORT}}
           envkey_API_ENV: ${{secrets.DOCKER_API_ENVIRONMENT}}
+          envkey_API_CERT_PASS: ${{secrets.API_CERT_PASS}}
           envkey_SQL_ROOT_PASS: ${{secrets.DOCKER_SQL_ROOT_PASS}}
           envkey_SQL_USER: ${{secrets.DOCKER_SQL_USER}}
           envkey_SQL_USER_PASS: ${{secrets.DOCKER_SQL_PASSWORD}}
@@ -88,9 +90,39 @@ jobs:
           name: dist-angular
           path: webui/enigma-ui/dist/enigma-ui/
 
+  generate-api-certificate:
+
+    environment: production
+
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: docker-compose
+      
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Generar Clave Privada
+        run: openssl req -config https.config -new -out csr.pem
+
+      - name: Generar Certificado Auto Firmado
+        run: openssl x509 -req -days 365 -extfile https.config -extensions v3_req -in csr.pem -signkey key.pem -out EnigmaBudget.WebApi.crt
+
+      - name: Generar certificado en formato PFX
+        run: openssl pkcs12 -export -out EnigmaBudget.WebApi.pfx -inkey key.pem -in EnigmaBudget.WebApi.crt -password pass:${{API_CERT_PASS}}
+
+      - name: Cachear distribuibles .NET Core
+        uses: actions/upload-artifact@v2
+        with:
+          name: dist-api-cert
+          path: docker-compose
+      
   build-api:
 
     runs-on: ubuntu-latest
+
+    needs: [generate-api-certificate]   
 
     defaults:
       run:
@@ -103,10 +135,10 @@ jobs:
         with:
           dotnet-version: '6.x'
 
-      - name: Install dependencies
+      - name: Instalar dependencias de proyecto
         run: dotnet restore
 
-      - name: Build
+      - name: Compilar WebApi
         run: dotnet build --configuration Release --no-restore
 
       - name: Cachear distribuibles .NET Core
@@ -126,7 +158,7 @@ jobs:
       - name: Configurar Clave SSH
         uses: shimataro/ssh-key-action@v2
         with:
-          key: ${{ secrets.SSH_PRIVATE_KEY }} 
+          key: ${{secrets.SSH_PRIVATE_KEY}} 
           known_hosts: unnecessary
           
       - name: Agregar Clientes Conocidos
@@ -162,7 +194,7 @@ jobs:
       - name: Copiar archivos de UI con rsync
         run: rsync -avz -e "ssh -p ${{secrets.SSH_PORT}}" dist-angular/ ${{secrets.SSH_USER}}@${{secrets.SSH_HOST}}:${{secrets.DEPLOY_PATH}}/www/ui
   
-      - name: Restaurar distribuibles .NET
+      - name: Restaurar arctifact distribuibles .NET
         uses: actions/download-artifact@v2
         with:
           name: dist-netcore
@@ -170,6 +202,15 @@ jobs:
 
       - name: Copiar archivos de API con rsync
         run: rsync -avz -e "ssh -p ${{secrets.SSH_PORT}}" dist-netcore/ ${{secrets.SSH_USER}}@${{secrets.SSH_HOST}}:${{secrets.DEPLOY_PATH}}/api/bin
+
+      - name: Restaurar arctifact certificado API
+        uses: actions/upload-artifact@v2
+        with:
+          name: dist-api-cert
+          path: dist-api-cert
+
+      - name: Copiar archivos certificado API con rsync
+        run: rsync -avz -e "ssh -p ${{secrets.SSH_PORT}}" dist-api-cert/ ${{secrets.SSH_USER}}@${{secrets.SSH_HOST}}:${{secrets.DEPLOY_PATH}}/api/https
 
       - name: Volver a ejecutar docker-compose
         uses: D3rHase/ssh-command-action@v0.2.1
