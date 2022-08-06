@@ -204,7 +204,7 @@ jobs:
         run: rsync -avz -e "ssh -p ${{secrets.SSH_PORT}}" dist-netcore/ ${{secrets.SSH_USER}}@${{secrets.SSH_HOST}}:${{secrets.DEPLOY_PATH}}/api/bin
 
       - name: Restaurar arctifact certificado API
-        uses: actions/upload-artifact@v2
+        uses: actions/download-artifact@v2
         with:
           name: dist-api-cert
           path: dist-api-cert
