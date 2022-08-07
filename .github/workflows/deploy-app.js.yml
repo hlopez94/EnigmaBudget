@@ -188,7 +188,7 @@ jobs:
 
   deploy-a-server:
 
-    needs: [preparar-server, generar-docker-compose-env, build-angular, generar-imagen-docker-api]
+    needs: [preparar-server, generar-env-docker-compose, build-angular, generar-imagen-docker-api]
 
     runs-on: ubuntu-latest
 
