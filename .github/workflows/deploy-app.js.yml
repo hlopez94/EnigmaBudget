@@ -12,14 +12,60 @@ on:
 
 jobs:
 
-  generate-env:
+  generar-env-angular:
+    environment: production
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Crear json con environment
+        uses: jsdaniell/create-json@1.1.2
+        with:
+          name: "environment.json"
+          json: '{
+                  "apiUrl":"${{ANGULAR_ENV_API_URL}}"
+                 }'
+          dir: 'angular-env'
+
+      - name: Cachear .env angular
+          uses: actions/upload-artifact@v2
+          with:
+            name: dist-env-angular
+            path: angular-env
+
+  generar-env-api:
+    environment: production
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Crear json con environment
+        uses: jsdaniell/create-json@1.1.2
+        with:
+          name: "environment.json"
+          json: '{
+                    "MariaDB:ConnectionString": "Server=${{API_SQL_SERVER}};Port=${{DOCKER_SQL_PORT}};user=${{DOCKER_SQL_USER}};Password=${{DOCKER_SQL_PASSWORD}};Database=enigma",
+                    "Jwt:Issuer": "Enigma.WebApi",
+                    "Jwt:Audience": "${{API_JWT_AUDIENCE}}",
+                    "Jwt:Subject": "${{API_JWT_SUBJECT}}",
+                    "Jwt:Key": "${{API_JWT_KEY}}",
+                    "Cors:Origins": "${{API_CORS_ORIGINS}}"
+                 }'
+          dir: 'env-api'
+
+      - name: Cachear .env angular
+          uses: actions/upload-artifact@v2
+          with:
+            name: env-api
+            path: env-api
+
+  generar-env-docker-compose:
 
     environment: production
 
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
       - name: Generar environment docker-compose
         uses: SpicyPizza/create-envfile@v1.3
         with:
@@ -44,8 +90,11 @@ jobs:
 
   build-angular:
 
+    environment: production
+
     runs-on: ubuntu-latest
 
+    needs: [generate-env-angular]
     defaults:
       run:
         working-directory: webui/enigma-ui
@@ -84,78 +133,25 @@ jobs:
       - name: Compilar Angular
         run: pnpm run build
        
+      - name: Sumar environment angular
+          uses: actions/download-artifact@v2
+          with:
+            name: dist-env-angular
+            path: webui/enigma-ui/dist/enigma-ui/assets/environments/
+
       - name: Cachear distribuibles Angular
         uses: actions/upload-artifact@v2
         with:
           name: dist-angular
           path: webui/enigma-ui/dist/enigma-ui/
 
-  generate-api-certificate:
-
+  preparar-server:
     environment: production
 
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: docker-compose
-      
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-
-      - name: Generar Clave Privada
-        run: openssl req -config https.config -new -out csr.pem
-
-      - name: Generar Certificado Auto Firmado
-        run: openssl x509 -req -days 365 -extfile https.config -extensions v3_req -in csr.pem -signkey key.pem -out EnigmaBudget.WebApi.crt
-
-      - name: Generar certificado en formato PFX
-        run: openssl pkcs12 -export -out EnigmaBudget.WebApi.pfx -inkey key.pem -in EnigmaBudget.WebApi.crt -password pass:${{secrets.API_CERT_PASS}}
-
-      - name: Cachear distribuibles .NET Core
-        uses: actions/upload-artifact@v2
-        with:
-          name: dist-api-cert
-          path: docker-compose
-      
-  build-api:
-
-    runs-on: ubuntu-latest
-
-    needs: [generate-api-certificate]   
-
-    defaults:
-      run:
-        working-directory: webapi/EnigmaBudget
 
     steps:
       - uses: actions/checkout@v3
-      - name: Setup .NET Core SDK 6.x
-        uses: actions/setup-dotnet@v2
-        with:
-          dotnet-version: '6.x'
-
-      - name: Instalar dependencias de proyecto
-        run: dotnet restore
-
-      - name: Compilar WebApi
-        run: dotnet build --configuration Release --no-restore
-
-      - name: Cachear distribuibles .NET Core
-        uses: actions/upload-artifact@v2
-        with:
-          name: dist-netcore
-          path: webapi/EnigmaBudget/EnigmaBudget.WebApi/bin/Release/net6.0
-
-  deploy-to-server:
-
-    needs: [generate-env, build-angular, build-api]
-
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v3
-
       - name: Configurar Clave SSH
         uses: shimataro/ssh-key-action@v2
         with:
@@ -175,43 +171,73 @@ jobs:
           COMMAND: |
             mkdir -p ${{secrets.DEPLOY_PATH}}
             mkdir -p ${{secrets.DEPLOY_PATH}}/www/ui
-            mkdir -p ${{secrets.DEPLOY_PATH}}/api/bin
+            mkdir -p ${{secrets.DEPLOY_PATH}}/.tmp/enigmaapiproj
+
+  generar-env-api:
+    environment: production
+    
+
+  generar-imagen-docker-api:
+
+    environment: production
+
+    needs: [generar-env-api, preparar-server]
+
+    runs-on: ubuntu-latest
+
+    steps:
+      
+      - name: Copiar temporalmente proyecto de API con rsync
+        run: rsync -avz -e "ssh -p ${{secrets.SSH_PORT}}" webapi/EnigmaBudget/ ${{secrets.SSH_USER}}@${{secrets.SSH_HOST}}:${{secrets.DEPLOY_PATH}}/.tmp/enigmaapiproj
   
-      - name: Restaurar environment docker-compose
+      - name: Generar Imagen Docker
+        uses: D3rHase/ssh-command-action@v0.2.1
+        with:
+          HOST: ${{secrets.SSH_HOST}}
+          PORT: ${{secrets.SSH_PORT}}
+          USER: ${{secrets.SSH_USER}}
+          PRIVATE_SSH_KEY: ${{secrets.SSH_PRIVATE_KEY}}
+          COMMAND: |
+            cd ${{secrets.DEPLOY_PATH}}/.tmp/enigmaapiproj
+            docker build -t enigmabudgetapi ./
+      
+      - name: Limpiar temporal
+        uses: D3rHase/ssh-command-action@v0.2.1
+        with:
+          HOST: ${{secrets.SSH_HOST}}
+          PORT: ${{secrets.SSH_PORT}}
+          USER: ${{secrets.SSH_USER}}
+          PRIVATE_SSH_KEY: ${{secrets.SSH_PRIVATE_KEY}}
+          COMMAND: |
+            rm -f-r ${{secrets.DEPLOY_PATH}}/.tmp/
+
+  deploy-a-server:
+
+    needs: [preparar-server, generar-docker-compose-env, build-angular, generar-imagen-docker-api]
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - uses: actions/checkout@v3
+    
+      - name: Restaurar artifact docker-compose
         uses: actions/download-artifact@v2
         with:
           name: dist-env-docker
           path: docker-compose
 
-      - name: Copiar docker-compose
+      - name: Copiar docker-compose a Server
         run: rsync -avz -e "ssh -p ${{secrets.SSH_PORT}}" docker-compose/ ${{secrets.SSH_USER}}@${{secrets.SSH_HOST}}:${{secrets.DEPLOY_PATH}}
 
-      - name: Restaurar distribuibles Angular
+      - name: Restaurar artifact de distribuibles Angular
         uses: actions/download-artifact@v2
         with:
           name: dist-angular
           path: dist-angular
 
-      - name: Copiar archivos de UI con rsync
-        run: rsync -avz -e "ssh -p ${{secrets.SSH_PORT}}" dist-angular/ ${{secrets.SSH_USER}}@${{secrets.SSH_HOST}}:${{secrets.DEPLOY_PATH}}/www/ui
-  
-      - name: Restaurar arctifact distribuibles .NET
-        uses: actions/download-artifact@v2
-        with:
-          name: dist-netcore
-          path: dist-netcore
-
-      - name: Copiar archivos de API con rsync
-        run: rsync -avz -e "ssh -p ${{secrets.SSH_PORT}}" dist-netcore/ ${{secrets.SSH_USER}}@${{secrets.SSH_HOST}}:${{secrets.DEPLOY_PATH}}/api/bin
-
-      - name: Restaurar arctifact certificado API
-        uses: actions/download-artifact@v2
-        with:
-          name: dist-api-cert
-          path: dist-api-cert
-
-      - name: Copiar archivos certificado API con rsync
-        run: rsync -avz -e "ssh -p ${{secrets.SSH_PORT}}" dist-api-cert/ ${{secrets.SSH_USER}}@${{secrets.SSH_HOST}}:${{secrets.DEPLOY_PATH}}/api/bin
+      - name: Copiar distribuibles Angular a Server
+        run: rsync -avz -e "ssh -p ${{secrets.SSH_PORT}}" dist-angular/ ${{secrets.SSH_USER}}@${{secrets.SSH_HOST}}:${{secrets.DEPLOY_PATH}}/www/ui  
 
       - name: Volver a ejecutar docker-compose
         uses: D3rHase/ssh-command-action@v0.2.1

@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using EnigmaBudget.WebApi.Model;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace EnigmaBudget.WebApi.Controllers
@@ -9,16 +10,20 @@ namespace EnigmaBudget.WebApi.Controllers
     {
 
         private readonly ILogger<BaseController> _logger;
-
         public BaseController(ILogger<BaseController> logger)
         {
             _logger = logger;
         }
 
         [HttpGet()]
-        public string Get()
+        public ActionResult<ApiResponse<string>> Get()
         {
-            return "[200] OK";
+            var res = new ApiResponse<string>()
+            {
+                Ok = true,
+                Result = "Respuesta correcta"
+            };
+            return Ok(res);
         }
     }
 }
