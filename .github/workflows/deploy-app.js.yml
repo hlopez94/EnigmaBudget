@@ -196,8 +196,7 @@ jobs:
           PORT: ${{secrets.SSH_PORT}}
           USER: ${{secrets.SSH_USER}}
           PRIVATE_SSH_KEY: ${{secrets.SSH_PRIVATE_KEY}}
-          COMMAND: |
-            rm -f-r ${{secrets.DEPLOY_PATH}}/.tmp/
+          COMMAND: rm -f -r ${{secrets.DEPLOY_PATH}}/.tmp
 
   deploy-a-server:
 
