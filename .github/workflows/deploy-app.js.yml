@@ -16,6 +16,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - uses: actions/checkout@v3
       - name: Crear json con environment
         uses: jsdaniell/create-json@1.1.2
         with:
@@ -38,6 +39,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - uses: actions/checkout@v3
       - name: Generar environment docker-compose
         uses: SpicyPizza/create-envfile@v1.3
         with:
@@ -161,6 +163,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      
+      - uses: actions/checkout@v3
       
       - name: Copiar temporalmente proyecto de API con rsync
         run: rsync -avz -e "ssh -p ${{secrets.SSH_PORT}}" webapi/EnigmaBudget/ ${{secrets.SSH_USER}}@${{secrets.SSH_HOST}}:${{secrets.DEPLOY_PATH}}/.tmp/enigmaapiproj
