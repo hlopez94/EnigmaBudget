@@ -24,7 +24,7 @@ jobs:
           json: '{
                   "apiUrl": "${{secrets.ANGULAR_ENV_API_URL}}"
                  }'
-          dir: angular-env
+          dir: 'angular-env/'
 
       - name: Cachear .env angular
         uses: actions/upload-artifact@v2
