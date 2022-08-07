@@ -33,32 +33,6 @@ jobs:
           name: dist-env-angular
           path: angular-env
 
-  generar-env-api:
-    environment: production
-
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Crear json con environment
-        uses: jsdaniell/create-json@1.1.2
-        with:
-          name: "environment.json"
-          json: '{
-                    "MariaDB:ConnectionString": "Server=${{API_SQL_SERVER}};Port=${{DOCKER_SQL_PORT}};user=${{DOCKER_SQL_USER}};Password=${{DOCKER_SQL_PASSWORD}};Database=enigma",
-                    "Jwt:Issuer": "Enigma.WebApi",
-                    "Jwt:Audience": "${{API_JWT_AUDIENCE}}",
-                    "Jwt:Subject": "${{API_JWT_SUBJECT}}",
-                    "Jwt:Key": "${{API_JWT_KEY}}",
-                    "Cors:Origins": "${{API_CORS_ORIGINS}}"
-                 }'
-          dir: 'env-api'
-
-      - name: Cachear .env angular
-        uses: actions/upload-artifact@v2
-        with:
-          name: env-api
-          path: env-api
-
   generar-env-docker-compose:
 
     environment: production
@@ -78,6 +52,12 @@ jobs:
           envkey_SQL_USER_PASS: ${{secrets.DOCKER_SQL_PASSWORD}}
           envkey_SQL_PORT: ${{secrets.DOCKER_SQL_PORT}}
           envkey_UI_PORT: ${{secrets.DOCKER_UI_PORT}}
+          envkey_MariaDB:ConnectionString: "Server=${{API_SQL_SERVER}};Port=${{DOCKER_SQL_PORT}};user=${{DOCKER_SQL_USER}};Password=${{DOCKER_SQL_PASSWORD}};Database=enigma",
+          envkey_Jwt:Issuer: "Enigma.WebApi",
+          envkey_Jwt:Audience: "${{API_JWT_AUDIENCE}}",
+          envkey_Jwt:Subject: "${{API_JWT_SUBJECT}}",
+          envkey_Jwt:Key: "${{API_JWT_KEY}}",
+          envkey_Cors:Origins: "${{API_CORS_ORIGINS}}"
           directory: docker-compose
           file_name: .env
           fail_on_empty: true
@@ -172,16 +152,13 @@ jobs:
             mkdir -p ${{secrets.DEPLOY_PATH}}
             mkdir -p ${{secrets.DEPLOY_PATH}}/www/ui
             mkdir -p ${{secrets.DEPLOY_PATH}}/.tmp/enigmaapiproj
-
-  generar-env-api:
-    environment: production
-    
+   
 
   generar-imagen-docker-api:
 
     environment: production
 
-    needs: [generar-env-api, preparar-server]
+    needs: [preparar-server]
 
     runs-on: ubuntu-latest
 
