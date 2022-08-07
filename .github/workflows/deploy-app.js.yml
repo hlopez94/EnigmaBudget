@@ -21,7 +21,7 @@ jobs:
         with:
           name: "environment.json"
           json: '{
-                  "apiUrl":"${{ANGULAR_ENV_API_URL}}"
+                  "apiUrl": "${{secrets.ANGULAR_ENV_API_URL}}"
                  }'
           dir: 'angular-env'
 
@@ -50,12 +50,12 @@ jobs:
           envkey_SQL_USER_PASS: ${{secrets.DOCKER_SQL_PASSWORD}}
           envkey_SQL_PORT: ${{secrets.DOCKER_SQL_PORT}}
           envkey_UI_PORT: ${{secrets.DOCKER_UI_PORT}}
-          envkey_MariaDB:ConnectionString: Server=${{API_SQL_SERVER}};Port=${{DOCKER_SQL_PORT}};user=${{DOCKER_SQL_USER}};Password=${{DOCKER_SQL_PASSWORD}};Database=enigma
+          envkey_MariaDB:ConnectionString: Server=${{secrets.API_SQL_SERVER}};Port=${{secrets.DOCKER_SQL_PORT}};user=${{secrets.DOCKER_SQL_USER}};Password=${{secrets.DOCKER_SQL_PASSWORD}};Database=enigma
           envkey_Jwt:Issuer: "Enigma.WebApi"
-          envkey_Jwt:Audience: ${{API_JWT_AUDIENCE}}
-          envkey_Jwt:Subject: ${{API_JWT_SUBJECT}}
-          envkey_Jwt:Key: ${{API_JWT_KEY}}
-          envkey_Cors:Origins: ${{API_CORS_ORIGINS}}
+          envkey_Jwt:Audience: ${{secrets.API_JWT_AUDIENCE}}
+          envkey_Jwt:Subject: ${{secrets.API_JWT_SUBJECT}}
+          envkey_Jwt:Key: ${{secrets.API_JWT_KEY}}
+          envkey_Cors:Origins: ${{secrets.API_CORS_ORIGINS}}
           directory: docker-compose
           file_name: .env
           fail_on_empty: true
