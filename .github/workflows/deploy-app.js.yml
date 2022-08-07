@@ -166,6 +166,15 @@ jobs:
       
       - uses: actions/checkout@v3
       
+      - name: Configurar Clave SSH
+        uses: shimataro/ssh-key-action@v2
+        with:
+          key: ${{secrets.SSH_PRIVATE_KEY}} 
+          known_hosts: unnecessary
+          
+      - name: Agregar Clientes Conocidos
+        run: ssh-keyscan -p ${{secrets.SSH_PORT}} -H ${{secrets.SSH_HOST}}  >> ~/.ssh/known_hosts
+        
       - name: Copiar temporalmente proyecto de API con rsync
         run: rsync -avz -e "ssh -p ${{secrets.SSH_PORT}}" webapi/EnigmaBudget/ ${{secrets.SSH_USER}}@${{secrets.SSH_HOST}}:${{secrets.DEPLOY_PATH}}/.tmp/enigmaapiproj
   
