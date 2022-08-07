@@ -54,10 +54,10 @@ jobs:
           dir: 'env-api'
 
       - name: Cachear .env angular
-          uses: actions/upload-artifact@v2
-          with:
-            name: env-api
-            path: env-api
+        uses: actions/upload-artifact@v2
+        with:
+          name: env-api
+          path: env-api
 
   generar-env-docker-compose:
 
