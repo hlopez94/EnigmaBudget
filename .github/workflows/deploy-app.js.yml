@@ -72,7 +72,7 @@ jobs:
 
     runs-on: ubuntu-latest
 
-    needs: [generate-env-angular]
+    needs: [generar-env-angular]
     defaults:
       run:
         working-directory: webui/enigma-ui
