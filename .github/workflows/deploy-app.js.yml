@@ -191,7 +191,7 @@ jobs:
           PRIVATE_SSH_KEY: ${{secrets.SSH_PRIVATE_KEY}}
           COMMAND: |
             cd ${{secrets.DEPLOY_PATH}}/.tmp/enigmaapiproj
-            docker build -t enigmabudgetapi ./
+            docker build --no-cache -t enigmabudgetapi .
       
       - name: Limpiar temporal
         uses: D3rHase/ssh-command-action@v0.2.1
