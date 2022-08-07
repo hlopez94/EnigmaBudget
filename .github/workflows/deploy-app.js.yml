@@ -56,12 +56,12 @@ jobs:
           envkey_SQL_USER_PASS: ${{secrets.DOCKER_SQL_PASSWORD}}
           envkey_SQL_PORT: ${{secrets.DOCKER_SQL_PORT}}
           envkey_UI_PORT: ${{secrets.DOCKER_UI_PORT}}
-          envkey_MariaDB:ConnectionString: Server=${{secrets.API_SQL_SERVER}};Port=${{secrets.DOCKER_SQL_PORT}};user=${{secrets.DOCKER_SQL_USER}};Password=${{secrets.DOCKER_SQL_PASSWORD}};Database=enigma
-          envkey_Jwt:Issuer: "Enigma.WebApi"
-          envkey_Jwt:Audience: ${{secrets.API_JWT_AUDIENCE}}
-          envkey_Jwt:Subject: ${{secrets.API_JWT_SUBJECT}}
-          envkey_Jwt:Key: ${{secrets.API_JWT_KEY}}
-          envkey_Cors:Origins: ${{secrets.API_CORS_ORIGINS}}
+          envkey_MARIADB_CONNECTIONSTRING: Server=${{secrets.API_SQL_SERVER}};Port=${{secrets.DOCKER_SQL_PORT}};user=${{secrets.DOCKER_SQL_USER}};Password=${{secrets.DOCKER_SQL_PASSWORD}};Database=enigma
+          envkey_JWT_ISSUER: "Enigma.WebApi"
+          envkey_JWT_AUDIENCE: ${{secrets.API_JWT_AUDIENCE}}
+          envkey_JWT_SUBJECT: ${{secrets.API_JWT_SUBJECT}}
+          envkey_JWT_KEY: ${{secrets.API_JWT_KEY}}
+          envkey_CORS_ORIGINS: ${{secrets.API_CORS_ORIGINS}}
           directory: docker-compose
           file_name: .env
           fail_on_empty: true

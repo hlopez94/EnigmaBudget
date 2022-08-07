@@ -8,8 +8,12 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=${API_ENV}
       - ASPNETCORE_URLS=http://+
-    volumes:
-      - ./api/bin:/app
+      - Cors:Origins=${CORS_ORIGINS}
+      - MariaDB:ConnectionString=${MARIADB_CONNECTIONSTRING}
+      - Jwt:Issuer=${JWT_ISSUER}
+      - Jwt:Audience=${JWT_AUDIENCE}
+      - Jwt:Subject=${JWT_SUBJECT}
+      - Jwt:Key=${JWT_KEY}
     depends_on:
       - db
   db:
