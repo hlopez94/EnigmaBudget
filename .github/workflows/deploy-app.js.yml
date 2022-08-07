@@ -17,6 +17,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
+      - run: mkdir angular-env
       - name: Crear json con environment
         uses: jsdaniell/create-json@1.1.2
         with:
