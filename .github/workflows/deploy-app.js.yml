@@ -134,10 +134,10 @@ jobs:
         run: pnpm run build
        
       - name: Sumar environment angular
-          uses: actions/download-artifact@v2
-          with:
-            name: dist-env-angular
-            path: webui/enigma-ui/dist/enigma-ui/assets/environments/
+        uses: actions/download-artifact@v2
+        with:
+          name: dist-env-angular
+          path: webui/enigma-ui/dist/enigma-ui/assets/environments/
 
       - name: Cachear distribuibles Angular
         uses: actions/upload-artifact@v2
