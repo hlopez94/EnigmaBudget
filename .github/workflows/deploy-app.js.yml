@@ -22,7 +22,11 @@ jobs:
         with:
           name: "environment.json"
           json: '{
-                  "apiUrl": "${{secrets.ANGULAR_ENV_API_URL}}"
+                    "name": "prod",
+                    "production": true,
+                    "settings": {
+                                  "apiUrl": "${{secrets.ANGULAR_ENV_API_URL}}"
+                                }
                  }'
           dir: 'angular-env/'
 
