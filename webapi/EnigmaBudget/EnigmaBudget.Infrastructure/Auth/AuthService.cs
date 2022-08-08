@@ -55,8 +55,10 @@ namespace EnigmaBudget.Infrastructure.Auth
             string sql = "SELECT * FROM usuarios WHERE usu_usuario = @usuario AND usu_fecha_baja IS NULL";
 
 
+
             using (MySqlCommand cmd = new MySqlCommand(sql, _connection))
             {
+
                 cmd.Parameters.Add(new MySqlParameter("usuario", request.UserName));
 
                 _connection.Open();
@@ -82,6 +84,7 @@ namespace EnigmaBudget.Infrastructure.Auth
                     else
                     {
                         result.Reason = "No se encontró usuario con las credenciales brindadas";
+
                     }
                 }
                 _connection.Close();
@@ -114,6 +117,7 @@ namespace EnigmaBudget.Infrastructure.Auth
                 cmd.Parameters.AddWithValue("correo", signup.Email);
                 cmd.Parameters.AddWithValue("password", hash);
                 cmd.Parameters.AddWithValue("seed", seed);
+
                 try
                 {
                     cmd.ExecuteNonQuery();
@@ -298,6 +302,7 @@ namespace EnigmaBudget.Infrastructure.Auth
 
             _connection.Open();
             var transaction = _connection.BeginTransaction();
+            
             using (MySqlCommand cmd = new MySqlCommand(sql, _connection, transaction))
             {
                 cmd.Parameters.Add(new MySqlParameter("pass", hashedPass));
