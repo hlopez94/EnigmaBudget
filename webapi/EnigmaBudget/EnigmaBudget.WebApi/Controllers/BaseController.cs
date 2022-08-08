@@ -1,5 +1,5 @@
 ﻿using EnigmaBudget.WebApi.Model;
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace EnigmaBudget.WebApi.Controllers
@@ -19,11 +19,8 @@ namespace EnigmaBudget.WebApi.Controllers
         [HttpGet()]
         public ActionResult<ApiResponse<string>> Get()
         {
-            var res = new ApiResponse<string>()
-            {
-                Ok = true,
-                Result = "Respuesta correcta"
-            };
+            var res = new ApiResponse<string>(true, "Respuesta correcta");
+
             return Ok(res);
         }
     }

@@ -46,24 +46,18 @@ namespace EnigmaBudget.Infrastructure.Auth
         {
             LoginResponse result = new LoginResponse();
 
-            if (request == null || (request.Email == null && request.UserName == null))
-                return result;
-
-            string sql = String.Empty;
-            if (request.Email != null)
+            if (request == null || request.UserName == null)
             {
-                sql = "SELECT * FROM usuarios WHERE usu_correo = @email AND usu_fecha_baja IS NULL";
+                result.Reason = "Solicitud inválida";
+                return result;
             }
-            else
-                sql = "SELECT * FROM usuarios WHERE usu_usuario = @usuario AND usu_fecha_baja IS NULL";
+
+            string sql = "SELECT * FROM usuarios WHERE usu_usuario = @usuario AND usu_fecha_baja IS NULL";
 
 
             using (MySqlCommand cmd = new MySqlCommand(sql, _connection))
             {
-                if (request.Email != null)
-                    cmd.Parameters.Add(new MySqlParameter("email", request.Email));
-                else
-                    cmd.Parameters.Add(new MySqlParameter("usuario", request.UserName));
+                cmd.Parameters.Add(new MySqlParameter("usuario", request.UserName));
 
                 _connection.Open();
 
@@ -79,8 +73,15 @@ namespace EnigmaBudget.Infrastructure.Auth
                             result.UserName = entity.UserName;
 
                             result.JWT = GenerateJWT(entity);
-
                         }
+                        else
+                        {
+                            result.Reason = "Credenciales inválidas";
+                        }
+                    }
+                    else
+                    {
+                        result.Reason = "No se encontró usuario con las credenciales brindadas";
                     }
                 }
                 _connection.Close();
@@ -102,23 +103,49 @@ namespace EnigmaBudget.Infrastructure.Auth
             var sql = @"INSERT INTO usuarios (usu_usuario, usu_correo, usu_password, usu_seed) 
                         VALUES (@usuario, @correo, @password, @seed)";
 
-            using (MySqlCommand cmd = new MySqlCommand(sql, _connection))
+            var result = new SignUpResponse();
+
+            _connection.Open();
+
+            using (MySqlTransaction trx = _connection.BeginTransaction())
+            using (MySqlCommand cmd = new MySqlCommand(sql, _connection, trx))
             {
                 cmd.Parameters.AddWithValue("usuario", signup.UserName);
                 cmd.Parameters.AddWithValue("correo", signup.Email);
                 cmd.Parameters.AddWithValue("password", hash);
                 cmd.Parameters.AddWithValue("seed", seed);
-                _connection.Open();
-                cmd.ExecuteNonQuery();
-                _connection.Close();
+                try
+                {
+                    cmd.ExecuteNonQuery();
+                    trx.Commit();
+
+                    result.Email = signup.Email;
+                    result.SignedUp = true;
+                    result.UserName = signup.UserName;
+                }
+                catch (MySqlException e)
+                {
+                    if (e.Message.Contains("UNI_usuarios_usu_correo"))
+                    {
+                        result.Reason = "Ya existe una cuenta con el correo indicado.";
+                    }
+                    else if (e.Message.Contains("UNI_usuarios_usu_usuario"))
+                    {
+                        result.Reason = "Ya existe una cuenta con nombre de usuario indicado.";
+                    }
+                    else
+                    {
+                        throw;
+                    }
+                    trx.Rollback();
+                }
+                finally
+                {
+                    _connection.Close();
+                }
             }
 
-            return new SignUpResponse()
-            {
-                Email = signup.Email,
-                SignedUp = true,
-                UserName = signup.UserName
-            };
+            return result;
 
         }
 
@@ -271,7 +298,7 @@ namespace EnigmaBudget.Infrastructure.Auth
 
             _connection.Open();
             var transaction = _connection.BeginTransaction();
-            using (MySqlCommand cmd = new MySqlCommand(sql,_connection, transaction))
+            using (MySqlCommand cmd = new MySqlCommand(sql, _connection, transaction))
             {
                 cmd.Parameters.Add(new MySqlParameter("pass", hashedPass));
                 cmd.Parameters.Add(new MySqlParameter("seed", salt));

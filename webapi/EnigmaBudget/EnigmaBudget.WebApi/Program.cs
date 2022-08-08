@@ -1,8 +1,6 @@
 using EnigmaBudget.Infrastructure.Auth;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
-using Microsoft.OpenApi.Models;
 using MySqlConnector;
 using System.Text;
 
@@ -16,14 +14,14 @@ internal class Program
 
         var corsOrigins = configuration["Cors:Origins"];
 
-        builder.Services.AddCors(options =>
-        {
-            options.AddPolicy(name: "CorsPolicy",
-                              policy =>
-                              {
-                                  policy.WithOrigins(corsOrigins);
-                              });
-        });
+        //builder.Services.AddCors(options =>
+        //{
+        //    options.AddPolicy(name: "CorsPolicy",
+        //                      policy =>
+        //                      {
+        //                          policy.WithOrigins(corsOrigins);
+        //                      });
+        //});
         // Add services to the container.
 
         builder.Services.AddControllers();
@@ -35,7 +33,7 @@ internal class Program
 
         
         var app = builder.Build();
-        app.UseCors("CorsPolicy");
+        //app.UseCors("CorsPolicy");
 
         // Configure the HTTP request pipeline.
         if (app.Environment.IsDevelopment())
@@ -43,9 +41,6 @@ internal class Program
             app.UseSwagger();
             app.UseSwaggerUI();
         }
-
-
-        app.UseHttpsRedirection();
 
         app.UseAuthentication();
         app.UseAuthorization();

@@ -1,5 +1,6 @@
 ﻿using EnigmaBudget.Infrastructure.Auth;
 using EnigmaBudget.Infrastructure.Auth.Model;
+using EnigmaBudget.WebApi.Model;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -21,9 +22,11 @@ namespace EnigmaBudget.WebApi.Controllers
 
         [HttpPost("login")]
         [AllowAnonymous]
-        public LoginResponse Login(LoginRequest request)
+        public ApiResponse<LoginResponse> Login(LoginRequest request)
         {
-            return _authService.Login(request);
+            LoginResponse response = _authService.Login(request);
+
+            return new ApiResponse<LoginResponse>(response.LoggedIn, response);
         }
 
         [HttpPost("signup")]
