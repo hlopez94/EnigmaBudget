@@ -13,6 +13,7 @@ export interface LoginResponse {
   jwt: string;
   userName: string;
   email: string;
+  reason:string;
 }
 
 export interface LoginRequest {

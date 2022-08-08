@@ -2,7 +2,12 @@ import { Component, OnInit } from '@angular/core';
 import { FormControl, FormGroup, Validators } from '@angular/forms';
 import { AuthService, LoginRequest } from '../auth.service';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { ActivatedRoute, Params } from '@angular/router';
+import {
+  ActivatedRoute,
+  Params,
+  Router,
+  NavigationExtras,
+} from '@angular/router';
 @Component({
   selector: 'app-login',
   templateUrl: './login.component.html',
@@ -10,12 +15,15 @@ import { ActivatedRoute, Params } from '@angular/router';
 })
 export class LoginComponent implements OnInit {
   loginForm: FormGroup;
-  originUrl: string | undefined;
+
+  originUrl: string | null = null;
+  originParams: Params | null = null;
 
   constructor(
     private _authService: AuthService,
-    private _snackBar: MatSnackBar,
-    private _route: ActivatedRoute
+    private _route: ActivatedRoute,
+    private _router: Router,
+    private _snackBar: MatSnackBar
   ) {
     this.loginForm = new FormGroup({
       userName: new FormControl('', [
@@ -30,8 +38,13 @@ export class LoginComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    if (this._authService.isUserLoggedIn()) {
+      this._router.navigate(['profile']);
+    }
+
     this._route.queryParams.subscribe((params: Params) => {
-      this.originUrl = params['originUrl'];
+      this.originUrl = params['origin'] ?? '/';
+      this.originParams = JSON.parse(params['originParams']);
     });
   }
 
@@ -40,7 +53,15 @@ export class LoginComponent implements OnInit {
       this.loginForm.value as LoginRequest
     );
     if (resLogin.loggedIn) {
+      this._snackBar.open(`Bienvenido ${resLogin.userName}`, undefined, {
+        duration: 3000,
+      });
+      this._router.navigate([this.originUrl], {
+        queryParams: this.originParams,
+        queryParamsHandling: '',
+      });
     } else {
+      this._snackBar.open(resLogin.reason, undefined, { duration: 3000 });
     }
   }
 }
