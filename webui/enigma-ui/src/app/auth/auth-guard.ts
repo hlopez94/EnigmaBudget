@@ -11,11 +11,11 @@ import { AuthService } from './auth.service';
 export class AuthGuard implements CanActivate {
   constructor(private _authService: AuthService, private _router: Router) {}
 
-  canActivate(
+  async canActivate(
     route: ActivatedRouteSnapshot,
     state: RouterStateSnapshot
-  ): boolean {
-    if (this._authService.isUserLoggedIn()) {
+  ): Promise<boolean> {
+    if (this._authService.isUserLoggedInSync()) {
       return true;
     } else {
       this._router.navigate(['/login'], {

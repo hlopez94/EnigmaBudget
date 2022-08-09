@@ -38,7 +38,7 @@ export class LoginComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    if (this._authService.isUserLoggedIn()) {
+    if (this._authService.isUserLoggedInSync()) {
       this._router.navigate(['profile']);
     }
 

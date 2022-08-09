@@ -1,6 +1,6 @@
 import { HttpClient } from '@angular/common/http';
-import { Injectable } from '@angular/core';
-import { BehaviorSubject, firstValueFrom, Observable } from 'rxjs';
+import { Injectable, OnDestroy } from '@angular/core';
+import { BehaviorSubject, firstValueFrom, Observable, takeWhile, tap } from 'rxjs';
 import { environment } from 'src/environments/environment';
 
 export interface ApiResponse<T> {
@@ -13,7 +13,7 @@ export interface LoginResponse {
   jwt: string;
   userName: string;
   email: string;
-  reason:string;
+  reason: string;
 }
 
 export interface LoginRequest {
@@ -25,24 +25,26 @@ export interface LoginRequest {
   providedIn: 'root',
 })
 export class AuthService {
-  private _isUserLoggedIn: BehaviorSubject<boolean>;
 
-  isUserLoggedInObservable: Observable<boolean>;
+  private _IsUserLoggedIn: BehaviorSubject<boolean>;
+  public IsUserLoggedIn: Observable<boolean>;
 
-  userToken: string | null;
-  constructor(private _httpClient: HttpClient) {
-    this.userToken = localStorage.getItem('token');
-
-    this._isUserLoggedIn = new BehaviorSubject<boolean>(this.userToken != null);
-    this.isUserLoggedInObservable = this._isUserLoggedIn.asObservable();
+  isUserLoggedInSync(): boolean {
+    return this._IsUserLoggedIn.value;
   }
 
-  isUserLoggedIn(): boolean {
-    return this._isUserLoggedIn.value;
+  constructor(private _httpClient: HttpClient) {
+    this._IsUserLoggedIn = new BehaviorSubject<boolean>(false);
+    this.IsUserLoggedIn = this._IsUserLoggedIn.asObservable();
+
+    var token = localStorage.getItem('token');
+    if (token) {
+      this.setearToken(token);
+    }
   }
 
   async loginUserWithCredentials(
-   request:LoginRequest
+    request: LoginRequest
   ): Promise<LoginResponse> {
     var res = await firstValueFrom(
       this._httpClient.post<ApiResponse<LoginResponse>>(
@@ -52,15 +54,43 @@ export class AuthService {
     );
 
     if (res.result.loggedIn) {
-      localStorage.setItem('token', res.result.jwt);
-      this.userToken = res.result.jwt;
-      this._isUserLoggedIn.next(true);
+      this.setearToken(res.result.jwt);
     } else {
-      localStorage.removeItem('token');
-      this.userToken = null;
-      this._isUserLoggedIn.next(false);
+      this.limpiarToken();
     }
 
     return res.result;
+  }
+
+  public logout() {
+    this.limpiarToken();
+  }
+
+  private limpiarToken() {
+    localStorage.removeItem('token');
+    this._IsUserLoggedIn.next(false);
+  }
+
+  private setearToken(token: string) {
+    if (!this.tokenExpired(token)) {
+      localStorage.setItem('token', token);
+      this._IsUserLoggedIn.next(true);
+      this.programarVencimientoToken(token);
+    } else {
+      this.limpiarToken();
+    }
+  }
+
+  private programarVencimientoToken(token: string) {
+
+  }
+
+  private tokenExpirationDate(token: string): Date {
+    const expiryInSeconds = JSON.parse(atob(token.split('.')[1])).exp;
+    return new Date(expiryInSeconds * 1000);
+  }
+  private tokenExpired(token: string): boolean {
+    const expiryInSeconds = JSON.parse(atob(token.split('.')[1])).exp;
+    return Math.floor(new Date().getTime() / 1000) >= expiryInSeconds;
   }
 }
