@@ -1,15 +1,15 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace EnigmaBudget.Infrastructure.Auth.Responses
+﻿namespace EnigmaBudget.Infrastructure.Auth.Requests
 {
-    public class SignUpRequest
+    public class SignUpResponse
     {
         public string UserName { get; set; }
         public string Email { get; set; }
-        public string Password { get; set; }
+        public bool SignedUp { get; set; }
+        public string? Reason { get; set; }
+
+        public SignUpResponse()
+        {
+            SignedUp = false;
+        }
     }
 }

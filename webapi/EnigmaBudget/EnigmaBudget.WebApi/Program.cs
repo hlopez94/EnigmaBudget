@@ -1,71 +1,102 @@
 using EnigmaBudget.Infrastructure.Auth;
+using EnigmaBudget.WebApi.Configuration;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
 using MySqlConnector;
+using System.Reflection;
 using System.Text;
+using Serilog;
 
-internal class Program
+
+var builder = WebApplication.CreateBuilder(args);
+
+var configuration = builder.Configuration;
+
+var corsOrigins = configuration["Cors:Origins"];
+
+var logFile = builder.Configuration.GetValue<string>("ArchivoLogs");
+
+builder.Services.AddTransient(_ => new MySqlConnection(builder.Configuration["MariaDB:ConnectionString"]));
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
 {
-    private static void Main(string[] args)
+    options.RequireHttpsMetadata = false;
+    options.SaveToken = true;
+    options.TokenValidationParameters = new TokenValidationParameters()
     {
-        var builder = WebApplication.CreateBuilder(args);
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        ValidAudience = builder.Configuration["Jwt:Audience"],
+        ValidIssuer = builder.Configuration["Jwt:Issuer"],
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]))
+    };
 
-        // Add services to the container.
+});
 
-        builder.Services.AddControllers();
-        // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
-        builder.Services.AddEndpointsApiExplorer();
-        builder.Services.AddSwaggerGen();
-        builder.Services.AddHttpContextAccessor();
-        RegisterServices(builder);
 
-        var app = builder.Build();
-
-        if (app.Environment.IsDevelopment())
-        {
-            app.UseSwagger();
-            app.UseSwaggerUI();
-        }
-        
-        app.UseAuthentication();
-        app.UseAuthorization();
-
-        app.MapControllers();
-
-        app.UseCors(x => x.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
-
-        app.Run();
-    }
-
-    private static void RegisterServices(WebApplicationBuilder builder)
+builder.Services.AddSwaggerGen(option =>
+{
+    option.SwaggerDoc("v1", new OpenApiInfo { Title = "Enigma API", Version = "v1" });
+    option.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
-        builder.Services.AddTransient(_ => new MySqlConnection(builder.Configuration["MariaDB:ConnectionString"]));
+        In = ParameterLocation.Header,
+        Description = "Por favor, ingrese un token válido",
+        Name = "Authorization",
+        Type = SecuritySchemeType.Http,
+        BearerFormat = "JWT",
+        Scheme = "Bearer"
+    });
 
-        builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
+    option.AddSecurityRequirement(new OpenApiSecurityRequirement()
+{
+    {
+        new OpenApiSecurityScheme
         {
-            options.RequireHttpsMetadata = false;
-            options.SaveToken = true;
-            options.TokenValidationParameters = new TokenValidationParameters()
+            Reference = new OpenApiReference
             {
-                ValidateIssuer = true,
-                ValidateAudience = true,
-                ValidateLifetime = true,
-                ValidateIssuerSigningKey = true,
-                ValidAudience = builder.Configuration["Jwt:Audience"],
-                ValidIssuer = builder.Configuration["Jwt:Issuer"],
-                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]))
-            };
-            
-        });
-
-
-        builder.Services.AddSingleton<AuthServiceOptions>(_ => new AuthServiceOptions(
-            builder.Configuration["Jwt:Issuer"],
-            builder.Configuration["Jwt:Audience"],
-            builder.Configuration["Jwt:Subject"],
-            builder.Configuration["Jwt:Key"])
-            );
-
-        builder.Services.AddTransient<IAuthService, AuthService>();
+                Type = ReferenceType.SecurityScheme,
+                Id = "Bearer"
+            }
+        },
+        new string[] { }
     }
+});
+});
+
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddSingleton<AuthServiceOptions>(_ => new AuthServiceOptions(
+    builder.Configuration["Jwt:Issuer"],
+    builder.Configuration["Jwt:Audience"],
+    builder.Configuration["Jwt:Subject"],
+    builder.Configuration["Jwt:Key"])
+    );
+
+builder.Services.AddControllers();
+builder.Services.AddEndpointsApiExplorer();
+
+DependencyInjectionExtensions.RegisterAutoMappers(builder.Services);
+DependencyInjectionExtensions.RegisterRepositories(builder.Services);
+DependencyInjectionExtensions.RegisterApplicationServices(builder.Services);
+
+var app = builder.Build();
+app.UseCors("CorsPolicy");
+
+// Configure the HTTP request pipeline.
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
 }
+
+
+
+app.UseAuthorization();
+app.UseAuthentication();
+app.MapControllers();
+
+app.Run();
+

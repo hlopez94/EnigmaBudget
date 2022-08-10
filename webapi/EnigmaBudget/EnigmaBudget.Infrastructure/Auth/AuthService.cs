@@ -1,6 +1,8 @@
 ﻿using AutoMapper;
 using EnigmaBudget.Infrastructure.Auth.Entities;
 using EnigmaBudget.Infrastructure.Auth.Model;
+using EnigmaBudget.Infrastructure.Auth.Requests;
+using EnigmaBudget.Infrastructure.Auth.Responses;
 using Microsoft.AspNetCore.Http;
 using Microsoft.IdentityModel.Tokens;
 using MySqlConnector;
@@ -72,14 +74,13 @@ namespace EnigmaBudget.Infrastructure.Auth
                 {
                     if (reader.Read())
                     {
-                        UsuariosTable entity = ToEntity(reader);
-                        if (AreEqual(request.Password, entity.Password, entity.Salt))
+                        usuarios entity = _mapper.Map<DbDataReader, usuarios>(reader);
+                        if (AreEqual(request.Password, entity.usu_password, entity.usu_seed))
                         {
-                            result.LoggedIn = true;
-                            result.Email = entity.Correo;
-                            result.UserName = entity.UserName;
-
+                            result.Email = entity.usu_correo;
+                            result.UserName = entity.usu_usuario;
                             result.JWT = GenerateJWT(entity);
+                            result.LoggedIn = true;
                         }
                         else
                         {
@@ -159,15 +160,15 @@ namespace EnigmaBudget.Infrastructure.Auth
         }
 
 
-        private string GenerateJWT(UsuariosTable entity)
+        private string GenerateJWT(usuarios entity)
         {
             var claims = new[] {
                         new Claim(JwtRegisteredClaimNames.Sub, _configuration.Subject),
                         new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
                         new Claim(JwtRegisteredClaimNames.Iat, DateTime.UtcNow.ToString()),
-                        new Claim("user", entity.UserName),
-                        new Claim("email", entity.Correo),
-                        new Claim("id", entity.Id.ToString())
+                        new Claim("user", entity.usu_usuario),
+                        new Claim("email", entity.usu_correo),
+                        new Claim("id", new Guid(entity.usu_id).ToString())
                     };
 
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration.Key));
@@ -208,22 +209,6 @@ namespace EnigmaBudget.Infrastructure.Auth
             return newHashedPin.Equals(hashedInput);
         }
 
-        private UsuariosTable ToEntity(DbDataReader reader)
-        {
-
-            return new UsuariosTable()
-            {
-                Correo = reader.GetString("usu_correo"),
-                FechaAlta = reader.GetDateTime("usu_fecha_alta"),
-                FechaModificacion = reader.GetDateTime("usu_fecha_modif"),
-                FechaBaja = reader.IsDBNull("usu_fecha_baja") ? null : reader.GetDateTime("usu_fecha_baja"),
-                Id = reader.GetGuid("usu_id"),
-                Password = reader.GetString("usu_password"),
-                Salt = reader.GetString("usu_seed"),
-                UserName = reader.GetString("usu_usuario")
-            };
-        }
-
         public ProfileResponse GetProfile()
         {
 
@@ -231,11 +216,7 @@ namespace EnigmaBudget.Infrastructure.Auth
 
             return new ProfileResponse()
             {
-                Email = usu.Correo,
-                FechaAlta = usu.FechaAlta,
-                FechaModificacion = usu.FechaModificacion,
-                UserName = usu.UserName,
-                UUID = usu.Id.ToString()
+               
             };
         }
 
@@ -246,11 +227,11 @@ namespace EnigmaBudget.Infrastructure.Auth
             return Guid.Parse(identity!.Claims.First(c => c.Type == "id").Value);
         }
 
-        private Usuario GetUserById(Guid id)
+        private usuarios GetUserById(Guid id)
         {
             var sql = "SELECT * FROM usuarios WHERE usu_id = @id AND usu_fecha_baja IS NULL";
 
-            Usuario usuario = null;
+            usuarios usuario = null;
             using (MySqlCommand cmd = new MySqlCommand(sql, _connection))
             {
                 _connection.Open();
@@ -261,7 +242,7 @@ namespace EnigmaBudget.Infrastructure.Auth
                 {
                     if (reader.Read())
                     {
-                        usuario = _mapper.Map<MySqlDataReader, usuarios>(reader);
+                        usuario = _mapper.Map<DbDataReader, usuarios>(reader);
                     }
                 }
 
@@ -274,7 +255,7 @@ namespace EnigmaBudget.Infrastructure.Auth
         public ChangePasswordResponse ChangePassword(ChangePasswordRequest request)
         {
             Guid loggedInGuid = GetAuthenticatedId();
-            UsuariosTable loggedInInfo = GetUserById(loggedInGuid);
+            usuarios loggedInInfo = GetUserById(loggedInGuid);
 
             if (request.OldPassword.Equals(request.NewPassword))
             {
@@ -286,7 +267,7 @@ namespace EnigmaBudget.Infrastructure.Auth
 
             }
 
-            if (!AreEqual(request.OldPassword, loggedInInfo.Password, loggedInInfo.Salt))
+            if (!AreEqual(request.OldPassword, loggedInInfo.usu_password, loggedInInfo.usu_seed))
             {
                 return new ChangePasswordResponse()
                 {
@@ -307,7 +288,7 @@ namespace EnigmaBudget.Infrastructure.Auth
 
             _connection.Open();
             var transaction = _connection.BeginTransaction();
-            
+
             using (MySqlCommand cmd = new MySqlCommand(sql, _connection, transaction))
             {
                 cmd.Parameters.Add(new MySqlParameter("pass", hashedPass));
@@ -333,18 +314,5 @@ namespace EnigmaBudget.Infrastructure.Auth
 
             return response;
         }
-    }
-
-
-    internal class UsuariosTable
-    {
-        public Guid Id { get; set; }
-        public string UserName { get; set; }
-        public string Correo { get; set; }
-        public DateTime FechaAlta { get; set; }
-        public DateTime FechaModificacion { get; set; }
-        public DateTime? FechaBaja { get; set; }
-        public string Password { get; set; }
-        public string Salt { get; set; }
     }
 }
