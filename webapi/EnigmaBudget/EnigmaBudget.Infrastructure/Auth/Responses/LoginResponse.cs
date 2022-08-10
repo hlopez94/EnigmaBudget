@@ -1,4 +1,4 @@
-﻿namespace EnigmaBudget.Infrastructure.Auth.Model
+﻿namespace EnigmaBudget.Infrastructure.Auth.Responses
 {
     public class LoginResponse
     {
@@ -10,7 +10,7 @@
 
         public LoginResponse()
         {
-            this.LoggedIn = false;
+            LoggedIn = false;
         }
     }
 }

@@ -1,4 +1,6 @@
-﻿using EnigmaBudget.Infrastructure.Auth.Model;
+﻿using AutoMapper;
+using EnigmaBudget.Infrastructure.Auth.Entities;
+using EnigmaBudget.Infrastructure.Auth.Model;
 using Microsoft.AspNetCore.Http;
 using Microsoft.IdentityModel.Tokens;
 using MySqlConnector;
@@ -32,14 +34,17 @@ namespace EnigmaBudget.Infrastructure.Auth
         MySqlConnection _connection;
         AuthServiceOptions _configuration;
         IHttpContextAccessor _httpContextAccessor;
+        IMapper _mapper;
 
         public AuthService(IHttpContextAccessor httpContextAccessor,
+            IMapper mapper,
                             MySqlConnection connection,
                             AuthServiceOptions options)
         {
             _connection = connection;
             _configuration = options;
             _httpContextAccessor = httpContextAccessor;
+            _mapper = mapper;
         }
 
         public LoginResponse Login(LoginRequest request)
@@ -241,22 +246,22 @@ namespace EnigmaBudget.Infrastructure.Auth
             return Guid.Parse(identity!.Claims.First(c => c.Type == "id").Value);
         }
 
-        private UsuariosTable GetUserById(Guid id)
+        private Usuario GetUserById(Guid id)
         {
             var sql = "SELECT * FROM usuarios WHERE usu_id = @id AND usu_fecha_baja IS NULL";
 
-            UsuariosTable usuario = null;
+            Usuario usuario = null;
             using (MySqlCommand cmd = new MySqlCommand(sql, _connection))
             {
                 _connection.Open();
 
                 cmd.Parameters.Add(new MySqlParameter("id", (id.ToByteArray())));
 
-                using (var reader = cmd.ExecuteReader())
+                using (MySqlDataReader reader = cmd.ExecuteReader())
                 {
                     if (reader.Read())
                     {
-                        usuario = ToEntity(reader);
+                        usuario = _mapper.Map<MySqlDataReader, usuarios>(reader);
                     }
                 }
 

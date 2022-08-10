@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace EnigmaBudget.Infrastructure.Auth.Model
+namespace EnigmaBudget.Infrastructure.Auth.Responses
 {
     public class SignUpRequest
     {

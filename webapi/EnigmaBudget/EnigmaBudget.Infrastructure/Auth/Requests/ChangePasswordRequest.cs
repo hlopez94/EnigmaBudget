@@ -1,4 +1,4 @@
-﻿namespace EnigmaBudget.Infrastructure.Auth.Model
+﻿namespace EnigmaBudget.Infrastructure.Auth.Requests
 {
     public class ChangePasswordRequest
     {

@@ -1,0 +1,12 @@
+<button type="button" mat-icon-button title="Usuario" [matMenuTriggerFor]="authMenu"><mat-icon>user_circle</mat-icon></button>
+
+<mat-menu #authMenu>
+  <ng-container *authIsNotLoggedIn>
+    <menu mat-menu-item><mat-icon>person</mat-icon> Perfil</menu>
+    <menu mat-menu-item><mat-icon>logout</mat-icon> Cerrar Sesión</menu>
+  </ng-container>
+  <ng-container *authIsLoggedIn>
+    <menu mat-menu-item><mat-icon>login</mat-icon> Iniciar Sesión</menu>
+    <menu mat-menu-item><mat-icon>account_circle</mat-icon> Registrarse</menu>
+  </ng-container>
+</mat-menu>
