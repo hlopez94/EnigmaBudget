@@ -1,4 +1,5 @@
 ﻿using EnigmaBudget.Infrastructure.Auth;
+using EnigmaBudget.Infrastructure.Auth.Model;
 using EnigmaBudget.Infrastructure.Auth.Requests;
 using EnigmaBudget.Infrastructure.Auth.Responses;
 using EnigmaBudget.WebApi.Model;
@@ -32,10 +33,10 @@ namespace EnigmaBudget.WebApi.Controllers
 
         [HttpPost("signup")]
         [AllowAnonymous]
-        public ApiResponse<SignUpResponse> SignUp(SignUpRequest request)
+        public ApiResponse<SignUpInfo> SignUp(SignUpRequest request)
         {
             var res = _authService.SignUp(request);
-            return new ApiResponse<SignUpResponse>(true, res);
+            return new ApiResponse<SignUpInfo>(true, res);
         }
 
         [HttpGet("profile")]

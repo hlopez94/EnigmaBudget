@@ -2,11 +2,10 @@
 using EnigmaBudget.Infrastructure.Auth.Entities;
 using EnigmaBudget.Infrastructure.Auth.Model;
 using EnigmaBudget.Infrastructure.Auth.Requests;
-using EnigmaBudget.Infrastructure.Auth.Responses;
+using EnigmaBudget.Model.Model;
 using Microsoft.AspNetCore.Http;
 using Microsoft.IdentityModel.Tokens;
 using MySqlConnector;
-using System.Data;
 using System.Data.Common;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
@@ -49,19 +48,16 @@ namespace EnigmaBudget.Infrastructure.Auth
             _mapper = mapper;
         }
 
-        public LoginResponse Login(LoginRequest request)
+        public AppServiceResponse<LoginInfo> Login(LoginRequest request)
         {
-            LoginResponse result = new LoginResponse();
+            AppServiceResponse<LoginInfo> result;
 
             if (request == null || request.UserName == null)
             {
-                result.Reason = "Solicitud inválida";
-                return result;
+                return new AppServiceResponse<LoginInfo>("Solicitud Inválida", null);
             }
 
             string sql = "SELECT * FROM usuarios WHERE usu_usuario = @usuario AND usu_fecha_baja IS NULL";
-
-
 
             using (MySqlCommand cmd = new MySqlCommand(sql, _connection))
             {
@@ -75,21 +71,25 @@ namespace EnigmaBudget.Infrastructure.Auth
                     if (reader.Read())
                     {
                         usuarios entity = _mapper.Map<DbDataReader, usuarios>(reader);
+
                         if (AreEqual(request.Password, entity.usu_password, entity.usu_seed))
                         {
-                            result.Email = entity.usu_correo;
-                            result.UserName = entity.usu_usuario;
-                            result.JWT = GenerateJWT(entity);
-                            result.LoggedIn = true;
+                            result = new AppServiceResponse<LoginInfo>(
+                                new LoginInfo()
+                                {
+                                    Email = entity.usu_correo,
+                                    UserName = entity.usu_usuario,
+                                    JWT = GenerateJWT(entity)
+                                });
                         }
                         else
                         {
-                            result.Reason = "Credenciales inválidas";
+                            result = new AppServiceResponse<LoginInfo>("Credenciales inválidas", null);
                         }
                     }
                     else
                     {
-                        result.Reason = "No se encontró usuario con las credenciales brindadas";
+                        result = new AppServiceResponse<LoginInfo>("No se encontró usuario con las credenciales brindadas", null);
 
                     }
                 }
@@ -99,7 +99,7 @@ namespace EnigmaBudget.Infrastructure.Auth
             return result;
         }
 
-        public SignUpResponse SignUp(SignUpRequest signup)
+        public AppServiceResponse<SignUpInfo> SignUp(SignUpRequest signup)
         {
             var seed = CreateSalt();
             var hash = GenerateHash(signup.Password, seed);
@@ -112,7 +112,7 @@ namespace EnigmaBudget.Infrastructure.Auth
             var sql = @"INSERT INTO usuarios (usu_usuario, usu_correo, usu_password, usu_seed) 
                         VALUES (@usuario, @correo, @password, @seed)";
 
-            var result = new SignUpResponse();
+            AppServiceResponse<SignUpInfo> result;
 
             _connection.Open();
 
@@ -128,20 +128,19 @@ namespace EnigmaBudget.Infrastructure.Auth
                 {
                     cmd.ExecuteNonQuery();
                     trx.Commit();
-
-                    result.Email = signup.Email;
-                    result.SignedUp = true;
-                    result.UserName = signup.UserName;
+                    result = new AppServiceResponse<SignUpInfo>(new SignUpInfo() { Email = signup.Email, UserName = signup.UserName });
                 }
                 catch (MySqlException e)
                 {
+
+
                     if (e.Message.Contains("UNI_usuarios_usu_correo"))
                     {
-                        result.Reason = "Ya existe una cuenta con el correo indicado.";
+                        result = new AppServiceResponse<SignUpInfo>("Ya existe una cuenta con el correo indicado.", null);
                     }
                     else if (e.Message.Contains("UNI_usuarios_usu_usuario"))
                     {
-                        result.Reason = "Ya existe una cuenta con nombre de usuario indicado.";
+                        result = new AppServiceResponse<SignUpInfo>("Ya existe una cuenta con nombre de usuario indicado.", null);
                     }
                     else
                     {
@@ -209,15 +208,12 @@ namespace EnigmaBudget.Infrastructure.Auth
             return newHashedPin.Equals(hashedInput);
         }
 
-        public ProfileResponse GetProfile()
+        public AppServiceResponse<Perfil> GetProfile()
         {
 
             var usu = GetUserById(GetAuthenticatedId());
-
-            return new ProfileResponse()
-            {
-               
-            };
+            Perfil res = new Perfil();
+            return new AppServiceResponse<Perfil>(res);
         }
 
         private Guid GetAuthenticatedId()
@@ -252,28 +248,20 @@ namespace EnigmaBudget.Infrastructure.Auth
             return usuario;
         }
 
-        public ChangePasswordResponse ChangePassword(ChangePasswordRequest request)
+        public AppServiceResponse<bool> ChangePassword(ChangePasswordRequest request)
         {
             Guid loggedInGuid = GetAuthenticatedId();
             usuarios loggedInInfo = GetUserById(loggedInGuid);
 
             if (request.OldPassword.Equals(request.NewPassword))
             {
-                return new ChangePasswordResponse()
-                {
-                    IsPasswordChanged = false,
-                    Reason = "La nueva contraseña no puede ser igual a la anterior"
-                };
+                return new AppServiceResponse<bool>("La nueva contraseña no puede ser igual a la anterior", null);
 
             }
 
             if (!AreEqual(request.OldPassword, loggedInInfo.usu_password, loggedInInfo.usu_seed))
             {
-                return new ChangePasswordResponse()
-                {
-                    IsPasswordChanged = false,
-                    Reason = "La contraseña a cambiar no coincide"
-                };
+                return new AppServiceResponse<bool>("La contraseña a cambiar no coincide", null);
             }
 
             var sql = "UPDATE usuarios SET usu_password = @pass, usu_seed = @seed WHERE usu_id = @id";
@@ -281,38 +269,43 @@ namespace EnigmaBudget.Infrastructure.Auth
             string salt = CreateSalt();
             string hashedPass = GenerateHash(request.NewPassword, salt);
 
-            var response = new ChangePasswordResponse()
-            {
-                IsPasswordChanged = false
-            };
 
             _connection.Open();
             var transaction = _connection.BeginTransaction();
-
+            AppServiceResponse<bool> response;
             using (MySqlCommand cmd = new MySqlCommand(sql, _connection, transaction))
             {
                 cmd.Parameters.Add(new MySqlParameter("pass", hashedPass));
                 cmd.Parameters.Add(new MySqlParameter("seed", salt));
                 cmd.Parameters.Add(new MySqlParameter("id", loggedInGuid.ToByteArray()));
 
-                int rows = cmd.ExecuteNonQuery();
-
-                if (rows == 1)
+                try
                 {
-                    response.IsPasswordChanged = true;
-                    transaction.Commit();
+                    int rows = cmd.ExecuteNonQuery();
+                    if (rows == 1)
+                    {
+                        transaction.Commit();
+                        response = new AppServiceResponse<bool>(true);
+                    }
+                    else
+                    {
+                        transaction.Rollback();
+                        response = new AppServiceResponse<bool>("Error al cambiar la contraseña.", null);
+                    }
+
                 }
-                else
+                catch (Exception)
                 {
                     transaction.Rollback();
-                    response.Reason = "Error al cambiar la contraseña.";
+                    throw;
                 }
+                finally
+                {
+                    _connection.Close();
+                }
+                return response;
 
-
-                _connection.Close();
             }
-
-            return response;
         }
     }
 }

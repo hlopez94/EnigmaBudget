@@ -1,6 +1,12 @@
-﻿namespace EnigmaBudget.Infrastructure.Auth.Entities
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace EnigmaBudget.Infrastructure.Auth.Entities
 {
-    internal class usuario_prefil
+    internal class usuario_perfil
     {
         public byte[] usp_usu_id { get; set; }
         public string usp_nombre { get; set; }

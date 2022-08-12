@@ -1,11 +1,10 @@
 ﻿using AutoMapper;
 using EnigmaBudget.Infrastructure.Auth.Entities;
-using System;
 using System.Data.Common;
 
 namespace EnigmaBudget.Infrastructure.Auth.Mappings
 {
-    public class UsuarioMap : Profile
+    internal class UsuarioMap : Profile
     {
         public UsuarioMap()
         {
