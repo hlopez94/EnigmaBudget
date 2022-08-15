@@ -72,7 +72,7 @@
             },
             "development": {
               "browserTarget": "enigma-ui:build:development",
-              "port": 53310
+              "port": 4310
             }
           },
           "defaultConfiguration": "development"

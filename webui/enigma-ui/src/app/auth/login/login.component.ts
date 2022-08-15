@@ -49,19 +49,24 @@ export class LoginComponent implements OnInit {
   }
 
   async login() {
-    var resLogin = await this._authService.loginUserWithCredentials(
-      this.loginForm.value as LoginRequest
-    );
-    if (resLogin.loggedIn) {
-      this._snackBar.open(`Bienvenido ${resLogin.userName}`, undefined, {
-        duration: 3000,
-      });
-      this._router.navigate([this.originUrl], {
-        queryParams: this.originParams,
-        queryParamsHandling: '',
-      });
-    } else {
-      this._snackBar.open(resLogin.reason, undefined, { duration: 3000 });
+
+    try{
+
+      var resLogin = await this._authService.loginUserWithCredentials(
+        this.loginForm.value as LoginRequest
+        );
+        debugger;
+        this._snackBar.open(`Bienvenido ${resLogin.userName}`, undefined, {
+          duration: 3000,
+        });
+
+        this._router.navigate([this.originUrl], {
+          queryParams: this.originParams,
+          queryParamsHandling: '',
+        });
+      }
+    catch(err:any) {
+      this._snackBar.open(err.message, undefined, { duration: 3000 });
     }
   }
 }

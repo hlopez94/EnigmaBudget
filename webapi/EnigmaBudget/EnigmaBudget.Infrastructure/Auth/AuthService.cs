@@ -216,6 +216,17 @@ namespace EnigmaBudget.Infrastructure.Auth
             return new AppServiceResponse<Perfil>(res);
         }
 
+        public AppServiceResponse<bool> UpdateProfile(Perfil perfil)
+        {
+            Guid loggedUser = GetAuthenticatedId();
+            if(loggedUser == Guid.Empty)
+            {
+                throw new UnauthorizedAccessException();
+            }
+
+            throw new NotImplementedException();
+        }
+
         private Guid GetAuthenticatedId()
         {
             var user = _httpContextAccessor.HttpContext.User;

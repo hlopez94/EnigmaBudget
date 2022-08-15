@@ -6,6 +6,12 @@ import { environment } from 'src/environments/environment';
 export interface ApiResponse<T> {
   ok: boolean;
   result: T;
+  errorText:string;
+  errors: ApiError[];
+}
+
+export interface ApiError{
+
 }
 
 export interface LoginResponse {
@@ -52,11 +58,12 @@ export class AuthService {
         request
       )
     );
-
-    if (res.result.loggedIn) {
+debugger;
+    if (res.ok) {
       this.setearToken(res.result.jwt);
     } else {
       this.limpiarToken();
+      throw Error(res.errorText);
     }
 
     return res.result;

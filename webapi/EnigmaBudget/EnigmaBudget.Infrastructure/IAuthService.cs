@@ -1,6 +1,5 @@
 ﻿using EnigmaBudget.Infrastructure.Auth.Model;
 using EnigmaBudget.Infrastructure.Auth.Requests;
-using EnigmaBudget.Infrastructure.Auth.Responses;
 using EnigmaBudget.Model.Model;
 
 namespace EnigmaBudget.Infrastructure.Auth
@@ -12,6 +11,7 @@ namespace EnigmaBudget.Infrastructure.Auth
         AppServiceResponse<SignUpInfo> SignUp(SignUpRequest signup);
 
         AppServiceResponse<Perfil> GetProfile();
+        AppServiceResponse<bool> UpdateProfile(Perfil perfil);
 
         AppServiceResponse<bool> ChangePassword(ChangePasswordRequest request);
     }

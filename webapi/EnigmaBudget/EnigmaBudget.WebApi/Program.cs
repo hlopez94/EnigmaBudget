@@ -14,11 +14,14 @@ var builder = WebApplication.CreateBuilder(args);
 
 var configuration = builder.Configuration;
 
-var corsOrigins = configuration["Cors:Origins"];
-
 var logFile = builder.Configuration.GetValue<string>("ArchivoLogs");
 
 builder.Services.AddTransient(_ => new MySqlConnection(builder.Configuration["MariaDB:ConnectionString"]));
+
+builder.Services.AddCors(p => p.AddPolicy("enigmaapp", builder =>
+{
+    builder.WithOrigins("*").AllowAnyMethod().AllowAnyHeader();
+}));
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
 {
@@ -83,7 +86,6 @@ DependencyInjectionExtensions.RegisterRepositories(builder.Services);
 DependencyInjectionExtensions.RegisterApplicationServices(builder.Services);
 
 var app = builder.Build();
-app.UseCors("CorsPolicy");
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -93,7 +95,7 @@ if (app.Environment.IsDevelopment())
 }
 
 
-
+app.UseCors("enigmaapp");
 app.UseAuthorization();
 app.UseAuthentication();
 app.MapControllers();
