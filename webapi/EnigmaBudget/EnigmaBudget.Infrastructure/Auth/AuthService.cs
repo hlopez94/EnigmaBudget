@@ -212,19 +212,79 @@ namespace EnigmaBudget.Infrastructure.Auth
         {
 
             var usu = GetUserById(GetAuthenticatedId());
-            Perfil res = new Perfil();
-            return new AppServiceResponse<Perfil>(res);
+
+            var sql = @"SELECT * 
+                        FROM usuario_perfil 
+                        WHERE usp_usu_id = @id;";
+
+            Perfil perfil = new Perfil();
+
+            using (MySqlCommand cmd = new MySqlCommand(sql, _connection))
+            {
+                _connection.Open();
+
+                cmd.Parameters.Add(new MySqlParameter("id", (usu.usu_id)));
+
+                using (MySqlDataReader reader = cmd.ExecuteReader())
+                {
+                    if (reader.Read())
+                    {
+                        usuario_perfil entity = _mapper.Map<DbDataReader, usuario_perfil>(reader);
+                        perfil = _mapper.Map<usuario_perfil, Perfil>(entity);
+                    }
+                    perfil.Usuario = usu.usu_usuario;
+                    perfil.Correo = usu.usu_correo;
+                }
+
+                _connection.Close();
+            }
+
+            return new AppServiceResponse<Perfil>(perfil);
         }
 
         public AppServiceResponse<bool> UpdateProfile(Perfil perfil)
         {
             Guid loggedUser = GetAuthenticatedId();
-            if(loggedUser == Guid.Empty)
+
+            if (loggedUser == Guid.Empty)
             {
                 throw new UnauthorizedAccessException();
             }
 
-            throw new NotImplementedException();
+            byte[] loggedUserbbytearray = loggedUser.ToByteArray();
+
+            var sql = @"INSERT INTO enigma.usuario_perfil
+                            (usp_usu_id, usp_nombre, usp_fecha_nacimiento, usp_tel_cod_pais, usp_tel_cod_area, usp_tel_nro) 
+                            VALUES(@id, @nombre, @nacimiento, @telPais, @telArea, @telNumero)  ON DUPLICATE KEY UPDATE usp_usu_id=@idKey  ";
+
+            _connection.Open();
+
+            using (MySqlTransaction trx = _connection.BeginTransaction())
+            using (MySqlCommand cmd = new MySqlCommand(sql, _connection, trx))
+            {
+                try
+                {
+                    cmd.Parameters.AddWithValue("id", loggedUserbbytearray);
+                    cmd.Parameters.AddWithValue("idKey", loggedUserbbytearray);
+                    cmd.Parameters.AddWithValue("nombre", perfil.Nombre);
+                    cmd.Parameters.AddWithValue("nacimiento", perfil.FechaNacimiento);
+                    cmd.Parameters.AddWithValue("telPais", perfil.TelefonoCodigoPais);
+                    cmd.Parameters.AddWithValue("telArea", perfil.TelefonoCodigoArea);
+                    cmd.Parameters.AddWithValue("telNumero", perfil.TelefonoNumero);
+
+                    cmd.ExecuteNonQuery();
+                    trx.Commit();
+                }
+                catch (Exception)
+                {
+                    trx.Rollback();
+                    _connection.Close();
+                    throw;
+                }
+
+            }
+
+            return new AppServiceResponse<bool>(true);
         }
 
         private Guid GetAuthenticatedId()
@@ -257,6 +317,34 @@ namespace EnigmaBudget.Infrastructure.Auth
             }
 
             return usuario;
+        }
+
+        public AppServiceResponse<IEnumerable<Pais>> GetCountries()
+        {
+            List<Pais> result = new List<Pais>();
+
+            string sql = @"SELECT * FROM paises;";
+
+
+            using (MySqlCommand cmd = new MySqlCommand(sql, _connection))
+            {
+            _connection.Open();
+                using (MySqlDataReader reader = cmd.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        paises entity = _mapper.Map<DbDataReader, paises>(reader);
+                        result.Add(_mapper.Map<paises, Pais>(entity));
+                    }
+                }
+
+                _connection.Close();
+            }
+
+
+            return new AppServiceResponse<IEnumerable<Pais>>(result) ;
+
+
         }
 
         public AppServiceResponse<bool> ChangePassword(ChangePasswordRequest request)

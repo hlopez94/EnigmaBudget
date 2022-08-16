@@ -31,6 +31,7 @@
               "src/assets"
             ],
             "styles": [
+              "./node_modules/flag-icons/sass/flag-icons.scss",
               "src/theme.scss",
               "src/styles.scss"
             ],

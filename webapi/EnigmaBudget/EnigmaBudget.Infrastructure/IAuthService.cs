@@ -13,6 +13,8 @@ namespace EnigmaBudget.Infrastructure.Auth
         AppServiceResponse<Perfil> GetProfile();
         AppServiceResponse<bool> UpdateProfile(Perfil perfil);
 
+
+        AppServiceResponse<IEnumerable<Pais>> GetCountries();
         AppServiceResponse<bool> ChangePassword(ChangePasswordRequest request);
     }
 }

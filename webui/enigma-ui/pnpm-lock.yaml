@@ -16,6 +16,7 @@ specifiers:
   '@angular/router': ^14.1.1
   '@types/jasmine': ~3.10.0
   '@types/node': ^12.11.1
+  flag-icons: ^6.6.4
   jasmine-core: ~4.0.0
   karma: ~6.3.0
   karma-chrome-launcher: ~3.1.0
@@ -38,6 +39,7 @@ dependencies:
   '@angular/platform-browser': 14.1.1_dusuq6hcudnbixadvxsdwhkk7i
   '@angular/platform-browser-dynamic': 14.1.1_lnensrfox2wowsihtp7kwlgdve
   '@angular/router': 14.1.1_7za74gf63bgb4umkx3jzbhs5mu
+  flag-icons: 6.6.4
   rxjs: 7.5.6
   tslib: 2.4.0
   zone.js: 0.11.7
@@ -3743,6 +3745,10 @@ packages:
       locate-path: 5.0.0
       path-exists: 4.0.0
     dev: true
+
+  /flag-icons/6.6.4:
+    resolution: {integrity: sha512-hRRXKw3f5F2OCcDTOTXO0tc3ODqBx/ttA61V9mqy/hVbnFXzW+7tJMLQ+xd77+BXwdUzQAMLW2G4RZqqvaN3Mg==}
+    dev: false
 
   /flatted/3.2.6:
     resolution: {integrity: sha512-0sQoMh9s0BYsm+12Huy/rkKxVu4R1+r96YX5cG44rHV0pQ6iC3Q+mkoMFaGWObMFYQxCVT+ssG1ksneA2MI9KQ==}

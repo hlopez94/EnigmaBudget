@@ -1,43 +1,24 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, OnDestroy } from '@angular/core';
-import { BehaviorSubject, firstValueFrom, Observable, takeWhile, tap } from 'rxjs';
+import {
+  BehaviorSubject,
+  firstValueFrom,
+  Observable
+} from 'rxjs';
 import { environment } from 'src/environments/environment';
-
-export interface ApiResponse<T> {
-  ok: boolean;
-  result: T;
-  errorText:string;
-  errors: ApiError[];
-}
-
-export interface ApiError{
-
-}
-
-export interface LoginResponse {
-  loggedIn: boolean;
-  jwt: string;
-  userName: string;
-  email: string;
-  reason: string;
-}
-
-export interface LoginRequest {
-  userName: string;
-  password: string;
-}
+import { ApiResponse } from '../core/model/ApiResponse';
+import { LoginRequest } from './login/login-request';
+import { LoginResponse } from './model/login-response';
+import { Pais } from './model/pais';
+import { Profile } from './model/profile';
 
 @Injectable({
   providedIn: 'root',
 })
 export class AuthService {
-
   private _IsUserLoggedIn: BehaviorSubject<boolean>;
   public IsUserLoggedIn: Observable<boolean>;
 
-  isUserLoggedInSync(): boolean {
-    return this._IsUserLoggedIn.value;
-  }
 
   constructor(private _httpClient: HttpClient) {
     this._IsUserLoggedIn = new BehaviorSubject<boolean>(false);
@@ -49,6 +30,35 @@ export class AuthService {
     }
   }
 
+  isUserLoggedInSync(): boolean {
+    return this._IsUserLoggedIn.value;
+  }
+
+  async getProfile(): Promise<Profile> {
+    var res = await firstValueFrom(
+      this._httpClient.get<ApiResponse<Profile>>(
+        `${environment.settings.apiUrl}/user/profile`
+      )
+    );
+
+    if(res.result.fechaNacimiento )
+      res.result.fechaNacimiento = new Date(Date.parse(res.result.fechaNacimiento.toString()));
+      else res.result.fechaNacimiento=null;
+
+    return res.result;
+  }
+
+  async updateProfile(perfil: Profile): Promise<boolean> {
+    var res = await firstValueFrom(
+      this._httpClient.post<ApiResponse<boolean>>(
+        `${environment.settings.apiUrl}/user/profile`,
+        perfil
+      )
+    );
+
+    return res.result;
+  }
+
   async loginUserWithCredentials(
     request: LoginRequest
   ): Promise<LoginResponse> {
@@ -58,7 +68,7 @@ export class AuthService {
         request
       )
     );
-debugger;
+
     if (res.ok) {
       this.setearToken(res.result.jwt);
     } else {
@@ -73,6 +83,15 @@ debugger;
     this.limpiarToken();
   }
 
+  public async paises() : Promise<Pais[]>{
+    var res = await firstValueFrom(
+      this._httpClient.get<ApiResponse<Pais[]>>(
+        `${environment.settings.apiUrl}/user/countries`
+      )
+    );
+
+    return res.result;
+  }
   private limpiarToken() {
     localStorage.removeItem('token');
     this._IsUserLoggedIn.next(false);
@@ -88,9 +107,7 @@ debugger;
     }
   }
 
-  private programarVencimientoToken(token: string) {
-
-  }
+  private programarVencimientoToken(token: string) {}
 
   private tokenExpirationDate(token: string): Date {
     const expiryInSeconds = JSON.parse(atob(token.split('.')[1])).exp;

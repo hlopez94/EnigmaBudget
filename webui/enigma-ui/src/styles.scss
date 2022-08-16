@@ -12,3 +12,12 @@ html, body{
 button{
   padding:0.5em
 }
+
+
+.rotating-object:focus,
+.rotating-object:checked,
+.rotating-object:active,
+.rotating-object:future{
+  transform: rotate(360deg);
+  transition: transform 450ms ease-in-out;
+}

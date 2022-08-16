@@ -9,17 +9,29 @@ import { AuthGuard } from './auth-guard';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
-import { MatFormFieldModule } from '@angular/material/form-field';
+import {
+  MatFormFieldModule,
+  MAT_FORM_FIELD_DEFAULT_OPTIONS,
+} from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { ReactiveFormsModule } from '@angular/forms';
 import { MatSnackBarModule } from '@angular/material/snack-bar';
+import { MatSelectModule } from '@angular/material/select';
+import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatMenuModule } from '@angular/material/menu';
 import { AuthDropdownComponent } from './auth-dropdown/auth-dropdown.component';
-import { IsLoggedInDirective } from './directives/is-logged-in.directive';
-import { IsNotLoggedInDirective } from './directives/is-not-logged-in.directive';
+import { IfLoggedInDirective } from './directives/if-logged-in.directive';
+import { IfNotLoggedInDirective } from './directives/if-not-logged-in.directive';
 
 @NgModule({
-  declarations: [LoginComponent, SignupComponent, ProfileComponent, AuthDropdownComponent, IsLoggedInDirective, IsNotLoggedInDirective],
+  declarations: [
+    LoginComponent,
+    SignupComponent,
+    ProfileComponent,
+    AuthDropdownComponent,
+    IfLoggedInDirective,
+    IfNotLoggedInDirective
+  ],
   imports: [
     CommonModule,
     AuthRoutingModule,
@@ -31,8 +43,16 @@ import { IsNotLoggedInDirective } from './directives/is-not-logged-in.directive'
     MatFormFieldModule,
     MatSnackBarModule,
     MatMenuModule,
+    MatSelectModule,
+    MatAutocompleteModule,
   ],
-  providers: [AuthGuard],
-  exports: [AuthDropdownComponent,IsLoggedInDirective, IsNotLoggedInDirective],
+  providers: [
+    AuthGuard,
+    {
+      provide: MAT_FORM_FIELD_DEFAULT_OPTIONS,
+      useValue: { appearance: 'outline' },
+    },
+  ],
+  exports: [AuthDropdownComponent, IfLoggedInDirective, IfNotLoggedInDirective],
 })
 export class AuthModule {}

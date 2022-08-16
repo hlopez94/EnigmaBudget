@@ -59,5 +59,11 @@ namespace EnigmaBudget.WebApi.Controllers
             return _authService.ChangePassword(request);
 
         }
+
+        [HttpGet("countries")]
+        public AppServiceResponse<IEnumerable<Pais>> GetCountries()
+        {
+            return _authService.GetCountries();
+        }
     }
 }

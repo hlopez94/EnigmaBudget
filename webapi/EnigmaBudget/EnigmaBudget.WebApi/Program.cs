@@ -14,13 +14,13 @@ var builder = WebApplication.CreateBuilder(args);
 
 var configuration = builder.Configuration;
 
-var logFile = builder.Configuration.GetValue<string>("ArchivoLogs");
+var logFile = builder.Configuration.GetValue<string>("Logs:FileRoute");
 
 builder.Services.AddTransient(_ => new MySqlConnection(builder.Configuration["MariaDB:ConnectionString"]));
 
-builder.Services.AddCors(p => p.AddPolicy("enigmaapp", builder =>
+builder.Services.AddCors(p => p.AddPolicy("enigmaapp", corsBuilder =>
 {
-    builder.WithOrigins("*").AllowAnyMethod().AllowAnyHeader();
+    corsBuilder.WithOrigins(builder.Configuration["Cors:Origins"]).AllowAnyMethod().AllowAnyHeader();
 }));
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
@@ -44,6 +44,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
 builder.Services.AddSwaggerGen(option =>
 {
     option.SwaggerDoc("v1", new OpenApiInfo { Title = "Enigma API", Version = "v1" });
+
     option.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         In = ParameterLocation.Header,
@@ -71,6 +72,7 @@ builder.Services.AddSwaggerGen(option =>
 });
 
 builder.Services.AddHttpContextAccessor();
+
 builder.Services.AddSingleton<AuthServiceOptions>(_ => new AuthServiceOptions(
     builder.Configuration["Jwt:Issuer"],
     builder.Configuration["Jwt:Audience"],
@@ -96,8 +98,8 @@ if (app.Environment.IsDevelopment())
 
 
 app.UseCors("enigmaapp");
-app.UseAuthorization();
 app.UseAuthentication();
+app.UseAuthorization();
 app.MapControllers();
 
 app.Run();

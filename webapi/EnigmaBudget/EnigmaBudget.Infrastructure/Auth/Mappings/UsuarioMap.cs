@@ -4,7 +4,7 @@ using System.Data.Common;
 
 namespace EnigmaBudget.Infrastructure.Auth.Mappings
 {
-    internal class UsuarioMap : Profile
+    public  class UsuarioMap : Profile
     {
         public UsuarioMap()
         {
@@ -16,12 +16,13 @@ namespace EnigmaBudget.Infrastructure.Auth.Mappings
                 .ForMember(p => p.usu_seed, opt => opt.MapFrom(q => q["usu_seed"]))
                 .ForMember(p => p.usu_fecha_alta, opt => opt.MapFrom(q => q["usu_fecha_alta"]))
                 .ForMember(p => p.usu_fecha_modif, opt => opt.MapFrom(q => q["usu_fecha_modif"]))
-                .ForMember(p => p.usu_fecha_baja, opt => { 
-                                                            opt.MapFrom(q => q.IsDBNull(q.GetOrdinal("usu_fecha_baja")) ? default(DateTime?) : q["usu_fecha_baja"]); 
-                                                        })
+                .ForMember(p => p.usu_fecha_baja, opt =>
+                {
+                    opt.MapFrom(q => q.IsDBNull(q.GetOrdinal("usu_fecha_baja")) ? default(DateTime?) : q["usu_fecha_baja"]);
+                })
                 ;
         }
 
-        
+
     }
 }

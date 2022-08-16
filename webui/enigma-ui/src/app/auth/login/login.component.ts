@@ -1,16 +1,20 @@
 import { Component, OnInit } from '@angular/core';
 import { FormControl, FormGroup, Validators } from '@angular/forms';
-import { AuthService, LoginRequest } from '../auth.service';
+import { AuthService } from '../auth.service';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import {
-  ActivatedRoute,
-  Params,
-  Router,
-  NavigationExtras,
-} from '@angular/router';
+import { ActivatedRoute, Params, Router } from '@angular/router';
+import { MAT_FORM_FIELD_DEFAULT_OPTIONS } from '@angular/material/form-field';
+import { LoginRequest } from './login-request';
+
 @Component({
   selector: 'app-login',
   templateUrl: './login.component.html',
+  providers: [
+    {
+      provide: MAT_FORM_FIELD_DEFAULT_OPTIONS,
+      useValue: { appearance: 'outline' },
+    },
+  ],
   styleUrls: ['./login.component.scss'],
 })
 export class LoginComponent implements OnInit {
@@ -44,28 +48,26 @@ export class LoginComponent implements OnInit {
 
     this._route.queryParams.subscribe((params: Params) => {
       this.originUrl = params['origin'] ?? '/';
-      this.originParams = JSON.parse(params['originParams']);
+      if(params['originParams'])
+        this.originParams = JSON.parse(params['originParams']);
     });
   }
 
   async login() {
-
-    try{
-
+    try {
       var resLogin = await this._authService.loginUserWithCredentials(
         this.loginForm.value as LoginRequest
-        );
-        debugger;
-        this._snackBar.open(`Bienvenido ${resLogin.userName}`, undefined, {
-          duration: 3000,
-        });
+      );
 
-        this._router.navigate([this.originUrl], {
-          queryParams: this.originParams,
-          queryParamsHandling: '',
-        });
-      }
-    catch(err:any) {
+      this._snackBar.open(`Bienvenido ${resLogin.userName}`, undefined, {
+        duration: 3000,
+      });
+
+      this._router.navigate([this.originUrl], {
+        queryParams: this.originParams,
+        queryParamsHandling: '',
+      });
+    } catch (err: any) {
       this._snackBar.open(err.message, undefined, { duration: 3000 });
     }
   }
