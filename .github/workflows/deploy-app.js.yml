@@ -253,5 +253,5 @@ jobs:
       - name: Limpiar artifacts
         uses: geekyeggo/delete-artifact@v1
         with: |
-              dist-env-docker
-              dist-env-angular
+          dist-env-docker
+          dist-env-angular
