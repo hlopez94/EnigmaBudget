@@ -251,8 +251,7 @@ jobs:
             docker-compose up -d
             
       - name: Limpiar artifacts
-      # delete-artifact
-      - uses: geekyeggo/delete-artifact@v1
+        uses: geekyeggo/delete-artifact@v1
         with: |
               dist-env-docker
               dist-env-angular
