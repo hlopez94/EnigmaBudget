@@ -20,7 +20,7 @@ import { LoginRequest } from './login-request';
 export class LoginComponent implements OnInit {
   loginForm: FormGroup;
 
-  originUrl: string | null = null;
+  originUrl: string[] | string | null = null;
   originParams: Params | null = null;
 
   constructor(
@@ -48,7 +48,7 @@ export class LoginComponent implements OnInit {
 
     this._route.queryParams.subscribe((params: Params) => {
       this.originUrl = params['origin'] ?? '/';
-      if(params['originParams'])
+      if (params['originParams'])
         this.originParams = JSON.parse(params['originParams']);
     });
   }
@@ -58,16 +58,25 @@ export class LoginComponent implements OnInit {
       var resLogin = await this._authService.loginUserWithCredentials(
         this.loginForm.value as LoginRequest
       );
-
       this._snackBar.open(`Bienvenido ${resLogin.userName}`, undefined, {
         duration: 3000,
       });
 
-      this._router.navigate([this.originUrl], {
-        queryParams: this.originParams,
-        queryParamsHandling: '',
-      });
+     var urlPaths : string[]= [];
+     urlPaths.concat(this.originUrl!);
+
+      if (this.originUrl && this.originUrl.length > 0)
+        this._router.navigate(
+           urlPaths.concat(this.originUrl!),
+          {
+            queryParams: this.originParams,
+            queryParamsHandling: '',
+          }
+        );
+      else this._router.navigate(['/']);
     } catch (err: any) {
+      console.log(err);
+      console.log(this.originUrl);
       this._snackBar.open(err.message, undefined, { duration: 3000 });
     }
   }

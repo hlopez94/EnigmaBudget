@@ -12,13 +12,14 @@ DELIMITER ;
 
 CREATE TABLE enigma.usuarios (
 	usu_id BINARY(16) NOT NULL COMMENT 'ID Unico para el usuario',
-	usu_usuario varchar(100) NOT NULL COMMENT 'Nombre de usuario',
-	usu_correo varchar(100) NOT NULL COMMENT 'Correo asociado al Usuario',
-	usu_password varchar(256) NULL COMMENT 'Clave hasheada del usuario',
-	usu_seed varchar(64) NULL COMMENT 'Semilla de hasheo de la clave de usuario',
-    usu_fecha_alta datetime NOT NULL COMMENT  'Fecha de alta del usuario',
-    usu_fecha_modif datetime NOT NULL COMMENT  'Fecha de modificación del usuario',
-    usu_fecha_baja datetime NULL COMMENT  'Fecha de baja del usuario',
+	usu_usuario VARCHAR(100) NOT NULL COMMENT 'Nombre de usuario',
+	usu_correo VARCHAR(100) NOT NULL COMMENT 'Correo asociado al Usuario',
+	usu_password VARCHAR(256) NULL COMMENT 'Clave hasheada del usuario',
+	usu_seed VARCHAR(64) NULL COMMENT 'Semilla de hasheo de la clave de usuario',
+    usu_fecha_alta DATETIME NOT NULL COMMENT  'Fecha de alta del usuario',
+    usu_fecha_modif DATETIME NOT NULL COMMENT  'Fecha de modificación del usuario',
+    usu_fecha_baja DATETIME NULL COMMENT  'Fecha de baja del usuario',
+	usu_correo_validado BOOL DEFAULT 0 NOT NULL COMMENT 'Indica si el mail brindado por el usuario fue validado',
 	CONSTRAINT PK_usuarios PRIMARY KEY (usu_id)
 )
 COMMENT='Tabla con datos de usuarios';
@@ -389,6 +390,35 @@ INSERT INTO enigma.paises (pai_iso2,pai_iso3,pai_nombre,pai_nombre_int,pai_phone
 	 ('ZM','ZMB','Zambia','Zambia',260),
 	 ('ZW','ZWE','Zimbabue','Zimbabwe',263);
 
+CREATE TABLE enigma.usuarios_validacion_email (
+	uve_usu_id binary(16) NOT NULL,
+	uve_id INT auto_increment NOT NULL,
+	uve_fecha_alta datetime NOT NULL,
+	uve_fecha_baja datetime NOT NULL,
+	uve_salt varchar(64) NOT NULL,
+	uve_validado bool DEFAULT 0 NOT NULL,
+	CONSTRAINT usuarios_validacion_email_PK PRIMARY KEY (uve_id),
+	CONSTRAINT usuarios_validacion_email_FK FOREIGN KEY (uve_usu_id) REFERENCES enigma.usuarios(usu_id)
+)
+
+CREATE INDEX usuarios_validacion_email_uve_ID_IDX USING BTREE ON enigma.usuarios_validacion_email (uve_id);
+CREATE INDEX usuarios_validacion_email_uve_salt_IDX USING BTREE ON enigma.usuarios_validacion_email (uve_salt,uve_id);
+
+DELIMITER $$
+$$ CREATE TRIGGER trg_uve_upd
+AFTER UPDATE
+ON usuarios_validacion_email FOR EACH ROW
+BEGIN
+ 	IF (new.uve_validado)
+		UPDATE enigma.usuarios
+			SET usu.usu_correo = new.uve_nuevo_correo,
+			SET usu.usu_correo_validado = TRUE 
+		WHERE usu.usu_id = new.uve_usu_id;
+	END IF;
+	SET NEW.uve_fecha_baja = NOW();
+END;
+$$
+DELIMITER ;
 
 CALL enigma.sp_leveling_script_ejecutado(@script_version);
 SELECT CONCAT('BASE DE DATOS NIVELADA A VERSION ' , @script_version ) estado_ejecucion;

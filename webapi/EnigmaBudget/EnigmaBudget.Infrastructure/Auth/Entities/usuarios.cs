@@ -8,7 +8,7 @@ namespace EnigmaBudget.Infrastructure.Auth.Entities
 {
     internal class usuarios
     {
-        public byte[] usu_id { get; set; }
+        public long usu_id { get; set; }
         public string usu_usuario { get; set; }
         public string usu_correo { get; set; }
         public string usu_password { get; set; }

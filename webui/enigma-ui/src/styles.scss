@@ -10,7 +10,7 @@ html, body{
 }
 
 button{
-  padding:0.5em
+ // padding:0.5em
 }
 
 
@@ -20,4 +20,16 @@ button{
 .rotating-object:future{
   transform: rotate(360deg);
   transition: transform 450ms ease-in-out;
+}
+
+p mat-form-field {
+  width: 100%;
+}
+
+
+.mat-menu-item .mat-icon,
+.mat-button-wrapper .mat-icon
+{
+  height: unset;
+  width: unset;
 }

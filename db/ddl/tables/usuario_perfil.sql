@@ -1,6 +1,6 @@
 -- enigma.usuario_perfil definition
 CREATE TABLE enigma.usuario_perfil (
-	usp_usu_id binary(16) NOT NULL,
+	usp_usu_id BIGINT NOT NULL,
 	usp_nombre varchar(100) NULL,
 	usp_fecha_nacimiento DATE NULL,
 	usp_tel_cod_pais SMALLINT NULL,

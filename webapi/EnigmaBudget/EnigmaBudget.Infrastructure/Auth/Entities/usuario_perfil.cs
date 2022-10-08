@@ -8,7 +8,7 @@ namespace EnigmaBudget.Infrastructure.Auth.Entities
 {
     internal class usuario_perfil
     {
-        public byte[] usp_usu_id { get; set; }
+        public long usp_usu_id { get; set; }
         public string usp_nombre { get; set; }
         public DateTime? usp_fecha_nacimiento { get; set; }
 

@@ -1,5 +1,7 @@
 ﻿using AutoMapper;
+using EnigmaBudget.Infrastructure;
 using EnigmaBudget.Infrastructure.Auth;
+using EnigmaBudget.Infrastructure.SendInBlue;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.DataProtection.Repositories;
 using Microsoft.Extensions.DependencyInjection;
@@ -24,6 +26,7 @@ namespace EnigmaBudget.WebApi.Configuration
 
         public static IServiceCollection RegisterApplicationServices(this IServiceCollection services)
         {
+            services.AddTransient<IEmailApiService, SendInBlueEmailApiService>();
             services.AddTransient<IAuthService, AuthService>();
 
             return services;

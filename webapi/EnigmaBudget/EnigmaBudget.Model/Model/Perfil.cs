@@ -2,7 +2,7 @@
 {
     public class Perfil
     {
-        public Guid IdUnicoUsuario { get; set; }
+        public string IdUnicoUsuario { get; set; }
         public string Usuario { get; set; }
         public string Correo { get; set; }
 

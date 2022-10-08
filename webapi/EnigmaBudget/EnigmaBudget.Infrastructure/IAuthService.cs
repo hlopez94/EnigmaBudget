@@ -16,5 +16,7 @@ namespace EnigmaBudget.Infrastructure.Auth
 
         AppServiceResponse<IEnumerable<Pais>> GetCountries();
         AppServiceResponse<bool> ChangePassword(ChangePasswordRequest request);
+        AppServiceResponse<bool> ValidateEmail(string token);
+        AppServiceResponse<bool> ResendValidationEmail();
     }
 }

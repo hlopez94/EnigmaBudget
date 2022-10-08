@@ -34,6 +34,11 @@ export class AuthService {
     return this._IsUserLoggedIn.value;
   }
 
+  async verifyAccountMail(token: string): Promise<ApiResponse<boolean>>  {
+    return await firstValueFrom(this._httpClient.post<ApiResponse<boolean>>(`${environment.settings.apiUrl}/user/verify-email-account`, token))
+
+  }
+
   async getProfile(): Promise<Profile> {
     var res = await firstValueFrom(
       this._httpClient.get<ApiResponse<Profile>>(
@@ -116,5 +121,19 @@ export class AuthService {
   private tokenExpired(token: string): boolean {
     const expiryInSeconds = JSON.parse(atob(token.split('.')[1])).exp;
     return Math.floor(new Date().getTime() / 1000) >= expiryInSeconds;
+  }
+
+  public cuentaVerificada() : Boolean{
+    var token = localStorage.getItem('token');
+
+    if(token){
+      var parse = JSON.parse(atob(token.split('.')[1]));
+      console.log(parse);
+      var verificado : Boolean = parse['verified-account'] as Boolean;
+      console.log(verificado);
+      return verificado;
+    }
+
+    return false;
   }
 }

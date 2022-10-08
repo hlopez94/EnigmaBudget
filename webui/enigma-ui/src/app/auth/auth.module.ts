@@ -19,9 +19,12 @@ import { MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatSelectModule } from '@angular/material/select';
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatMenuModule } from '@angular/material/menu';
+import { MatDividerModule } from '@angular/material/divider';
 import { AuthDropdownComponent } from './auth-dropdown/auth-dropdown.component';
 import { IfLoggedInDirective } from './directives/if-logged-in.directive';
 import { IfNotLoggedInDirective } from './directives/if-not-logged-in.directive';
+import { UnverifiedAccountComponent } from './unverified-account/unverified-account.component';
+import { ValidateAccountComponent } from './validate-account/validate-account.component';
 
 @NgModule({
   declarations: [
@@ -30,7 +33,9 @@ import { IfNotLoggedInDirective } from './directives/if-not-logged-in.directive'
     ProfileComponent,
     AuthDropdownComponent,
     IfLoggedInDirective,
-    IfNotLoggedInDirective
+    IfNotLoggedInDirective,
+    UnverifiedAccountComponent,
+    ValidateAccountComponent
   ],
   imports: [
     CommonModule,
@@ -43,6 +48,7 @@ import { IfNotLoggedInDirective } from './directives/if-not-logged-in.directive'
     MatFormFieldModule,
     MatSnackBarModule,
     MatMenuModule,
+    MatDividerModule,
     MatSelectModule,
     MatAutocompleteModule,
   ],

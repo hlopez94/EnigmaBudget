@@ -1,4 +1,3 @@
-using EnigmaBudget.Infrastructure.Auth;
 using EnigmaBudget.WebApi.Configuration;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Configuration;
@@ -8,7 +7,9 @@ using MySqlConnector;
 using System.Reflection;
 using System.Text;
 using Serilog;
-
+using EnigmaBudget.Infrastructure.Auth.Model;
+using EnigmaBudget.Infrastructure.SendInBlue.Model;
+using EnigmaBudget.Infrastructure.Helpers;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -77,12 +78,20 @@ builder.Services.AddSingleton<AuthServiceOptions>(_ => new AuthServiceOptions(
     builder.Configuration["Jwt:Issuer"],
     builder.Configuration["Jwt:Audience"],
     builder.Configuration["Jwt:Subject"],
-    builder.Configuration["Jwt:Key"])
-    );
+    builder.Configuration["Jwt:Key"],
+    builder.Configuration["ValidacionCorreoTemplate:AppUrl"]
+    ));
+
+builder.Services.AddSingleton<SendInBlueOptions>(_ => new SendInBlueOptions(
+    builder.Configuration["SendInMail:ApiKey"],
+    builder.Configuration["SendInMail:Uri"],
+    builder.Configuration["ValidacionCorreoTemplate:Id"]
+    ));
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 
+EncodeDecodeHelper.Initialize(builder.Configuration);
 DependencyInjectionExtensions.RegisterAutoMappers(builder.Services);
 DependencyInjectionExtensions.RegisterRepositories(builder.Services);
 DependencyInjectionExtensions.RegisterApplicationServices(builder.Services);

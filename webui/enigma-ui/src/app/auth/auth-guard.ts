@@ -16,10 +16,26 @@ export class AuthGuard implements CanActivate {
     state: RouterStateSnapshot
   ): Promise<boolean> {
     if (this._authService.isUserLoggedInSync()) {
+      var noVerificado: Boolean = this._authService.cuentaVerificada();
+      if (!noVerificado) {
+        debugger;
+        this._router.navigate(['/unverified-account'], {
+          queryParams: {
+            origin: route.url,
+            originParams: JSON.stringify(route.queryParams ?? ''),
+          },
+          queryParamsHandling: 'merge',
+        });
+        return false;
+      }
+
       return true;
     } else {
       this._router.navigate(['/login'], {
-        queryParams: { origin: route.url, originParams: JSON.stringify(route.queryParams)},
+        queryParams: {
+          origin: route.url,
+          originParams: JSON.stringify(route.queryParams ?? ''),
+        },
         queryParamsHandling: 'merge',
       });
 

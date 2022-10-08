@@ -1,7 +1,7 @@
-<h1 class="mat-heading-1">Perfil de Usuario</h1>
 
 <form [formGroup]="perfilForm" *ngIf="perfil"  (ngSubmit)="submit()">
   <mat-card class="profile-form-card">
+    <h1 class="mat-heading-1">Perfil de Usuario</h1>
     <mat-card-header>
       <img matCardAvatar />
       <mat-card-title>{{perfil.usuario}}</mat-card-title>
@@ -49,19 +49,20 @@
             <input formControlName="telefonoNumero" type="tel" matInput placeholder="N° de celular sin 15"/>
           </mat-form-field>
       </div>
+      <p class="mat-caption" style="color: rgba(128, 128, 128, 0.50); text-align: end;">{{perfil.idUnicoUsuario}}</p>
     </mat-card-content>
-    <mat-card-actions align="end">
-      <button mat-raised-button color="accent" (click)="editar()" type="button" *ngIf="perfilForm.pristine">
+    <mat-card-actions style="display: flex">
+      <button mat-button color="accent" (click)="cambiarClave()" type="button" *ngIf="!perfilForm.enabled">
+        <mat-icon>key</mat-icon> Cambiar Contraseña
+      </button>
+      <span class="spacer"></span>
+      <button mat-raised-button color="accent" (click)="editar()" type="button" *ngIf="!perfilForm.enabled">
         <mat-icon>edit</mat-icon> Editar Perfil
       </button>
-      <button mat-raised-button color="accent" type="submit" *ngIf="perfilForm.touched" [disabled]="perfilForm.invalid">
+      <button mat-raised-button color="accent" type="submit" *ngIf="perfilForm.enabled" [disabled]="perfilForm.pristine || perfilForm.invalid">
         <mat-icon>save</mat-icon> Guardar
       </button>
     </mat-card-actions>
-
-    <div align="end">
-      <span class="mat-form-field-label">{{perfil.idUnicoUsuario}}</span>
-    </div>
 
   </mat-card>
 </form>

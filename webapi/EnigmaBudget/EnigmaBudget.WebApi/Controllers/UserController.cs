@@ -65,5 +65,18 @@ namespace EnigmaBudget.WebApi.Controllers
         {
             return _authService.GetCountries();
         }
+
+        [HttpGet("resend-verification")]
+        public AppServiceResponse<IEnumerable<Pais>> ReenviarVerificacion()
+        {
+            return _authService.GetCountries();
+        }
+
+
+        [HttpPost("verify-email-account")]
+        [AllowAnonymous]
+        public AppServiceResponse<bool> VerifyEmail([FromBody] string token) {
+            return _authService.ValidateEmail(token);
+        }
     }
 }
