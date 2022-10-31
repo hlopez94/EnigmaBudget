@@ -10,6 +10,7 @@ specifiers:
   '@angular/compiler-cli': ^14.1.1
   '@angular/core': ^14.1.1
   '@angular/forms': ^14.1.1
+  '@angular/localize': 14.1.1
   '@angular/material': 14.1.1
   '@angular/platform-browser': ^14.1.1
   '@angular/platform-browser-dynamic': ^14.1.1
@@ -45,9 +46,10 @@ dependencies:
   zone.js: 0.11.7
 
 devDependencies:
-  '@angular-devkit/build-angular': 14.1.1_se3bjzmu2qrjdfqocfoacz45xu
+  '@angular-devkit/build-angular': 14.1.1_i2gbjjpv3ountiscrj7ad7kzeu
   '@angular/cli': 14.1.1
   '@angular/compiler-cli': 14.1.1_gkf5pbxkkdsvyf5py7p5lqkrhu
+  '@angular/localize': 14.1.1_xwqfevt4uj6slzr5rwst5jboym
   '@types/jasmine': 3.10.6
   '@types/node': 12.20.55
   jasmine-core: 4.0.1
@@ -78,7 +80,7 @@ packages:
       - chokidar
     dev: true
 
-  /@angular-devkit/build-angular/14.1.1_se3bjzmu2qrjdfqocfoacz45xu:
+  /@angular-devkit/build-angular/14.1.1_i2gbjjpv3ountiscrj7ad7kzeu:
     resolution: {integrity: sha512-SlkWvTP6lrXOr5dOLtI56hSX7WuDznaUFHGfXpuwA+buiUgvigzO68VhKfsKn5I44J0PRpqXKPM7bxOXAOMe8Q==}
     engines: {node: ^14.15.0 || >=16.10.0, npm: ^6.11.0 || ^7.5.6 || >=8.0.0, yarn: '>= 1.13.0'}
     peerDependencies:
@@ -109,6 +111,7 @@ packages:
       '@angular-devkit/build-webpack': 0.1401.1_6rc575xxn4hngez2jk2zkyfdoi
       '@angular-devkit/core': 14.1.1
       '@angular/compiler-cli': 14.1.1_gkf5pbxkkdsvyf5py7p5lqkrhu
+      '@angular/localize': 14.1.1_xwqfevt4uj6slzr5rwst5jboym
       '@babel/core': 7.18.6
       '@babel/generator': 7.18.7
       '@babel/helper-annotate-as-pure': 7.18.6
@@ -364,6 +367,23 @@ packages:
       tslib: 2.4.0
     dev: false
 
+  /@angular/localize/14.1.1_xwqfevt4uj6slzr5rwst5jboym:
+    resolution: {integrity: sha512-SUGTDJYcJoSJWaFcG12njbfnFreZZRnEr3Rs211wD3VSu4UJXrpP1hx2M/FoaHLZkcgpSSfkg/QHLDLYJLRL9Q==}
+    engines: {node: ^14.15.0 || >=16.10.0}
+    hasBin: true
+    peerDependencies:
+      '@angular/compiler': 14.1.1
+      '@angular/compiler-cli': 14.1.1
+    dependencies:
+      '@angular/compiler': 14.1.1_@angular+core@14.1.1
+      '@angular/compiler-cli': 14.1.1_gkf5pbxkkdsvyf5py7p5lqkrhu
+      '@babel/core': 7.18.9
+      glob: 8.0.3
+      yargs: 17.5.1
+    transitivePeerDependencies:
+      - supports-color
+    dev: true
+
   /@angular/material/14.1.1_ewwflzlctbqwbqu4d3mbw2utoa:
     resolution: {integrity: sha512-HU83cgnAayItSXhyMdu1+edXj2DMjGXndvFicf300JtyliyjFmVzuM78O7hIJWLhT4Mohh/GkTlOSp4sc8xXhQ==}
     peerDependencies:
@@ -496,6 +516,29 @@ packages:
       - supports-color
     dev: true
 
+  /@babel/core/7.18.9:
+    resolution: {integrity: sha512-1LIb1eL8APMy91/IMW+31ckrfBM4yCoLaVzoDhZUKSM4cu1L1nIidyxkCgzPAgrC5WEz36IPEr/eSeSF9pIn+g==}
+    engines: {node: '>=6.9.0'}
+    dependencies:
+      '@ampproject/remapping': 2.2.0
+      '@babel/code-frame': 7.18.6
+      '@babel/generator': 7.18.10
+      '@babel/helper-compilation-targets': 7.18.9_@babel+core@7.18.9
+      '@babel/helper-module-transforms': 7.18.9
+      '@babel/helpers': 7.18.9
+      '@babel/parser': 7.18.10
+      '@babel/template': 7.18.10
+      '@babel/traverse': 7.18.10
+      '@babel/types': 7.18.10
+      convert-source-map: 1.8.0
+      debug: 4.3.4
+      gensync: 1.0.0-beta.2
+      json5: 2.2.1
+      semver: 6.3.0
+    transitivePeerDependencies:
+      - supports-color
+    dev: true
+
   /@babel/generator/7.18.10:
     resolution: {integrity: sha512-0+sW7e3HjQbiHbj1NeU/vN8ornohYlacAfZIaXhdoGweQqgcNy69COVciYYqEXJ/v+9OBA7Frxm4CVAuNqKeNA==}
     engines: {node: '>=6.9.0'}
@@ -550,6 +593,19 @@ packages:
     dependencies:
       '@babel/compat-data': 7.18.8
       '@babel/core': 7.18.6
+      '@babel/helper-validator-option': 7.18.6
+      browserslist: 4.21.3
+      semver: 6.3.0
+    dev: true
+
+  /@babel/helper-compilation-targets/7.18.9_@babel+core@7.18.9:
+    resolution: {integrity: sha512-tzLCyVmqUiFlcFoAPLA/gL9TeYrF61VLNtb+hvkuVaB5SUjW7jcfrglBIX1vUIoT7CLP3bBlIMeyEsIl2eFQNg==}
+    engines: {node: '>=6.9.0'}
+    peerDependencies:
+      '@babel/core': ^7.0.0
+    dependencies:
+      '@babel/compat-data': 7.18.8
+      '@babel/core': 7.18.9
       '@babel/helper-validator-option': 7.18.6
       browserslist: 4.21.3
       semver: 6.3.0

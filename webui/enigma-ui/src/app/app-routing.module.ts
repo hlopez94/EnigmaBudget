@@ -9,8 +9,28 @@ const routes: Routes = [
     component:HomeComponent
   },
   {
-    path:'test',
-    component:HomeComponent,
+    path:'tarjetas',
+    loadChildren: () => import('./tarjetas/tarjetas.module').then(m => m.TarjetasModule),
+    canActivate:[AuthGuard]
+  },
+  {
+    path:'cuentas',
+    loadChildren: () => import('./cuentas/cuentas.module').then(m => m.CuentasModule),
+    canActivate:[AuthGuard]
+  },
+  {
+    path:'reportes',
+    loadChildren: () => import('./reportes/reportes.module').then(m => m.ReportesModule),
+    canActivate:[AuthGuard]
+  },
+  {
+    path:'tarjetas',
+    loadChildren: () => import('./tarjetas/tarjetas.module').then(m => m.TarjetasModule),
+    canActivate:[AuthGuard]
+  },
+  {
+    path:'ahorros',
+    loadChildren: () => import('./ahorros/ahorros.module').then(m => m.AhorrosModule),
     canActivate:[AuthGuard]
   }
 ];

@@ -16,9 +16,20 @@
       "root": "",
       "sourceRoot": "src",
       "prefix": "app",
+      "i18n": {
+        "sourceLocale": "es-AR",
+        "locales": {
+          "en":{
+            "translation":"src/locale/messages.en.xlf",
+            "baseHref": "en"
+          }
+        }
+
+      },
       "architect": {
         "build": {
           "builder": "@angular-devkit/build-angular:browser",
+
           "options": {
             "outputPath": "dist/enigma-ui",
             "index": "src/index.html",

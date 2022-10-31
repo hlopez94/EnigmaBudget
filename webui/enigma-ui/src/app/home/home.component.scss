@@ -1,0 +1,25 @@
+.lista-cuentas {
+  display: flex;
+  padding: 0.5em;
+  flex-direction: row;
+  list-style: none;
+  justify-content: flex-start;
+  align-items: center;
+  overflow: auto;
+  overflow: -moz-scrollbars-none;
+  -ms-overflow-style: none;
+  ::-webkit-scrollbar { width: 0 !important };
+
+  li {
+    margin-right:0.5em;
+    margin-left:0.5em;
+
+    :first{
+      margin-left:0;
+    }
+
+    :last{
+      margin-right:0;
+    }
+  }
+}
