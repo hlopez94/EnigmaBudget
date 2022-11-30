@@ -21,7 +21,7 @@ namespace EnigmaBudget.WebApi.Controllers
             var res = new ApiResponse<string>()
             {
                 Ok = true,
-                Result = "Hola Giancito"
+                Result = "Hola Fran"
             };
             return Ok(res);
         }
