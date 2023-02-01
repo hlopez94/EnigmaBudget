@@ -248,12 +248,18 @@ $altTheme: (
 
 
 // Theme Init
-@include mat.all-component-themes($theme );
 
-.theme-alternate {
+@media (prefers-color-scheme: dark) {
   @include mat.all-component-themes($altTheme);
+  .theme-alternate {
+    @include mat.all-component-themes($theme);
+  }
 }
 
+@media (prefers-color-scheme: light) {
+  @include mat.all-component-themes($theme);
+
+}
 // Specific component overrides, pieces that are not in line with the general theming
 
 // Handle buttons appropriately, with respect to line-height
