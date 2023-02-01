@@ -1,12 +1,9 @@
 using EnigmaBudget.WebApi.Configuration;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using MySqlConnector;
-using System.Reflection;
 using System.Text;
-using Serilog;
 using EnigmaBudget.Infrastructure.Auth.Model;
 using EnigmaBudget.Infrastructure.SendInBlue.Model;
 using EnigmaBudget.Infrastructure.Helpers;
