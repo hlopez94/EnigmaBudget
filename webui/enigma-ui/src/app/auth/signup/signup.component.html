@@ -12,6 +12,7 @@
             required
             matInput
             type="text"
+            Title="Username"
             formControlName="userName"
             autocomplete="username"
           />
@@ -24,6 +25,7 @@
           <input
             required
             matInput
+            title="Email"
             type="email"
             formControlName="correo"
             autocomplete="username"
@@ -35,6 +37,7 @@
         <input
           required
           matInput
+          title="Password"
           type="password"
           autocomplete="new-password"
           formControlName="password"
@@ -46,6 +49,7 @@
         <input
           required
           matInput
+          title="Repeat password"
           type="password"
           autocomplete="new-password"
           formControlName="passwordrepeat"
@@ -54,24 +58,15 @@
     </mat-card-content>
 
     <mat-card-actions align="end">
-      <a
-        mat-button
-        color="default"
-        title="Registrar nuevo usuario"
-        type="button"
-        href="/signup"
-      >
-        REGISTRARSE
-      </a>
 
       <button
         mat-raised-button
         color="accent"
-        title="Iniciar Sesión"
+        title="Registrarse"
         type="submit"
         [disabled]="signupForm.invalid"
       >
-        INICIAR SESIÓN
+      REGISTRARSE
       </button>
     </mat-card-actions>
   </mat-card>

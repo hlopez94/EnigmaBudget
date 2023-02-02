@@ -143,8 +143,20 @@ $mat-dark-theme-background: (
   disabled-list-option:     $dark-bg-lighter-10,
 );
 
+@include mat.core();
+@include mat.all-component-typographies($fontConfig);
+
 // Compute font config
-@include mat.core($fontConfig);
+// TODO(v15): As of v15 mat.legacy-core no longer includes default typography styles.
+//  The following line adds:
+//    1. Default typography styles for all components
+//    2. Styles for typography hierarchy classes (e.g. .mat-headline-1)
+//  If you specify typography styles for the components you use elsewhere, you should delete this line.
+//  If you don't need the default component typographies but still want the hierarchy styles,
+//  you can delete this line and instead use:
+//    `@include mat.legacy-typography-hierarchy($fontConfig);`
+@include mat.all-legacy-component-typographies($fontConfig);
+@include mat.legacy-core();
 
 // Theme Config
 
@@ -222,7 +234,7 @@ $my-app-light-variants: (
   info: $my-app-light-info,
 );
 
-$theme: mat.define-light-theme(
+$light-theme: mat.define-light-theme(
   (color: (
     primary: $theme-primary,
     accent: $theme-accent,
@@ -237,7 +249,7 @@ $theme: mat.define-light-theme(
 );
 
 
-$altTheme: (
+$dark-theme: (
   primary: $theme-primary,
   accent: $theme-accent,
   warn: $theme-warn,
@@ -248,18 +260,15 @@ $altTheme: (
 
 
 // Theme Init
+@include mat.all-component-themes($light-theme);
+@include mat.all-legacy-component-themes($light-theme);
 
-@media (prefers-color-scheme: dark) {
-  @include mat.all-component-themes($altTheme);
-  .theme-alternate {
-    @include mat.all-component-themes($theme);
+.theme-alternate {
+    @include mat.all-component-themes($dark-theme);
+    @include mat.all-component-colors($dark-theme);
+    @include mat.all-legacy-component-colors($dark-theme);
   }
-}
 
-@media (prefers-color-scheme: light) {
-  @include mat.all-component-themes($theme);
-
-}
 // Specific component overrides, pieces that are not in line with the general theming
 
 // Handle buttons appropriately, with respect to line-height

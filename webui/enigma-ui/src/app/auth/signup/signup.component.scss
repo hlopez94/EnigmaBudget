@@ -1,0 +1,17 @@
+form{
+  max-width: 480px;
+  margin:auto;
+}
+
+mat-form-field{
+  width: 100%;
+}
+
+:host{
+  height: 100%;
+  display: block;
+}
+
+mat-form-field{
+  width: 100%;
+}
