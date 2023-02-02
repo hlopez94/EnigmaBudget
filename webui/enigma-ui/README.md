@@ -2,14 +2,6 @@
 
 This project was generated with [Angular CLI](https://github.com/angular/angular-cli) version 13.3.7.
 
-## Development server
-
-Run `ng serve` for a dev server. Navigate to `http://localhost:4200/`. The application will automatically reload if you change any of the source files.
-
-## Code scaffolding
-
-Run `ng generate component component-name` to generate a new component. You can also use `ng generate directive|pipe|service|class|guard|interface|enum|module`.
-
 ## Build
 
 Run `ng build` to build the project. The build artifacts will be stored in the `dist/` directory.
@@ -26,8 +18,18 @@ Run `ng e2e` to execute the end-to-end tests via a platform of your choice. To u
 
 To get more help on the Angular CLI use `ng help` or go check out the [Angular CLI Overview and Command Reference](https://angular.io/cli) page.
 
-## Creditos
-- [Flag-Icons](https://github.com/lipis/flag-icons): 
-    A curated collection of all country flags in SVG — plus the CSS for easier integration. See the demo.
     
+## Serve app with SSL
+To be able to test PWA features, you'll need to serve your app through a SSL connection. To do that, add your self-signed certificates which you must generate depending on your host operating system, on the folder *.\ssl*  named as follow:
+  - **cert.pem** with your public key 
+  - **cert.pem** with your private key
+  
+  Then serve your app with the command `ng serve --ssl` 
 
+  > On some systems you'll need to add your certificate as trusted for your web browsers to accept connections on the site
+
+## Credits
+- [Angular](https://github.com/angular/angular): 
+    The modern web developer’s platform.
+- [Flag-Icons](https://github.com/lipis/flag-icons): 
+    A curated collection of all country flags in SVG — plus the CSS for easier integration.

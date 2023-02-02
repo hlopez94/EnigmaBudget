@@ -1,7 +1,8 @@
 import { environment as defaultEnvironment } from './environment';
 
 export const environmentLoader = new Promise<any>((resolve, reject) => {
-  var xmlhttp = new XMLHttpRequest(),
+  if(defaultEnvironment.production){
+    var xmlhttp = new XMLHttpRequest(),
     method = 'GET',
     url = './assets/environments/environment.json';
     xmlhttp.open(method, url, true);
@@ -12,5 +13,6 @@ export const environmentLoader = new Promise<any>((resolve, reject) => {
         resolve(defaultEnvironment);
       }
     };
-  xmlhttp.send();
-});
+    xmlhttp.send();
+  }
+  });
