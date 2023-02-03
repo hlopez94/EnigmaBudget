@@ -1,5 +1,6 @@
 ﻿using AutoMapper;
 using EnigmaBudget.Infrastructure.Auth.Entities;
+using EnigmaBudget.Infrastructure.Auth.Helpers;
 using EnigmaBudget.Infrastructure.Auth.Model;
 using EnigmaBudget.Infrastructure.Auth.Requests;
 using EnigmaBudget.Infrastructure.Helpers;
@@ -63,7 +64,7 @@ namespace EnigmaBudget.Infrastructure.Auth
                     {
                         usuarios entity = _mapper.Map<DbDataReader, usuarios>(reader);
 
-                        if (AreEqual(request.Password, entity.usu_password, entity.usu_seed))
+                        if (entity.usu_password.HashedPasswordIsValid(request.Password, entity.usu_seed))
                         {
                             result = new AppServiceResponse<LoginInfo>(
                                 new LoginInfo()
@@ -175,7 +176,7 @@ namespace EnigmaBudget.Infrastructure.Auth
         private void CargarYEnviarValidacionEmail(usuarios usuario, string nuevoCorreo)
         {
 
-            var token = CreateSalt();
+            var token = HashHelper.CreateSalt();
 
             var sql = "INSERT INTO enigma.usuarios_validacion_email (uve_usu_id, uve_fecha_alta, uve_fecha_baja, uve_salt, uve_nuevo_correo) VALUES (@id, @alta, @baja, @salt, @correo)";
 
@@ -221,10 +222,10 @@ namespace EnigmaBudget.Infrastructure.Auth
 
         public AppServiceResponse<SignUpInfo> SignUp(SignUpRequest signup)
         {
-            var seed = CreateSalt();
-            var hash = GenerateHash(signup.Password, seed);
+            var seed = HashHelper.CreateSalt();
+            var hash = signup.Password.HashPassword(seed);
 
-            if (!AreEqual(signup.Password, hash, seed))
+            if (!hash.HashedPasswordIsValid(signup.Password, seed))
             {
                 throw new CryptographicException("Error al generar hash de password, no coinciden.");
             }
@@ -285,57 +286,6 @@ namespace EnigmaBudget.Infrastructure.Auth
             }
             return result;
 
-        }
-
-
-        private string GenerateJWT(usuarios entity)
-        {
-            var claims = new[] {
-                        new Claim(JwtRegisteredClaimNames.Sub, _configuration.Subject),
-                        new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-                        new Claim(JwtRegisteredClaimNames.Iat, DateTime.UtcNow.ToString()),
-                        new Claim(JwtRegisteredClaimNames.NameId, DateTime.UtcNow.ToString()),
-                        new Claim("user", entity.usu_usuario),
-                        new Claim("email", entity.usu_correo),
-                        new Claim("id", EncodeDecodeHelper.Encrypt(entity.usu_id.ToString())),
-                        new Claim("verified-account", entity.usu_correo_verificado.ToString().ToLower())
-                    };
-
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration.Key));
-            var signIn = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-            var token = new JwtSecurityToken(
-                _configuration.Issuer,
-                _configuration.Audience,
-                claims,
-                expires: DateTime.UtcNow.AddMinutes(360),
-                signingCredentials: signIn);
-
-            return new JwtSecurityTokenHandler().WriteToken(token);
-        }
-
-        private string CreateSalt()
-        {
-            //Generate a cryptographic random number.
-            RandomNumberGenerator rng = RandomNumberGenerator.Create();
-            byte[] buff = new byte[16];
-            rng.GetBytes(buff);
-            return Convert.ToBase64String(buff);
-        }
-
-        private string GenerateHash(string input, string salt)
-        {
-            byte[] bytes = Encoding.UTF8.GetBytes(input + salt);
-
-            SHA256.Create();
-            SHA256 sHA256ManagedString = SHA256.Create();
-            byte[] hash = sHA256ManagedString.ComputeHash(bytes);
-            return Convert.ToBase64String(hash);
-        }
-
-        private bool AreEqual(string plainTextInput, string hashedInput, string salt)
-        {
-            string newHashedPin = GenerateHash(plainTextInput, salt);
-            return newHashedPin.Equals(hashedInput);
         }
 
         public AppServiceResponse<Perfil> GetProfile()
@@ -495,18 +445,17 @@ namespace EnigmaBudget.Infrastructure.Auth
             if (request.OldPassword.Equals(request.NewPassword))
             {
                 return new AppServiceResponse<bool>("La nueva contraseña no puede ser igual a la anterior", null);
-
             }
 
-            if (!AreEqual(request.OldPassword, loggedInInfo.usu_password, loggedInInfo.usu_seed))
+            if (!loggedInInfo.usu_password.HashedPasswordIsValid(request.OldPassword, loggedInInfo.usu_seed))
             {
                 return new AppServiceResponse<bool>("La contraseña a cambiar no coincide", null);
             }
 
             var sql = "UPDATE usuarios SET usu_password = @pass, usu_seed = @seed WHERE usu_id = @id";
 
-            string salt = CreateSalt();
-            string hashedPass = GenerateHash(request.NewPassword, salt);
+            string salt = HashHelper.CreateSalt();
+            string hashedPass = request.NewPassword.HashPassword(salt);
 
 
             _connection.Open();
@@ -545,6 +494,35 @@ namespace EnigmaBudget.Infrastructure.Auth
                 return response;
 
             }
+        }
+
+        private string GenerateJWT(usuarios entity, List<string>? roles = null)
+        {
+            var claims = new List<Claim>() {
+                        new Claim(JwtRegisteredClaimNames.Sub, _configuration.Subject),
+                        new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+                        new Claim(JwtRegisteredClaimNames.Iat, DateTime.UtcNow.ToString()),
+                        new Claim(JwtRegisteredClaimNames.NameId, DateTime.UtcNow.ToString()),
+                        new Claim("user", entity.usu_usuario),
+                        new Claim("email", entity.usu_correo),
+                        new Claim("id", EncodeDecodeHelper.Encrypt(entity.usu_id.ToString())),
+                        new Claim("verified-account", entity.usu_correo_verificado.ToString().ToLower())
+                    };
+
+            if (roles is not null && roles.Any())
+            {
+                claims.AddRange(roles.Select(r => { return new Claim(ClaimTypes.Role, r); }));
+            }
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration.Key));
+            var signIn = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+            var token = new JwtSecurityToken(
+                _configuration.Issuer,
+                _configuration.Audience,
+                claims,
+                expires: DateTime.UtcNow.AddMinutes(360),
+                signingCredentials: signIn);
+
+            return new JwtSecurityTokenHandler().WriteToken(token);
         }
     }
 }
