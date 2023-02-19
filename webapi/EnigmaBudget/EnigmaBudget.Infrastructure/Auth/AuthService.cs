@@ -1,4 +1,5 @@
 ﻿using AutoMapper;
+using EnigmaBudget.Application.Model;
 using EnigmaBudget.Infrastructure.Auth.Entities;
 using EnigmaBudget.Infrastructure.Auth.Helpers;
 using EnigmaBudget.Infrastructure.Auth.Model;
@@ -17,7 +18,6 @@ using System.Text;
 
 namespace EnigmaBudget.Infrastructure.Auth
 {
-
     public class AuthService : IAuthService
     {
         private readonly MySqlConnection _connection;
@@ -27,11 +27,12 @@ namespace EnigmaBudget.Infrastructure.Auth
         private readonly IMapper _mapper;
         private readonly IEmailApiService _mailSvc;
 
-        public AuthService(IHttpContextAccessor httpContextAccessor,
+        public AuthService(
+            IHttpContextAccessor httpContextAccessor,
             IMapper mapper,
             IEmailApiService mailApiSvc,
-                            MySqlConnection connection,
-                            AuthServiceOptions options)
+            MySqlConnection connection,
+            AuthServiceOptions options)
         {
             _connection = connection;
             _configuration = options;
@@ -144,10 +145,10 @@ namespace EnigmaBudget.Infrastructure.Auth
             _connection.Open();
 
             usuarios_validacion_email validacion = null;
-            using(var cmdSel = new MySqlCommand(sql, _connection))
+            using (var cmdSel = new MySqlCommand(sql, _connection))
             {
                 cmdSel.Parameters.AddWithValue("token", token);
-                using(var reader= cmdSel.ExecuteReader())
+                using (var reader = cmdSel.ExecuteReader())
                 {
                     if (reader.Read())
                     {
@@ -156,15 +157,15 @@ namespace EnigmaBudget.Infrastructure.Auth
                 }
             }
 
-            if(validacion is null)
+            if (validacion is null)
             {
-                return new AppServiceResponse<bool>("Token inválido",null);
+                return new AppServiceResponse<bool>("Token inválido", null);
             }
 
             if (!validacion.valida)
             {
-                if(validacion.uve_fecha_baja < DateTime.Now)
-                    return new AppServiceResponse<bool>("Token inválido",null);
+                if (validacion.uve_fecha_baja < DateTime.Now)
+                    return new AppServiceResponse<bool>("Token inválido", null);
             }
 
 
@@ -288,7 +289,7 @@ namespace EnigmaBudget.Infrastructure.Auth
 
         }
 
-        public AppServiceResponse<Perfil> GetProfile()
+        public AppServiceResponse<UserProfile> GetProfile()
         {
 
             var usu = GetUserById(GetAuthenticatedId());
@@ -297,7 +298,7 @@ namespace EnigmaBudget.Infrastructure.Auth
                         FROM usuario_perfil 
                         WHERE usp_usu_id = @id;";
 
-            Perfil perfil = new Perfil();
+            UserProfile perfil = new UserProfile();
 
             using (MySqlCommand cmd = new MySqlCommand(sql, _connection))
             {
@@ -310,7 +311,7 @@ namespace EnigmaBudget.Infrastructure.Auth
                     if (reader.Read())
                     {
                         usuario_perfil entity = _mapper.Map<DbDataReader, usuario_perfil>(reader);
-                        perfil = _mapper.Map<usuario_perfil, Perfil>(entity);
+                        perfil = _mapper.Map<usuario_perfil, UserProfile>(entity);
                     }
                     perfil.Usuario = usu.usu_usuario;
                     perfil.Correo = usu.usu_correo;
@@ -319,10 +320,10 @@ namespace EnigmaBudget.Infrastructure.Auth
                 _connection.Close();
             }
 
-            return new AppServiceResponse<Perfil>(perfil);
+            return new AppServiceResponse<UserProfile>(perfil);
         }
 
-        public AppServiceResponse<bool> UpdateProfile(Perfil perfil)
+        public AppServiceResponse<bool> UpdateProfile(UserProfile perfil)
         {
             var loggedUser = GetUserById(GetAuthenticatedId());
 

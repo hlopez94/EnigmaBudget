@@ -1,9 +1,5 @@
 ﻿using Microsoft.Extensions.Configuration;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace EnigmaBudget.Infrastructure.Helpers
 {
@@ -11,8 +7,8 @@ namespace EnigmaBudget.Infrastructure.Helpers
     {
         private static string _encriptionKey;
 
-        public static void Initialize(IConfiguration config){
-            _encriptionKey = config["Encoder:Key"];
+        public static void Init(EncodeDecodeHelperConfig config){
+            _encriptionKey = config.Key;
             }
 
         public static string Encrypt(string data)

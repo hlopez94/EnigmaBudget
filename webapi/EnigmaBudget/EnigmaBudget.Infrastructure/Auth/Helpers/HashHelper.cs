@@ -1,13 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Security.Cryptography;
+﻿using System.Security.Cryptography;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace EnigmaBudget.Infrastructure.Auth.Helpers
 {
-    internal static class HashHelper
+    public static class HashHelper
     {
         /// <summary>
         /// Hashes a password given a salt string 
@@ -15,7 +11,7 @@ namespace EnigmaBudget.Infrastructure.Auth.Helpers
         /// <param name="password">User Password to hash</param>
         /// <param name="salt">Salt string to append to the password for extra security</param>
         /// <returns>A string containing the hashed salted password</returns>
-        internal static string HashPassword(this string password, string salt)
+        public static string HashPassword(this string password, string salt)
         {
             byte[] bytes = Encoding.UTF8.GetBytes(password + salt);
 
@@ -29,7 +25,7 @@ namespace EnigmaBudget.Infrastructure.Auth.Helpers
         /// </summary>
         /// <param name="sizeInBytes">Size of the random string to create in bytes</param>
         /// <returns>Random string</returns>
-        internal static string CreateSalt(int sizeInBytes = 16)
+        public static string CreateSalt(int sizeInBytes = 16)
         {
             //Generate a cryptographic random number.
             RandomNumberGenerator rng = RandomNumberGenerator.Create();
@@ -44,7 +40,7 @@ namespace EnigmaBudget.Infrastructure.Auth.Helpers
         /// <param name="plainTextPassword"></param>
         /// <param name="salt"></param>
         /// <returns></returns>
-        internal static bool HashedPasswordIsValid(this string hashedPassword, string plainTextPassword, string salt)
+        public static bool HashedPasswordIsValid(this string hashedPassword, string plainTextPassword, string salt)
         {
             string newHashedPin = plainTextPassword.HashPassword(salt);
             return newHashedPin.Equals(hashedPassword);

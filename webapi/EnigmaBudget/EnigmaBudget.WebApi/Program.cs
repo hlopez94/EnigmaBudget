@@ -88,7 +88,7 @@ builder.Services.AddSingleton<SendInBlueOptions>(_ => new SendInBlueOptions(
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 
-EncodeDecodeHelper.Initialize(builder.Configuration);
+EncodeDecodeHelper.Init(builder.Configuration.GetSection("Encoder").Get<EncodeDecodeHelperConfig>());
 DependencyInjectionExtensions.RegisterAutoMappers(builder.Services);
 DependencyInjectionExtensions.RegisterRepositories(builder.Services);
 DependencyInjectionExtensions.RegisterApplicationServices(builder.Services);
