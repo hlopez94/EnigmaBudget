@@ -22,7 +22,7 @@ namespace EnigmaBudget.Infrastructure.Auth.Mappings
                 .ForMember(p => p.usp_fecha_baja, opt => opt.MapFrom(q => q.IsDBNull(q.GetOrdinal("usp_fecha_baja")) ? default(DateTime?) : q["usp_fecha_baja"]))
                 ;
 
-            CreateMap<usuario_perfil, Perfil>()
+            CreateMap<usuario_perfil, UserProfile>()
                 .ForMember(p => p.TelefonoNumero, opt => opt.MapFrom(q => q.usp_tel_nro))
                 .ForMember(p => p.IdUnicoUsuario, opt => opt.MapFrom(q => q.usp_usu_id))
                 .ForMember(p => p.TelefonoCodigoPais, opt => opt.MapFrom(q => q.usp_tel_cod_pais))

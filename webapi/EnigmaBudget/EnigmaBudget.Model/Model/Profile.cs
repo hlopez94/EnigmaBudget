@@ -1,6 +1,6 @@
 ﻿namespace EnigmaBudget.Model.Model
 {
-    public class Perfil
+    public class UserProfile
     {
         public string IdUnicoUsuario { get; set; }
         public string Usuario { get; set; }

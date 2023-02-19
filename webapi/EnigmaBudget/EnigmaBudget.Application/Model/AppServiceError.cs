@@ -1,4 +1,4 @@
-﻿namespace EnigmaBudget.Model.Model
+﻿namespace EnigmaBudget.Application.Model
 {
     public class AppServiceError
     {
