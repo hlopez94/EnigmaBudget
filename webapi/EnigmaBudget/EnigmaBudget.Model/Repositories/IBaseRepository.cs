@@ -1,12 +1,11 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace EnigmaBudget.Model.Repositories
+﻿namespace EnigmaBudget.Model.Repositories
 {
-    public interface IBaseRepository<T>
+    internal interface IBaseRepository<T, KType>
     {
+        T GetById(KType id);
+        IEnumerable<T> ListAll();
+        IEnumerable<T> Create(T entity);
+        void Update(T entity);
+        void Delete(KType id);
     }
 }

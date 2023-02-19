@@ -1,4 +1,4 @@
-﻿namespace EnigmaBudget.Application.Services
+﻿namespace EnigmaBudget.Model.Model
 {
     public class AccountMovement
     {
