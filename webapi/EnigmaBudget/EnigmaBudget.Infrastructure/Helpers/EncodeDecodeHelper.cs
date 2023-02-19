@@ -1,5 +1,4 @@
-﻿using Microsoft.Extensions.Configuration;
-using System.Text;
+﻿using System.Text;
 
 namespace EnigmaBudget.Infrastructure.Helpers
 {
@@ -25,12 +24,12 @@ namespace EnigmaBudget.Infrastructure.Helpers
             return unicode.GetString(Encrypt(unicode.GetBytes(_encriptionKey), Convert.FromBase64String(data)));
         }
 
-        public static byte[] Encrypt(byte[] key, byte[] data)
+        private static byte[] Encrypt(byte[] key, byte[] data)
         {
             return EncryptOutput(key, data).ToArray();
         }
 
-        public static byte[] Decrypt(byte[] key, byte[] data)
+        private static byte[] Decrypt(byte[] key, byte[] data)
         {
             return EncryptOutput(key, data).ToArray();
         }

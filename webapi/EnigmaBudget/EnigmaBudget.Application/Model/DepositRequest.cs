@@ -1,6 +1,8 @@
-﻿namespace EnigmaBudget.Application.Model
+﻿namespace EnigmaBudget.Model.Model
 {
-    public class DepositOnAccount
+    public class DepositOnAccountRequest
     {
+        public Guid AccountId { get; set; }
+        public decimal Ammount { get; set; }
     }
 }

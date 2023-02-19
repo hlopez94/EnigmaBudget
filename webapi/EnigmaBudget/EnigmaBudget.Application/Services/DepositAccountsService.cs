@@ -1,15 +1,21 @@
 ﻿using EnigmaBudget.Application.Model;
+using EnigmaBudget.Model.Model;
 
 namespace EnigmaBudget.Application.Services
 {
-    internal class DepositAccountsService : IDepositAccountsService
+    public class DepositAccountsService : IDepositAccountsService
     {
         public AppServiceResponse<DepositAccount> CreateDepositAccount(CreateDepositAccountRequest request)
         {
             throw new NotImplementedException();
         }
 
-        public AppServiceResponse<DepositAccount> EditDepositAccountDetails(EditDepositAccountRequest request)
+        public AppServiceResponse<DepositAccount> EditDepositAccountDetails(Guid guid, EditDepositAccountRequest request)
+        {
+            throw new NotImplementedException();
+        }
+
+        public AppServiceResponse<DepositAccountDetails> GetDepositAccountDetails(Guid guid)
         {
             throw new NotImplementedException();
         }
@@ -19,7 +25,7 @@ namespace EnigmaBudget.Application.Services
             throw new NotImplementedException();
         }
 
-        public AppServiceResponse<AccountMovement> MakeDepositOnAccount(DepositOnAccount request)
+        public AppServiceResponse<AccountMovement> MakeDepositOnAccount(DepositOnAccountRequest request)
         {
             throw new NotImplementedException();
         }

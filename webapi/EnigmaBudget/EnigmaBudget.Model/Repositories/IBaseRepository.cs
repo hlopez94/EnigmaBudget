@@ -1,6 +1,6 @@
 ﻿namespace EnigmaBudget.Model.Repositories
 {
-    internal interface IBaseRepository<T, KType>
+    public interface IBaseRepository<T, KType>
     {
         T GetById(KType id);
         IEnumerable<T> ListAll();
