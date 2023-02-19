@@ -1,4 +1,5 @@
-﻿using EnigmaBudget.Infrastructure.Auth;
+﻿using EnigmaBudget.Application.Model;
+using EnigmaBudget.Infrastructure.Auth;
 using EnigmaBudget.Infrastructure.Auth.Model;
 using EnigmaBudget.Infrastructure.Auth.Requests;
 using EnigmaBudget.Model.Model;
@@ -14,11 +15,9 @@ namespace EnigmaBudget.WebApi.Controllers
     public class UserController : ControllerBase
     {
         private readonly IAuthService _authService;
-        private readonly ILogger<UserController> _logger;
 
-        public UserController(ILogger<UserController> logger, IAuthService authSvc)
+        public UserController( IAuthService authSvc)
         {
-            _logger = logger;
             _authService = authSvc;
         }
 
@@ -41,14 +40,14 @@ namespace EnigmaBudget.WebApi.Controllers
 
         [HttpGet("profile")]
         [Authorize]
-        public AppServiceResponse<Perfil> GetProfile()
+        public AppServiceResponse<UserProfile> GetProfile()
         {
             return _authService.GetProfile();
         }
 
         [HttpPost("profile")]
         [Authorize]
-        public AppServiceResponse<bool> UpdateProfile([FromBody]Perfil perfil)
+        public AppServiceResponse<bool> UpdateProfile([FromBody]UserProfile perfil)
         {
             return _authService.UpdateProfile(perfil);
         }
