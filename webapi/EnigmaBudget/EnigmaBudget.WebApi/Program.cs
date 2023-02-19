@@ -14,11 +14,11 @@ var configuration = builder.Configuration;
 
 var logFile = builder.Configuration.GetValue<string>("Logs:FileRoute");
 
-builder.Services.AddTransient(_ => new MySqlConnection(builder.Configuration["MariaDB:ConnectionString"]));
+builder.Services.AddScoped(_ => new MySqlConnection(builder.Configuration["MariaDB:ConnectionString"]));
 
 builder.Services.AddCors(p => p.AddPolicy("enigmaapp", corsBuilder =>
 {
-    corsBuilder.WithOrigins(builder.Configuration["Cors:Origins"]).AllowAnyMethod().AllowAnyHeader();
+    corsBuilder.WithOrigins(builder.Configuration.GetSection("Cors:Origins").Get<string[]>()).AllowAnyMethod().AllowAnyHeader();
 }));
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
@@ -71,27 +71,17 @@ builder.Services.AddSwaggerGen(option =>
 
 builder.Services.AddHttpContextAccessor();
 
-builder.Services.AddSingleton<AuthServiceOptions>(_ => new AuthServiceOptions(
-    builder.Configuration["Jwt:Issuer"],
-    builder.Configuration["Jwt:Audience"],
-    builder.Configuration["Jwt:Subject"],
-    builder.Configuration["Jwt:Key"],
-    builder.Configuration["ValidacionCorreoTemplate:AppUrl"]
-    ));
-
-builder.Services.AddSingleton<SendInBlueOptions>(_ => new SendInBlueOptions(
-    builder.Configuration["SendInMail:ApiKey"],
-    builder.Configuration["SendInMail:Uri"],
-    builder.Configuration["ValidacionCorreoTemplate:Id"]
-    ));
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 
-EncodeDecodeHelper.Init(builder.Configuration.GetSection("Encoder").Get<EncodeDecodeHelperConfig>());
-DependencyInjectionExtensions.RegisterAutoMappers(builder.Services);
-DependencyInjectionExtensions.RegisterRepositories(builder.Services);
-DependencyInjectionExtensions.RegisterApplicationServices(builder.Services);
+EncodeDecodeHelper.Init(builder.Configuration["Encoder:Key"]);
+builder.Services.AddSingleton(_ => builder.Configuration.GetSection("Jwt").Get<AuthServiceOptions>());
+builder.Services.AddSingleton(_ => builder.Configuration.GetSection("SendInBlue").Get<SendInBlueOptions>());
+
+builder.Services.RegisterAutoMappers();
+builder.Services.RegisterRepositories();
+builder.Services.RegisterApplicationServices();
 
 var app = builder.Build();
 

@@ -1,4 +1,6 @@
-﻿using System.Text;
+﻿using EnigmaBudget.Infrastructure.Auth.Helpers;
+using Microsoft.Extensions.Configuration;
+using System.Text;
 
 namespace EnigmaBudget.Infrastructure.Helpers
 {
@@ -6,9 +8,12 @@ namespace EnigmaBudget.Infrastructure.Helpers
     {
         private static string _encriptionKey;
 
-        public static void Init(EncodeDecodeHelperConfig config){
-            _encriptionKey = config.Key;
-            }
+        public static void Init(string key)
+        {
+            if (string.IsNullOrEmpty(_encriptionKey))
+                _encriptionKey = key;
+            else throw new InvalidOperationException("Encription Key already initialized");
+        }
 
         public static string Encrypt(string data)
         {

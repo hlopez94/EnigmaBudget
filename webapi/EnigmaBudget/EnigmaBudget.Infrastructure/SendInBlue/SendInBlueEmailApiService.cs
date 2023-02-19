@@ -33,14 +33,14 @@ namespace EnigmaBudget.Infrastructure.SendInBlue
             EmailData emailData = new EmailData()
             {
                 Params = pars,
-                templateId = int.Parse(_options.templateIdValidacionCorreo),
+                templateId = _options.ValidationTemplate.Id,
                 to = emailTo.ToArray()
             };
 
-            using (var request = new HttpRequestMessage(HttpMethod.Post, _options.apiUri))
+            using (var request = new HttpRequestMessage(HttpMethod.Post, _options.ApiUri))
             {
                 request.Headers.Add("accept", "application/json");
-                request.Headers.Add("api-key", _options.api_key);
+                request.Headers.Add("api-key", _options.ApiKey);
 
                 var serializerOptions = new JsonSerializerOptions
                 {
