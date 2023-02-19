@@ -23,6 +23,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\EnigmaBudget.Application\EnigmaBudget.Application.csproj" />
     <ProjectReference Include="..\EnigmaBudget.Infrastructure\EnigmaBudget.Infrastructure.csproj" />
   </ItemGroup>
 

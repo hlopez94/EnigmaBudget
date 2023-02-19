@@ -1,4 +1,5 @@
-﻿using EnigmaBudget.Infrastructure.Auth.Model;
+﻿using EnigmaBudget.Application.Model;
+using EnigmaBudget.Infrastructure.Auth.Model;
 using EnigmaBudget.Infrastructure.Auth.Requests;
 using EnigmaBudget.Model.Model;
 
@@ -10,8 +11,8 @@ namespace EnigmaBudget.Infrastructure.Auth
         
         AppServiceResponse<SignUpInfo> SignUp(SignUpRequest signup);
 
-        AppServiceResponse<Perfil> GetProfile();
-        AppServiceResponse<bool> UpdateProfile(Perfil perfil);
+        AppServiceResponse<UserProfile> GetProfile();
+        AppServiceResponse<bool> UpdateProfile(UserProfile perfil);
 
 
         AppServiceResponse<IEnumerable<Pais>> GetCountries();

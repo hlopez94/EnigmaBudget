@@ -24,6 +24,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{DEA1E7B2
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EnigmaBudget.Backend.Tests", "EnigmaBudget.Backend.Tests\EnigmaBudget.Backend.Tests.csproj", "{1D7104B0-0149-411A-B18C-C62E082053AE}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EnigmaBudget.Application", "EnigmaBudget.Application\EnigmaBudget.Application.csproj", "{1236FBFB-CBCC-4F02-B00F-149E5466EBAA}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -46,6 +48,10 @@ Global
 		{1D7104B0-0149-411A-B18C-C62E082053AE}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{1D7104B0-0149-411A-B18C-C62E082053AE}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{1D7104B0-0149-411A-B18C-C62E082053AE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1236FBFB-CBCC-4F02-B00F-149E5466EBAA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1236FBFB-CBCC-4F02-B00F-149E5466EBAA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1236FBFB-CBCC-4F02-B00F-149E5466EBAA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1236FBFB-CBCC-4F02-B00F-149E5466EBAA}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -55,6 +61,7 @@ Global
 		{C6826186-5B97-4B91-A958-295D0F36152C} = {DA8F5D7C-77A3-4ED4-BD20-49DCA13BFCCA}
 		{5B864DCB-5E4F-4579-BC43-BA68D3EE4654} = {623C8327-8F2E-46EF-B845-0B06D04894C7}
 		{1D7104B0-0149-411A-B18C-C62E082053AE} = {DEA1E7B2-0D6A-4EED-AF13-3F40ED1B3B94}
+		{1236FBFB-CBCC-4F02-B00F-149E5466EBAA} = {623C8327-8F2E-46EF-B845-0B06D04894C7}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {759F1391-BBCD-41BC-A901-93098D676DE2}

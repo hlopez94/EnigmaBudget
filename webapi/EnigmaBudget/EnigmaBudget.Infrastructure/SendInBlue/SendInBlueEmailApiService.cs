@@ -18,14 +18,17 @@ namespace EnigmaBudget.Infrastructure.SendInBlue
 
         public void EnviarCorreoValidacionCuenta(EmailValidacionInfo infoTemplate)
         {
-            Dictionary<string, string> pars = new Dictionary<string, string>();
+            Dictionary<string, string> pars = new Dictionary<string, string>
+            {
+                { "user_name", infoTemplate.UsuarioNombre },
+                { "activation_url", string.Concat(infoTemplate.UrlApp, "/#/validate-mail?token=", infoTemplate.Token) },
+                { "app_url", infoTemplate.UrlApp }
+            };
 
-            pars.Add("user_name", infoTemplate.UsuarioNombre);
-            pars.Add("activation_url", String.Concat(infoTemplate.UrlApp, "/#/validate-mail?token=", infoTemplate.Token));
-            pars.Add("app_url", infoTemplate.UrlApp);
-
-            List<EmailToData> emailTo = new List<EmailToData>();
-            emailTo.Add(new EmailToData() { email = infoTemplate.Correo, name = infoTemplate.UsuarioNombre });
+            List<EmailToData> emailTo = new List<EmailToData>
+            {
+                new EmailToData() { email = infoTemplate.Correo, name = infoTemplate.UsuarioNombre }
+            };
 
             EmailData emailData = new EmailData()
             {
@@ -44,7 +47,7 @@ namespace EnigmaBudget.Infrastructure.SendInBlue
                     PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
                     WriteIndented = true
                 };
-                var json = JsonSerializer.Serialize(emailData);
+                var json = JsonSerializer.Serialize(emailData, serializerOptions);
 
                 HttpContent httpContent = new StringContent(json, Encoding.UTF8, "application/json");
                 httpContent.Headers.ContentType = new MediaTypeHeaderValue("application/json");
