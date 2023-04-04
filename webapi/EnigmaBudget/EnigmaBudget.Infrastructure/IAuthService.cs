@@ -1,23 +1,18 @@
-﻿using EnigmaBudget.Application.Model;
-using EnigmaBudget.Infrastructure.Auth.Model;
+﻿using EnigmaBudget.Infrastructure.Auth.Model;
 using EnigmaBudget.Infrastructure.Auth.Requests;
-using EnigmaBudget.Model.Model;
 
 namespace EnigmaBudget.Infrastructure.Auth
 {
     public interface IAuthService
     {
-        AppServiceResponse<LoginInfo> Login(LoginRequest request);
-        
-        AppServiceResponse<SignUpInfo> SignUp(SignUpRequest signup);
+        AuthResult<LoginInfo> Login(LoginRequest request);
 
-        AppServiceResponse<UserProfile> GetProfile();
-        AppServiceResponse<bool> UpdateProfile(UserProfile perfil);
+        AuthResult<SignUpInfo> SignUp(SignUpRequest signup);
 
-
-        AppServiceResponse<IEnumerable<Pais>> GetCountries();
-        AppServiceResponse<bool> ChangePassword(ChangePasswordRequest request);
-        AppServiceResponse<bool> ValidateEmail(string token);
-        AppServiceResponse<bool> ResendValidationEmail();
+        AuthResult<UserProfile> GetProfile();
+        AuthResult UpdateProfile(UserProfile perfil);
+        AuthResult ChangePassword(ChangePasswordRequest request);
+        AuthResult ValidateEmail(string token);
+        AuthResult ResendValidationEmail();
     }
 }

@@ -8,18 +8,11 @@
 
   <ItemGroup>
     <PackageReference Include="AutoMapper" Version="11.0.1" />
-    <PackageReference Include="ISO.3166.CountryCodes" Version="1.0.3" />
-    <PackageReference Include="ISO.4217.CurrencyCodes" Version="1.0.10" />
     <PackageReference Include="Microsoft.AspNetCore.Http.Abstractions" Version="2.2.0" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="6.0.0" />
     <PackageReference Include="MySqlConnector" Version="2.1.11" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="6.22.0" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\EnigmaBudget.Application\EnigmaBudget.Application.csproj" />
-    <ProjectReference Include="..\EnigmaBudget.Model\EnigmaBudget.Model.csproj" />
   </ItemGroup>
 
 </Project>

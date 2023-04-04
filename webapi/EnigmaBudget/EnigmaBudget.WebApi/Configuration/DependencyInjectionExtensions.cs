@@ -1,10 +1,15 @@
 ﻿using AutoMapper;
+using EnigmaBudget.Application;
+using EnigmaBudget.Application.Services;
+using EnigmaBudget.Domain.Repositories;
 using EnigmaBudget.Infrastructure;
 using EnigmaBudget.Infrastructure.Auth;
 using EnigmaBudget.Infrastructure.SendInBlue;
+using EnigmaBudget.Persistence.MariaDB;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.DataProtection.Repositories;
 using Microsoft.Extensions.DependencyInjection;
+using MySqlConnector;
 using System.Reflection;
 
 namespace EnigmaBudget.WebApi.Configuration
@@ -14,18 +19,21 @@ namespace EnigmaBudget.WebApi.Configuration
         public static void RegisterAutoMappers(this IServiceCollection services)
         {
             services.AddAutoMapper(Assembly.Load("EnigmaBudget.Infrastructure"));
+            services.AddAutoMapper(Assembly.Load("EnigmaBudget.Persistence.MariaDB"));
         }
 
         public static void RegisterRepositories(this IServiceCollection services)
         {
-            //services.AddTransient<IRepository, Repository>();
+            services.AddTransient<IContextRepository, HttpContextRepository>();
+            services.AddTransient<IDepositAccountRepository, DepositAccountsRepository>();
         }
 
         public static void RegisterApplicationServices(this IServiceCollection services)
         {
-            services.AddTransient<IEmailApiService, SendInBlueEmailApiService>();
             services.AddTransient<IAuthService, AuthService>();
-
+            services.AddTransient<IEmailApiService, SendInBlueEmailApiService>();
+            services.AddTransient<ICountriesService, CountriesService>();
+            services.AddTransient<IDepositAccountsService, DepositAccountsService>();
         }
     }
 }

@@ -1,7 +1,7 @@
 ﻿using AutoMapper;
 using EnigmaBudget.Infrastructure.Auth.Entities;
 using EnigmaBudget.Infrastructure.Helpers;
-using EnigmaBudget.Model.Model;
+using EnigmaBudget.Infrastructure.Auth.Model;
 using System.Data.Common;
 
 namespace EnigmaBudget.Infrastructure.Auth.Mappings
@@ -24,12 +24,11 @@ namespace EnigmaBudget.Infrastructure.Auth.Mappings
 
             CreateMap<usuario_perfil, UserProfile>()
                 .ForMember(p => p.TelefonoNumero, opt => opt.MapFrom(q => q.usp_tel_nro))
-                .ForMember(p => p.IdUnicoUsuario, opt => opt.MapFrom(q => q.usp_usu_id))
                 .ForMember(p => p.TelefonoCodigoPais, opt => opt.MapFrom(q => q.usp_tel_cod_pais))
                 .ForMember(p => p.TelefonoCodigoArea, opt => opt.MapFrom(q => q.usp_tel_cod_area))
                 .ForMember(p => p.FechaNacimiento, opt => opt.MapFrom(q => q.usp_fecha_nacimiento))
                 .ForMember(p => p.Nombre, opt => opt.MapFrom(q => q.usp_nombre))
-                .ForMember(p => p.IdUnicoUsuario, opt => opt.MapFrom(q => EncodeDecodeHelper.Encrypt(q.usp_usu_id.ToString())))
+                .ForMember(p => p.Id, opt => opt.MapFrom(q => EncodeDecodeHelper.Encrypt(q.usp_usu_id.ToString())))
                 ;
         }
 

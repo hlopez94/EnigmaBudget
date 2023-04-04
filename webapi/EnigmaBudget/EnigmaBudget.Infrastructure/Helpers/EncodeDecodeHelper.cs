@@ -1,5 +1,6 @@
 ﻿using EnigmaBudget.Infrastructure.Auth.Helpers;
 using Microsoft.Extensions.Configuration;
+using Microsoft.IdentityModel.Tokens;
 using System.Text;
 
 namespace EnigmaBudget.Infrastructure.Helpers
@@ -17,6 +18,10 @@ namespace EnigmaBudget.Infrastructure.Helpers
 
         public static string Encrypt(string data)
         {
+            if (string.IsNullOrEmpty(data))
+            {
+                throw new ArgumentNullException(nameof(data), "Can't encrypt null value");
+            }
             Encoding unicode = Encoding.Unicode;
 
             return Convert.ToBase64String(Encrypt(unicode.GetBytes(_encriptionKey), unicode.GetBytes(data)));
@@ -24,6 +29,10 @@ namespace EnigmaBudget.Infrastructure.Helpers
 
         public static string Decrypt(string data)
         {
+            if (string.IsNullOrEmpty(data))
+            {
+                throw new ArgumentNullException(nameof(data), "Can't encrypt null value");
+            }
             Encoding unicode = Encoding.Unicode;
 
             return unicode.GetString(Encrypt(unicode.GetBytes(_encriptionKey), Convert.FromBase64String(data)));
@@ -31,11 +40,14 @@ namespace EnigmaBudget.Infrastructure.Helpers
 
         private static byte[] Encrypt(byte[] key, byte[] data)
         {
-            return EncryptOutput(key, data).ToArray();
-        }
-
-        private static byte[] Decrypt(byte[] key, byte[] data)
-        {
+            if (key==null || key.Length == 0)
+            {
+                throw new ArgumentNullException(nameof(key), "Can't encrypt null value");
+            }
+            if (data == null || data.Length == 0)
+            {
+                throw new ArgumentNullException(nameof(data), "Can't encrypt null value");
+            }
             return EncryptOutput(key, data).ToArray();
         }
 

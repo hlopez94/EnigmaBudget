@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net6.0</TargetFramework>
@@ -25,6 +25,7 @@
   <ItemGroup>
     <ProjectReference Include="..\EnigmaBudget.Application\EnigmaBudget.Application.csproj" />
     <ProjectReference Include="..\EnigmaBudget.Infrastructure\EnigmaBudget.Infrastructure.csproj" />
+    <ProjectReference Include="..\EnigmaBudget.Repositories.MariaDB\EnigmaBudget.Persistence.MariaDB.csproj" />
   </ItemGroup>
 
   <ProjectExtensions><VisualStudio><UserProperties properties_4launchsettings_1json__JsonSchema="" /></VisualStudio></ProjectExtensions>

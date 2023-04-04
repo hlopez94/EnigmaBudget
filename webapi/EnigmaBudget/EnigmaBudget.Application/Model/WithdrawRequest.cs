@@ -2,7 +2,7 @@
 {
     public class WithdrawRequest
     {
-        public Guid AccountId { get; set; }
+        public string AccountId { get; set; }
         public decimal Ammount { get; set; }
     }
 }

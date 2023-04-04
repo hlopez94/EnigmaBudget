@@ -1,6 +1,6 @@
 ﻿using EnigmaBudget.Application;
 using EnigmaBudget.Application.Model;
-using EnigmaBudget.Model.Model;
+using EnigmaBudget.Domain.Model;
 using Microsoft.AspNetCore.Mvc;
 
 namespace EnigmaBudget.WebApi.Controllers
@@ -14,41 +14,41 @@ namespace EnigmaBudget.WebApi.Controllers
         }
 
         [HttpGet()]
-        public AppServiceResponse<List<DepositAccount>> ListAccounts()
+        public async Task<AppResult<List<DepositAccount>>> ListAccounts()
         {
-            return _depositAccountsService.ListDepositAccounts();
+            return await _depositAccountsService.ListUserDepositAccounts();
         }
 
         [HttpGet("{accountId}")]
-        public AppServiceResponse<DepositAccountDetails> GetAccountDetails([FromRoute]Guid accountId)
+        public async Task<AppResult<DepositAccountDetails>> GetAccountDetails([FromRoute]string accountId)
         {
-            return _depositAccountsService.GetDepositAccountDetails(accountId);
+            return await _depositAccountsService.GetDepositAccountDetails(accountId);
         }
 
-        [HttpGet("{accountId}/withdraw")]
-        public AppServiceResponse<AccountMovement> MakeWithdrawalOnAccount([FromRoute] Guid accountId, [FromBody] WithdrawRequest withdrawRequest)
+        [HttpPost("{accountId}/withdraw")]
+        public async Task<AppResult<AccountMovement>> MakeWithdrawalOnAccount([FromRoute] string accountId, [FromBody] WithdrawRequest withdrawRequest)
         {
             withdrawRequest.AccountId=accountId;
-            return _depositAccountsService.MakeWithdrawOnAccount(withdrawRequest);
+            return await _depositAccountsService.MakeWithdrawOnAccount(withdrawRequest);
         }
 
-        [HttpGet("{accountId}/deposit")]
-        public AppServiceResponse<AccountMovement> MakeDepositOnAccount([FromRoute] Guid accountId, [FromBody] DepositOnAccountRequest depositRequest)
+        [HttpPost("{accountId}/deposit")]
+        public async Task<AppResult<AccountMovement>> MakeDepositOnAccount([FromRoute] string accountId, [FromBody] DepositOnAccountRequest depositRequest)
         {
             depositRequest.AccountId=accountId;
-            return _depositAccountsService.MakeDepositOnAccount(depositRequest);
+            return await _depositAccountsService.MakeDepositOnAccount(depositRequest);
         }
 
         [HttpPost()]
-        public AppServiceResponse<DepositAccount> PostDepositAccount(CreateDepositAccountRequest body)
+        public async Task<AppResult<DepositAccount>> PostDepositAccount(CreateDepositAccountRequest body)
         {
-            return _depositAccountsService.CreateDepositAccount(body);
+            return await _depositAccountsService.CreateDepositAccount(body);
         }
 
-        [HttpPut()]
-        public AppServiceResponse<DepositAccount> PutDepositAccount(Guid accountId, [FromBody] EditDepositAccountRequest body)
+        [HttpPut("{accountId}")]
+        public async Task<AppResult<DepositAccount>> PutDepositAccount(string accountId, [FromBody] EditDepositAccountRequest body)
         {
-            return _depositAccountsService.EditDepositAccountDetails(accountId, body);
+            return await _depositAccountsService.EditDepositAccountDetails(accountId, body);
         }
 
     }

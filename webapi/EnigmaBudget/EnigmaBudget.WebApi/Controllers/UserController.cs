@@ -2,8 +2,6 @@
 using EnigmaBudget.Infrastructure.Auth;
 using EnigmaBudget.Infrastructure.Auth.Model;
 using EnigmaBudget.Infrastructure.Auth.Requests;
-using EnigmaBudget.Model.Model;
-using EnigmaBudget.WebApi.Model;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -23,7 +21,7 @@ namespace EnigmaBudget.WebApi.Controllers
 
         [HttpPost("login")]
         [AllowAnonymous]
-        public AppServiceResponse<LoginInfo> Login(LoginRequest request)
+        public AuthResult<LoginInfo> Login(LoginRequest request)
         {
             var response = _authService.Login(request);
 
@@ -32,7 +30,7 @@ namespace EnigmaBudget.WebApi.Controllers
 
         [HttpPost("signup")]
         [AllowAnonymous]
-        public AppServiceResponse<SignUpInfo> SignUp(SignUpRequest request)
+        public AuthResult<SignUpInfo> SignUp(SignUpRequest request)
         {
             var res = _authService.SignUp(request);
             return res;
@@ -40,41 +38,35 @@ namespace EnigmaBudget.WebApi.Controllers
 
         [HttpGet("profile")]
         [Authorize]
-        public AppServiceResponse<UserProfile> GetProfile()
+        public AuthResult<UserProfile> GetProfile()
         {
             return _authService.GetProfile();
         }
 
         [HttpPost("profile")]
         [Authorize]
-        public AppServiceResponse<bool> UpdateProfile([FromBody]UserProfile perfil)
+        public AuthResult UpdateProfile([FromBody]UserProfile perfil)
         {
             return _authService.UpdateProfile(perfil);
         }
         [HttpPost("change-password")]
         [Authorize]
-        public AppServiceResponse<bool> ChangePassword(ChangePasswordRequest request)
+        public AuthResult ChangePassword(ChangePasswordRequest request)
         {
             return _authService.ChangePassword(request);
 
         }
 
-        [HttpGet("countries")]
-        public AppServiceResponse<IEnumerable<Pais>> GetCountries()
-        {
-            return _authService.GetCountries();
-        }
-
         [HttpGet("resend-verification")]
-        public AppServiceResponse<IEnumerable<Pais>> ReenviarVerificacion()
+        public AuthResult<IEnumerable<Pais>> ReenviarVerificacion()
         {
-            return _authService.GetCountries();
+            throw new NotImplementedException();
         }
 
 
         [HttpPost("verify-email-account")]
         [AllowAnonymous]
-        public AppServiceResponse<bool> VerifyEmail([FromBody] string token) {
+        public AuthResult VerifyEmail([FromBody] string token) {
             return _authService.ValidateEmail(token);
         }
     }

@@ -7,19 +7,14 @@ using System.Text;
 using EnigmaBudget.Infrastructure.Auth.Model;
 using EnigmaBudget.Infrastructure.SendInBlue.Model;
 using EnigmaBudget.Infrastructure.Helpers;
+using EnigmaBudget.WebApi.Middlewares;
 
 var builder = WebApplication.CreateBuilder(args);
 
 var configuration = builder.Configuration;
 
-var logFile = builder.Configuration.GetValue<string>("Logs:FileRoute");
-
-builder.Services.AddScoped(_ => new MySqlConnection(builder.Configuration["MariaDB:ConnectionString"]));
-
-builder.Services.AddCors(p => p.AddPolicy("enigmaapp", corsBuilder =>
-{
-    corsBuilder.WithOrigins(builder.Configuration.GetSection("Cors:Origins").Get<string[]>()).AllowAnyMethod().AllowAnyHeader();
-}));
+builder.ConfigureCORS();
+builder.RegisterConnectionStrings();
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
 {
@@ -79,11 +74,13 @@ EncodeDecodeHelper.Init(builder.Configuration["Encoder:Key"]);
 builder.Services.AddSingleton(_ => builder.Configuration.GetSection("Jwt").Get<AuthServiceOptions>());
 builder.Services.AddSingleton(_ => builder.Configuration.GetSection("SendInBlue").Get<SendInBlueOptions>());
 
+
 builder.Services.RegisterAutoMappers();
 builder.Services.RegisterRepositories();
 builder.Services.RegisterApplicationServices();
 
 var app = builder.Build();
+app.UseCors("enigmaapp");
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -92,10 +89,11 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+app.UseMiddleware<ResponseResultMiddleware>();
 
-app.UseCors("enigmaapp");
 app.UseAuthentication();
 app.UseAuthorization();
+
 app.MapControllers();
 
 app.Run();

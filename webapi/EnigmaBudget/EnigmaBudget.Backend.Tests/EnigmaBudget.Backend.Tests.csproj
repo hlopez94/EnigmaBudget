@@ -18,6 +18,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\EnigmaBudget.Infrastructure\EnigmaBudget.Infrastructure.csproj" />
+    <ProjectReference Include="..\EnigmaBudget.WebApi\EnigmaBudget.WebApi.csproj" />
   </ItemGroup>
 
 </Project>

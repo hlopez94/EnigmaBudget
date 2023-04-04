@@ -7,7 +7,16 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\EnigmaBudget.Model\EnigmaBudget.Model.csproj" />
+    <PackageReference Include="AutoMapper" Version="11.0.1" />
+    <PackageReference Include="ISO.3166.CountryCodes" Version="1.0.3" />
+    <PackageReference Include="ISO.4217.CurrencyCodes" Version="1.0.10" />
+    <PackageReference Include="System.Linq.Async" Version="6.0.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\EnigmaBudget.Domain\EnigmaBudget.Domain.csproj" />
+    <ProjectReference Include="..\EnigmaBudget.Infrastructure\EnigmaBudget.Infrastructure.csproj" />
+    <ProjectReference Include="..\EnigmaBudget.Model\EnigmaBudget.Domain.csproj" />
   </ItemGroup>
 
 </Project>
