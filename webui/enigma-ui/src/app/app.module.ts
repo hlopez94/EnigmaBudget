@@ -22,6 +22,7 @@ import { MatCardModule } from '@angular/material/card';
 import { MatRippleModule } from '@angular/material/core';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatListModule } from '@angular/material/list';
+import { WelcomePageComponent } from './shell/welcome-page/welcome-page.component';
 
 @NgModule({
   declarations: [
@@ -29,7 +30,7 @@ import { MatListModule } from '@angular/material/list';
     NavbarComponent,
     FooterComponent,
     SidebarComponent,
-    HomeComponent,
+    WelcomePageComponent,
   ],
   imports: [
     BrowserModule,

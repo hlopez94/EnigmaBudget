@@ -88,7 +88,7 @@
     </button>
   </li>
 </ul>
-
+<app-generar-cuenta-deposito></app-generar-cuenta-deposito>
 <h1>Últimos movimientos</h1>
 <mat-card>
   <mat-list>
@@ -103,3 +103,11 @@
 
    </mat-list>
 </mat-card>
+
+
+<ng-container *ngIf="divisas | async"	>
+  <p *ngFor="let divisa of divisas | async">
+
+    {{ 123456.12345 | currency:divisa.code:'symbol-narrow'}} || {{divisa.country}}
+  </p>
+</ng-container>

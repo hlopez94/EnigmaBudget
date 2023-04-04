@@ -44,3 +44,9 @@ p mat-form-field {
   height: unset;
   width: unset;
 }
+
+
+.mat-mdc-floating-label,
+.mat-mdc-form-field-icon-prefix{
+  padding-left: 3ch!important;
+}

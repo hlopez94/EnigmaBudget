@@ -92,7 +92,8 @@
           "defaultConfiguration": "development",
           "options": {
             "sslCert": ".ssl/cert.pem",
-            "sslKey": ".ssl/key.pem"
+            "sslKey": ".ssl/key.pem",
+            "proxyConfig": "proxy.conf.json"
           }
         },
         "extract-i18n": {

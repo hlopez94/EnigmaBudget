@@ -1,8 +1,8 @@
 import { ApiError } from "./ApiError";
 
 export interface ApiResponse<T> {
-  ok: boolean;
-  result: T;
+  isSuccess: boolean;
+  data: T;
   errorText: string;
   errors: ApiError[];
 }
