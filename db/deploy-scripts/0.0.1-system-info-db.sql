@@ -28,8 +28,8 @@ DELIMITER ;
 DELIMITER $$
 $$ BEGIN NOT ATOMIC
 	SET @script_version = '0.0.1';
-	SELECT @ejecutado := enigma.fn_leveling_script_ejecutado(@script_version);
-	SELECT @errmsg := CONCAT('SCRIPT ', @script_version, ' EJECUTADO EN FECHA ', @ejecutado);
+	SET @ejecutado := enigma.fn_leveling_script_ejecutado(@script_version);
+	SET @errmsg := CONCAT('SCRIPT ', @script_version, ' EJECUTADO EN FECHA ', @ejecutado);
 
 	IF @ejecutado
 		THEN
