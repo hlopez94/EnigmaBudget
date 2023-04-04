@@ -46,11 +46,11 @@ export class AuthService {
       )
     );
 
-    if(res.result.fechaNacimiento )
-      res.result.fechaNacimiento = new Date(Date.parse(res.result.fechaNacimiento.toString()));
-      else res.result.fechaNacimiento=null;
+    if(res.data.fechaNacimiento )
+      res.data.fechaNacimiento = new Date(Date.parse(res.data.fechaNacimiento.toString()));
+      else res.data.fechaNacimiento=null;
 
-    return res.result;
+    return res.data;
   }
 
   async updateProfile(perfil: Profile): Promise<boolean> {
@@ -61,7 +61,7 @@ export class AuthService {
       )
     );
 
-    return res.result;
+    return res.data;
   }
 
   async loginUserWithCredentials(
@@ -74,14 +74,14 @@ export class AuthService {
       )
     );
 
-    if (res.ok) {
-      this.setearToken(res.result.jwt);
+    if (res.isSuccess) {
+      this.setearToken(res.data.jwt);
     } else {
       this.limpiarToken();
       throw Error(res.errorText);
     }
 
-    return res.result;
+    return res.data;
   }
 
   public logout() {
@@ -95,7 +95,7 @@ export class AuthService {
       )
     );
 
-    return res.result;
+    return res.data;
   }
   private limpiarToken() {
     localStorage.removeItem('token');
@@ -136,4 +136,8 @@ export class AuthService {
 
     return false;
   }
+
+  public async SignUp(signupInfo: any) : Promise<ApiResponse<any>>{
+    return await firstValueFrom(this._httpClient.post<ApiResponse<any>>(`${environment.settings.apiUrl}/user/signup`, signupInfo))
+ }
 }

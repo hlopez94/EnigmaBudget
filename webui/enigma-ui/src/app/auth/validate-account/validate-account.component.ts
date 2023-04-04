@@ -34,7 +34,7 @@ export class ValidateAccountComponent implements OnInit {
   async validarMail(token: string){
     var res : ApiResponse<boolean> = await this._authService.verifyAccountMail(token);
 
-    if(res.ok){
+    if(res.isSuccess){
       this._authService.logout();
       var snackRef = this._snackbar.open('Cuenta Verificada Correctamente. Volve a iniciar Sesión 😉', 'Iniciar Sesión', { duration:3000})
 

@@ -60,6 +60,7 @@ export class LoginComponent implements OnInit {
       );
       this._snackBar.open(`Bienvenido ${resLogin.userName}`, undefined, {
         duration: 3000,
+        panelClass: ['mat-primary']
       });
 
      var urlPaths : string[]= [];
@@ -75,13 +76,12 @@ export class LoginComponent implements OnInit {
         );
       else this._router.navigate(['/']);
     } catch (err: any) {
-
       switch(err.status){
         case 0:
           this._snackBar.open('El servidor no responde.', undefined, { duration: 3000, panelClass: ['mat-toolbar', 'mat-warn'] });
           break;
         default:
-            this._snackBar.open(err.message, undefined, { duration: 3000 });
+            this._snackBar.open('error', undefined, { duration: 3000 });
       }
     }
   }
