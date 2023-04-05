@@ -9,7 +9,7 @@
       <mat-card-content>
         <div style="display: flex">
           <h1 class="mat-display-1">
-            {{ 1000 | currency: "ARS":"symbol-narrow":"4.2-2" }}
+            {{ 1000 | currency : "ARS" : "symbol-narrow" : "4.2-2" }}
           </h1>
           <button
             mat-icon-button
@@ -21,93 +21,79 @@
           </button>
         </div>
       </mat-card-content>
-
     </mat-card>
   </li>
 </ul>
 <p></p>
-<h1>Cuentas</h1>
-<ul class="lista-cuentas">
-  <li *ngFor="let i of counter(2)">
-    <mat-card>
-      <mat-card-header>
-        <mat-card-title>BBVA </mat-card-title>
-        <mat-card-subtitle>Caja Ahorros</mat-card-subtitle>
-        <button
-          mat-icon-button
-          [matMenuTriggerFor]="menu"
-          class="mat-card-top-right-menu"
-          aria-label="Example icon-button with a menu"
-        >
-          <mat-icon>more_vert</mat-icon>
-        </button>
-        <mat-menu #menu="matMenu">
-          <button mat-menu-item>
-            <mat-icon>sort</mat-icon>
-            <span>Ver Movimientos</span>
-          </button>
-          <button mat-menu-item disabled>
-            <mat-icon>voicemail</mat-icon>
-            <span>Check voice mail</span>
-          </button>
-          <button mat-menu-item>
-            <mat-icon>notifications_off</mat-icon>
-            <span>Disable alerts</span>
-          </button>
-        </mat-menu>
-      </mat-card-header>
 
-      <mat-card-content>
-        <div style="display: flex">
-          <h1 class="mat-display-1">
-            {{ 1000 | currency: "ARS":"symbol-narrow":"4.2-2" }}
-          </h1>
+<section id="listado-cuentas">
+  <h1>Cuentas</h1>
+  <ul class="lista-cuentas">
+    <li *ngFor="let i of counter(4)">
+      <mat-card>
+        <mat-card-header>
+          <mat-card-title>BBVA </mat-card-title>
+          <mat-card-subtitle>Caja Ahorros</mat-card-subtitle>
           <button
             mat-icon-button
-            title="Ocultar/mostrar balance"
-            aria-label="Ocultar/mostrar balance"
-            type="button"
+            [matMenuTriggerFor]="menu"
+            class="mat-card-top-right-menu"
+            aria-label="Example icon-button with a menu"
           >
-            <mat-icon>visibility_on</mat-icon>
+            <mat-icon>more_vert</mat-icon>
           </button>
-        </div>
-        <mat-card-actions style="display: flex">
-          <button mat-button style="color: green">
-            <mat-icon>arrow_circle_up</mat-icon>&nbsp;Crédito
-          </button>
-          <button mat-button color="warn">
-            <mat-icon>arrow_circle_down</mat-icon>&nbsp;Débito
-          </button>
-        </mat-card-actions>
-      </mat-card-content>
-    </mat-card>
-  </li>
-  <li>
+          <mat-menu #menu="matMenu">
+            <button mat-menu-item>
+              <mat-icon>sort</mat-icon>
+              <span>Ver Movimientos</span>
+            </button>
+            <button mat-menu-item disabled>
+              <mat-icon>edit</mat-icon>
+              <span>Editar Detalles</span>
+            </button>
+          </mat-menu>
+        </mat-card-header>
+
+        <mat-card-content>
+          <div style="display: flex">
+            <h1 class="mat-display-1">
+              {{ 1000 | currency : "ARS" : "symbol-narrow" : "4.2-2" }}
+            </h1>
+            <button
+              mat-icon-button
+              title="Ocultar/mostrar balance"
+              aria-label="Ocultar/mostrar balance"
+              type="button"
+            >
+              <mat-icon>visibility_on</mat-icon>
+            </button>
+          </div>
+          <mat-card-actions style="display: flex">
+            <button mat-button style="color: green">
+              <mat-icon>arrow_circle_up</mat-icon>&nbsp;Crédito
+            </button>
+            <button mat-button color="warn">
+              <mat-icon>arrow_circle_down</mat-icon>&nbsp;Débito
+            </button>
+          </mat-card-actions>
+        </mat-card-content>
+      </mat-card>
+    </li>
+  </ul>
+  <div>
     <button mat-mini-fab color="default" title="Agregar Cuenta">
       <mat-icon>add</mat-icon>
     </button>
-  </li>
-</ul>
+  </div>
+</section>
+
 <app-generar-cuenta-deposito></app-generar-cuenta-deposito>
 <h1>Últimos movimientos</h1>
 <mat-card>
   <mat-list>
-
     <ng-container *ngFor="let i of counter(10); let last = last">
-      <mat-list-item>
-        Pepper
-
-      </mat-list-item>
+      <mat-list-item> Pepper </mat-list-item>
       <mat-divider *ngIf="!last"></mat-divider>
     </ng-container>
-
-   </mat-list>
+  </mat-list>
 </mat-card>
-
-
-<ng-container *ngIf="divisas | async"	>
-  <p *ngFor="let divisa of divisas | async">
-
-    {{ 123456.12345 | currency:divisa.code:'symbol-narrow'}} || {{divisa.country}}
-  </p>
-</ng-container>
