@@ -26,9 +26,17 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "EnigmaBudget.Application", 
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "repositories", "repositories", "{33BE885F-33FD-4E66-8600-C0A00F041CD1}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "EnigmaBudget.Persistence.MariaDB", "EnigmaBudget.Repositories.MariaDB\EnigmaBudget.Persistence.MariaDB.csproj", "{70461D9A-83F7-43B7-B5F3-7B79E7B9C1EE}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "EnigmaBudget.Persistence.Repositories.MariaDB", "EnigmaBudget.Repositories.MariaDB\EnigmaBudget.Persistence.Repositories.MariaDB.csproj", "{70461D9A-83F7-43B7-B5F3-7B79E7B9C1EE}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "EnigmaBudget.Domain", "EnigmaBudget.Domain\EnigmaBudget.Domain.csproj", "{531BC584-CA59-4AB8-9071-EA220058889D}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "EnigmaBudget.Persistence.Contexts.EfCore.Enigma", "EnigmaBudget.Persistence.MariaDB.EFCore\EnigmaBudget.Persistence.Contexts.EfCore.Enigma.csproj", "{9091E16F-B8AA-4BFE-B3B6-549DB5462EBA}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "persistence", "persistence", "{6D00237A-E4EE-456F-8680-63DCE17064BD}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "contexts", "contexts", "{BFD042D9-E784-46A0-9AB7-37BB7CA22EC0}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EnigmaBudget.Persistence.Repositories.EFCore", "EnigmaBudget.Persistence.Repositories.EFCore\EnigmaBudget.Persistence.Repositories.EFCore.csproj", "{326C1042-AD33-4F49-8F58-2DEFBAF6C6AF}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -60,6 +68,14 @@ Global
 		{531BC584-CA59-4AB8-9071-EA220058889D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{531BC584-CA59-4AB8-9071-EA220058889D}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{531BC584-CA59-4AB8-9071-EA220058889D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9091E16F-B8AA-4BFE-B3B6-549DB5462EBA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9091E16F-B8AA-4BFE-B3B6-549DB5462EBA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9091E16F-B8AA-4BFE-B3B6-549DB5462EBA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9091E16F-B8AA-4BFE-B3B6-549DB5462EBA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{326C1042-AD33-4F49-8F58-2DEFBAF6C6AF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{326C1042-AD33-4F49-8F58-2DEFBAF6C6AF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{326C1042-AD33-4F49-8F58-2DEFBAF6C6AF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{326C1042-AD33-4F49-8F58-2DEFBAF6C6AF}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -69,8 +85,12 @@ Global
 		{C6826186-5B97-4B91-A958-295D0F36152C} = {DA8F5D7C-77A3-4ED4-BD20-49DCA13BFCCA}
 		{1D7104B0-0149-411A-B18C-C62E082053AE} = {DEA1E7B2-0D6A-4EED-AF13-3F40ED1B3B94}
 		{1236FBFB-CBCC-4F02-B00F-149E5466EBAA} = {623C8327-8F2E-46EF-B845-0B06D04894C7}
+		{33BE885F-33FD-4E66-8600-C0A00F041CD1} = {6D00237A-E4EE-456F-8680-63DCE17064BD}
 		{70461D9A-83F7-43B7-B5F3-7B79E7B9C1EE} = {33BE885F-33FD-4E66-8600-C0A00F041CD1}
 		{531BC584-CA59-4AB8-9071-EA220058889D} = {623C8327-8F2E-46EF-B845-0B06D04894C7}
+		{9091E16F-B8AA-4BFE-B3B6-549DB5462EBA} = {BFD042D9-E784-46A0-9AB7-37BB7CA22EC0}
+		{BFD042D9-E784-46A0-9AB7-37BB7CA22EC0} = {6D00237A-E4EE-456F-8680-63DCE17064BD}
+		{326C1042-AD33-4F49-8F58-2DEFBAF6C6AF} = {33BE885F-33FD-4E66-8600-C0A00F041CD1}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {759F1391-BBCD-41BC-A901-93098D676DE2}
