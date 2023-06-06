@@ -8,9 +8,9 @@ namespace EnigmaBudget.WebApi.Controllers
     public class DepositAccountsController : BaseController
     {
         private readonly IDepositAccountsService _depositAccountsService;
-        public DepositAccountsController(IDepositAccountsService depositAccountsService) 
+        public DepositAccountsController(IDepositAccountsService depositAccountsService)
         {
-            _depositAccountsService= depositAccountsService;
+            _depositAccountsService = depositAccountsService;
         }
 
         [HttpGet()]
@@ -20,7 +20,7 @@ namespace EnigmaBudget.WebApi.Controllers
         }
 
         [HttpGet("{accountId}")]
-        public async Task<AppResult<DepositAccountDetails>> GetAccountDetails([FromRoute]string accountId)
+        public async Task<AppResult<DepositAccountDetails>> GetAccountDetails([FromRoute] string accountId)
         {
             return await _depositAccountsService.GetDepositAccountDetails(accountId);
         }
@@ -28,14 +28,14 @@ namespace EnigmaBudget.WebApi.Controllers
         [HttpPost("{accountId}/withdraw")]
         public async Task<AppResult<AccountMovement>> MakeWithdrawalOnAccount([FromRoute] string accountId, [FromBody] WithdrawRequest withdrawRequest)
         {
-            withdrawRequest.AccountId=accountId;
+            withdrawRequest.AccountId = accountId;
             return await _depositAccountsService.MakeWithdrawOnAccount(withdrawRequest);
         }
 
         [HttpPost("{accountId}/deposit")]
         public async Task<AppResult<AccountMovement>> MakeDepositOnAccount([FromRoute] string accountId, [FromBody] DepositOnAccountRequest depositRequest)
         {
-            depositRequest.AccountId=accountId;
+            depositRequest.AccountId = accountId;
             return await _depositAccountsService.MakeDepositOnAccount(depositRequest);
         }
 

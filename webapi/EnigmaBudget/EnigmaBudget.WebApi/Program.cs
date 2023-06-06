@@ -1,13 +1,12 @@
+using EnigmaBudget.Infrastructure.Auth.Model;
+using EnigmaBudget.Infrastructure.Helpers;
+using EnigmaBudget.Infrastructure.SendInBlue.Model;
 using EnigmaBudget.WebApi.Configuration;
+using EnigmaBudget.WebApi.Middlewares;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
-using MySqlConnector;
 using System.Text;
-using EnigmaBudget.Infrastructure.Auth.Model;
-using EnigmaBudget.Infrastructure.SendInBlue.Model;
-using EnigmaBudget.Infrastructure.Helpers;
-using EnigmaBudget.WebApi.Middlewares;
 
 var builder = WebApplication.CreateBuilder(args);
 

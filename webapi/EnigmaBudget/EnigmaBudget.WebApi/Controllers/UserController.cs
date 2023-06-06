@@ -1,5 +1,4 @@
-﻿using EnigmaBudget.Application.Model;
-using EnigmaBudget.Infrastructure.Auth;
+﻿using EnigmaBudget.Infrastructure.Auth;
 using EnigmaBudget.Infrastructure.Auth.Model;
 using EnigmaBudget.Infrastructure.Auth.Requests;
 using Microsoft.AspNetCore.Authorization;
@@ -14,7 +13,7 @@ namespace EnigmaBudget.WebApi.Controllers
     {
         private readonly IAuthService _authService;
 
-        public UserController( IAuthService authSvc)
+        public UserController(IAuthService authSvc)
         {
             _authService = authSvc;
         }
@@ -45,7 +44,7 @@ namespace EnigmaBudget.WebApi.Controllers
 
         [HttpPost("profile")]
         [Authorize]
-        public AuthResult UpdateProfile([FromBody]UserProfile perfil)
+        public AuthResult UpdateProfile([FromBody] UserProfile perfil)
         {
             return _authService.UpdateProfile(perfil);
         }
@@ -66,7 +65,8 @@ namespace EnigmaBudget.WebApi.Controllers
 
         [HttpPost("verify-email-account")]
         [AllowAnonymous]
-        public AuthResult VerifyEmail([FromBody] string token) {
+        public AuthResult VerifyEmail([FromBody] string token)
+        {
             return _authService.ValidateEmail(token);
         }
     }

@@ -5,6 +5,6 @@
         public long? GetLoggedUserID();
         public string GetLoggedUserUUID();
         public bool UserHasRole(string roleName);
-        
+
     }
 }

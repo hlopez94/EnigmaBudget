@@ -53,7 +53,7 @@ namespace EnigmaBudget.Infrastructure.SendInBlue
                 httpContent.Headers.ContentType = new MediaTypeHeaderValue("application/json");
 
                 request.Content = httpContent;
-                
+
                 var response = _httpClient.Send(request);
 
                 response.EnsureSuccessStatusCode();

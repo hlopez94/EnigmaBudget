@@ -1,7 +1,7 @@
 ﻿using EnigmaBudget.Application.Model;
-using EnigmaBudget.Infrastructure.Auth;
 using EnigmaBudget.Domain.Model;
 using EnigmaBudget.Domain.Repositories;
+using EnigmaBudget.Infrastructure.Auth;
 
 namespace EnigmaBudget.Application.Services
 {

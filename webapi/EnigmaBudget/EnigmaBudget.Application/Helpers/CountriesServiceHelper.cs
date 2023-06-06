@@ -23,7 +23,7 @@ namespace EnigmaBudget.Application.Helpers
             return new Currency()
             {
                 Code = currency.Code,
-                Country = CountryCodesResolver.GetList().FirstOrDefault(c=>currency.Country.ToUpperInvariant() ==c.Name.ToUpperInvariant()).MapToCountry(),
+                Country = CountryCodesResolver.GetList().FirstOrDefault(c => currency.Country.ToUpperInvariant() == c.Name.ToUpperInvariant()).MapToCountry(),
                 Exponent = currency.Exponent,
                 Name = currency.Name,
                 Num = currency.Num

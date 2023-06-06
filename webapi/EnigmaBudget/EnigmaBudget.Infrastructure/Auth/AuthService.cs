@@ -56,7 +56,7 @@ namespace EnigmaBudget.Infrastructure.Auth
 
                 cmd.Parameters.Add(new MySqlParameter("usuario", request.UserName));
 
-                
+
                 _connection.Open();
 
                 using (MySqlDataReader reader = cmd.ExecuteReader())

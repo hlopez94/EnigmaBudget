@@ -1,11 +1,4 @@
-﻿using EnigmaBudget.Infrastructure.Auth.Helpers;
-using EnigmaBudget.Infrastructure.Helpers;
-using NuGet.Frameworks;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using EnigmaBudget.Infrastructure.Helpers;
 
 namespace EnigmaBudget.Backend.Tests.Infrastructure
 {

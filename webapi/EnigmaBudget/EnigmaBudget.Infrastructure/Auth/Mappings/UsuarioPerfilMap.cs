@@ -1,7 +1,7 @@
 ﻿using AutoMapper;
 using EnigmaBudget.Infrastructure.Auth.Entities;
-using EnigmaBudget.Infrastructure.Helpers;
 using EnigmaBudget.Infrastructure.Auth.Model;
+using EnigmaBudget.Infrastructure.Helpers;
 using System.Data.Common;
 
 namespace EnigmaBudget.Infrastructure.Auth.Mappings

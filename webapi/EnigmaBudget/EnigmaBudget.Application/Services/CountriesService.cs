@@ -3,7 +3,6 @@ using EnigmaBudget.Application.Model;
 using EnigmaBudget.Domain.Model;
 using ISO._3166;
 using ISO._4217;
-using Microsoft.IdentityModel.Tokens;
 
 namespace EnigmaBudget.Application.Services
 {
@@ -53,7 +52,7 @@ namespace EnigmaBudget.Application.Services
         public AppResult<Currency> GetCurrencyById(string num)
         {
             AppResult<Currency> result = new AppResult<Currency>();
-            var currency = CurrencyCodesResolver.Codes.FirstOrDefault(cur => cur.Num==num).MapToCurrency();
+            var currency = CurrencyCodesResolver.Codes.FirstOrDefault(cur => cur.Num == num).MapToCurrency();
 
             if (currency is null)
                 result.AddNotFoundError("País no encontrado");
@@ -76,7 +75,7 @@ namespace EnigmaBudget.Application.Services
         {
             AppResult<List<Currency>> result = new AppResult<List<Currency>>();
 
-            result.Data = CurrencyCodesResolver.Codes.DistinctBy(curr => curr.Num).Select(curr=>curr.MapToCurrency()).ToList();
+            result.Data = CurrencyCodesResolver.Codes.DistinctBy(curr => curr.Num).Select(curr => curr.MapToCurrency()).ToList();
 
             return result;
         }

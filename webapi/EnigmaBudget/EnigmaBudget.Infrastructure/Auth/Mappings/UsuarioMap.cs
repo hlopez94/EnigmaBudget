@@ -4,7 +4,7 @@ using System.Data.Common;
 
 namespace EnigmaBudget.Infrastructure.Auth.Mappings
 {
-    public  class UsuarioMap : Profile
+    public class UsuarioMap : Profile
     {
         public UsuarioMap()
         {

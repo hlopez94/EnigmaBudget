@@ -1,6 +1,5 @@
 ﻿using EnigmaBudget.Application;
 using EnigmaBudget.Application.Model;
-using EnigmaBudget.Infrastructure.Helpers;
 using EnigmaBudget.Domain.Model;
 using Microsoft.AspNetCore.Mvc;
 
@@ -12,7 +11,7 @@ namespace EnigmaBudget.WebApi.Controllers
         private readonly ICountriesService _countriesService;
         public CountriesController(ICountriesService countriesService)
         {
-            _countriesService= countriesService;
+            _countriesService = countriesService;
         }
 
         [HttpGet("countries")]
