@@ -1,5 +1,5 @@
-﻿using EnigmaBudget.Persistence.Contexts.EfCore.Enigma.Entities;
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using System.Reflection;
 
 namespace EnigmaBudget.Persistence.Contexts.EfCore.Enigma;
@@ -15,18 +15,20 @@ public partial class EnigmaContext : DbContext
     {
     }
 
-    public virtual DbSet<DepositAccountEntity> DepositAccounts { get; set; }
-
-    public virtual DbSet<TypesDepositAccountEntity> TypesDepositAccounts { get; set; }
-
-    public virtual DbSet<UsuarioEntity> Usuarios { get; set; }
-
-    public virtual DbSet<UsuarioPerfilEntity> UsuarioPerfiles { get; set; }
-
-    public virtual DbSet<UsuariosValidacionEmailEntity> UsuariosValidacionEmails { get; set; }
-
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-        => optionsBuilder.UseMySql("name=ConnectionStrings:EnigmaDb", ServerVersion.Parse("10.5.9-mariadb"));
+    {
+        if (!optionsBuilder.IsConfigured)
+        {
+            IConfigurationRoot configuration = new ConfigurationBuilder()
+                .SetBasePath(Directory.GetCurrentDirectory())
+                .AddJsonFile("appsettings.json", true, true)
+                .AddUserSecrets(Assembly.Load("EnigmaBudget.Persistence.Contexts.EfCore.Enigma"), true)
+                .Build();
+
+            optionsBuilder.UseMySql(configuration.GetConnectionString("EnigmaDb"), ServerVersion.AutoDetect(configuration.GetConnectionString("EnigmaDb")));
+        }
+
+    }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
