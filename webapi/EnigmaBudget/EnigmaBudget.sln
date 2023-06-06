@@ -30,7 +30,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "EnigmaBudget.Persistence.Re
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "EnigmaBudget.Domain", "EnigmaBudget.Domain\EnigmaBudget.Domain.csproj", "{531BC584-CA59-4AB8-9071-EA220058889D}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "EnigmaBudget.Persistence.Contexts.EfCore.Enigma", "EnigmaBudget.Persistence.MariaDB.EFCore\EnigmaBudget.Persistence.Contexts.EfCore.Enigma.csproj", "{9091E16F-B8AA-4BFE-B3B6-549DB5462EBA}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "EnigmaBudget.Persistence.Contexts.EfCore.Enigma", "EnigmaBudget.Persistence.Contexts.EfCore.Enigma\EnigmaBudget.Persistence.Contexts.EfCore.Enigma.csproj", "{9091E16F-B8AA-4BFE-B3B6-549DB5462EBA}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "persistence", "persistence", "{6D00237A-E4EE-456F-8680-63DCE17064BD}"
 EndProject

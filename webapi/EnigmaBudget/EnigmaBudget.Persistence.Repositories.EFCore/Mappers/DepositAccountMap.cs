@@ -4,7 +4,7 @@ using EnigmaBudget.Domain.Model;
 using EnigmaBudget.Infrastructure.Helpers;
 using EnigmaBudget.Persistence.Contexts.EfCore.Enigma.Entities;
 
-namespace EnigmaBudget.Persistence.Repositories.EfCore.Mappers
+namespace EnigmaBudget.Persistence.Repositories.EFCore.Mappers
 {
     public class DepositAccountMap : Profile
     {

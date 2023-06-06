@@ -13,6 +13,7 @@
   <ItemGroup>
     <ProjectReference Include="..\EnigmaBudget.Domain\EnigmaBudget.Domain.csproj" />
     <ProjectReference Include="..\EnigmaBudget.Infrastructure\EnigmaBudget.Infrastructure.csproj" />
+    <ProjectReference Include="..\EnigmaBudget.Persistence.Contexts.EfCore.Enigma\EnigmaBudget.Persistence.Contexts.EfCore.Enigma.csproj" />
     <ProjectReference Include="..\EnigmaBudget.Persistence.MariaDB.EFCore\EnigmaBudget.Persistence.Contexts.EfCore.Enigma.csproj" />
   </ItemGroup>
 

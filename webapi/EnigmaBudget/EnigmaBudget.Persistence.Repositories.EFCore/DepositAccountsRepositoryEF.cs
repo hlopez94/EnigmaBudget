@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace EnigmaBudget.Persistence.Repositories.EFCore
 {
-    public class DepositAccountsRepositoryEF : BaseEFRepository, IDepositAccountRepository
+    public class DepositAccountsRepositoryEF : BaseEnigmaEFRepository, IDepositAccountRepository
     {
         private readonly IContextRepository _contextRepository;
         public DepositAccountsRepositoryEF(
