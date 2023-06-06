@@ -3,7 +3,7 @@ using EnigmaBudget.Infrastructure.Helpers;
 using Microsoft.AspNetCore.Http;
 using System.Security.Claims;
 
-namespace EnigmaBudget.Persistence.Repositories.MariaDB
+namespace EnigmaBudget.Persistence.Repositories.EFCore
 {
     public class HttpContextRepository : IContextRepository
     {

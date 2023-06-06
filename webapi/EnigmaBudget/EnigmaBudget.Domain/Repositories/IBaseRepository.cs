@@ -1,11 +1,11 @@
 ﻿namespace EnigmaBudget.Domain.Repositories
 {
-    public interface IBaseRepository<T, KType>
+    public interface IBaseRepository<TModel, KType>
     {
-        Task<T> GetById(KType id);
-        Task<T> Create(T entity);
-        IAsyncEnumerable<T> ListAll();
-        Task<bool> Update(T entity);
-        Task<bool> Delete(KType id);        
+        Task<TModel> GetById(KType id);
+        Task<TModel> Create(TModel model);
+        IAsyncEnumerable<TModel> ListAll();
+        Task<bool> Update(TModel model);
+        Task<bool> Delete(KType id);
     }
 }

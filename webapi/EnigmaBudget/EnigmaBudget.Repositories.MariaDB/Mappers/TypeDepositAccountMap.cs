@@ -1,10 +1,10 @@
 ﻿using AutoMapper;
 using EnigmaBudget.Domain.Enums;
 using EnigmaBudget.Domain.Model;
-using EnigmaBudget.Persistence.MariaDB.Entities;
+using EnigmaBudget.Persistence.Repositories.MariaDB.Entities;
 using System.Data.Common;
 
-namespace EnigmaBudget.Persistence.MariaDB.Mappers
+namespace EnigmaBudget.Persistence.Repositories.MariaDB.Mappers
 {
     public class TypeDepositAccountMap : Profile
     {

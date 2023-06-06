@@ -1,11 +1,11 @@
 ﻿using AutoMapper;
-using EnigmaBudget.Infrastructure.Helpers;
 using EnigmaBudget.Domain.Enums;
 using EnigmaBudget.Domain.Model;
-using EnigmaBudget.Persistence.MariaDB.Entities;
+using EnigmaBudget.Infrastructure.Helpers;
+using EnigmaBudget.Persistence.Repositories.MariaDB.Entities;
 using System.Data.Common;
 
-namespace EnigmaBudget.Persistence.MariaDB.Mappers
+namespace EnigmaBudget.Persistence.Repositories.MariaDB.Mappers
 {
     public class DepositAccountMap : Profile
     {
@@ -39,7 +39,7 @@ namespace EnigmaBudget.Persistence.MariaDB.Mappers
                 .ForPath(p => p.Type.Description, opt => opt.MapFrom(q => q.type_deposit_account.tda_description))
                 .ForPath(p => p.Type.Name, opt => opt.MapFrom(q => q.type_deposit_account.tda_name))
                 .ForPath(p => p.Type.TypeEnum, opt => opt.MapFrom(q => Enum.Parse<DepositAccountTypesEnum>(q.type_deposit_account.tda_enum_name)));
-                ;
+            ;
         }
     }
 }

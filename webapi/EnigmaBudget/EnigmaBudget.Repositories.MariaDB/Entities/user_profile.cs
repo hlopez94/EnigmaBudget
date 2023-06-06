@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace EnigmaBudget.Persistence.MariaDB.Entities
+﻿namespace EnigmaBudget.Persistence.Repositories.MariaDB.Entities
 {
     internal class user_profile
     {

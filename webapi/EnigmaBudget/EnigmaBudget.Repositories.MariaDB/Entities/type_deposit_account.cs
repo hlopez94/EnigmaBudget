@@ -1,4 +1,4 @@
-﻿namespace EnigmaBudget.Persistence.MariaDB.Entities
+﻿namespace EnigmaBudget.Persistence.Repositories.MariaDB.Entities
 {
     internal class type_deposit_account
     {

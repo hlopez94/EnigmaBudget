@@ -1,10 +1,8 @@
 ﻿using AutoMapper;
-using Microsoft.VisualBasic;
 using MySqlConnector;
 using System.Data.Common;
-using System.Diagnostics.Metrics;
 
-namespace EnigmaBudget.Persistence.MariaDB
+namespace EnigmaBudget.Persistence.Repositories.MariaDB
 {
     public class BaseRepository
     {
@@ -42,7 +40,7 @@ namespace EnigmaBudget.Persistence.MariaDB
                     trx.Commit();
                     _connection.Close();
 
-                    if(insertedId.HasValue)
+                    if (insertedId.HasValue)
                         insertedId = cmd.LastInsertedId;
 
                     return nonQueryResult;

@@ -1,11 +1,11 @@
 ﻿using AutoMapper;
-using EnigmaBudget.Infrastructure.Helpers;
 using EnigmaBudget.Domain.Model;
 using EnigmaBudget.Domain.Repositories;
-using EnigmaBudget.Persistence.MariaDB.Entities;
+using EnigmaBudget.Infrastructure.Helpers;
+using EnigmaBudget.Persistence.Repositories.MariaDB.Entities;
 using MySqlConnector;
 
-namespace EnigmaBudget.Persistence.MariaDB
+namespace EnigmaBudget.Persistence.Repositories.MariaDB
 {
     public class DepositAccountsRepository : BaseRepository, IDepositAccountRepository
     {
@@ -17,7 +17,7 @@ namespace EnigmaBudget.Persistence.MariaDB
             IContextRepository contextRepository
             ) : base(mapper, connection)
         {
-            _contextRepository=contextRepository;
+            _contextRepository = contextRepository;
         }
         public async Task<DepositAccount> Create(DepositAccount entity)
         {
@@ -36,7 +36,7 @@ namespace EnigmaBudget.Persistence.MariaDB
                 new MySqlParameter("fechaModif", DateTime.Now)
             };
 
-            long newId=0;
+            long newId = 0;
             var result = await ExecuteNonQuery(sql, parameters.ToArray(), newId);
 
             if (result > 0)
@@ -56,7 +56,7 @@ namespace EnigmaBudget.Persistence.MariaDB
                 new MySqlParameter("deaId", EncodeDecodeHelper.Decrypt(id.ToString())),
             };
 
-            var result = await ExecuteNonQuery(sql,parameters.ToArray());
+            var result = await ExecuteNonQuery(sql, parameters.ToArray());
 
             return result == 1;
         }
@@ -71,7 +71,7 @@ namespace EnigmaBudget.Persistence.MariaDB
             };
 
             return await ExecuteScalar<deposit_account, DepositAccount>(sql, parameters.ToArray());
-            
+
         }
 
         public IAsyncEnumerable<DepositAccount> ListAll()
@@ -101,7 +101,7 @@ namespace EnigmaBudget.Persistence.MariaDB
                                dea_description = @description,
                                dea_funds = @funds,
                          WHERE dea_id = @deaId;";
-           ;
+            ;
             var parameters = new List<MySqlParameter>
             {
                 new MySqlParameter("depAccountTypeId", entity.Type.Id),
@@ -112,7 +112,7 @@ namespace EnigmaBudget.Persistence.MariaDB
 
             var result = await ExecuteNonQuery(sql, parameters.ToArray());
 
-            return result==1;
+            return result == 1;
         }
     }
 }

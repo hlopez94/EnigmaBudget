@@ -1,7 +1,4 @@
-﻿using EnigmaBudget.Infrastructure.Auth.Helpers;
-using Microsoft.Extensions.Configuration;
-using Microsoft.IdentityModel.Tokens;
-using System.Text;
+﻿using System.Text;
 
 namespace EnigmaBudget.Infrastructure.Helpers
 {
@@ -16,6 +13,12 @@ namespace EnigmaBudget.Infrastructure.Helpers
             else throw new InvalidOperationException("Encription Key already initialized");
         }
 
+        public static string Encrypt(long data)
+        {
+            Encoding unicode = Encoding.Unicode;
+
+            return Convert.ToBase64String(Encrypt(unicode.GetBytes(_encriptionKey), unicode.GetBytes(data.ToString())));
+        }
         public static string Encrypt(string data)
         {
             if (string.IsNullOrEmpty(data))
@@ -38,9 +41,13 @@ namespace EnigmaBudget.Infrastructure.Helpers
             return unicode.GetString(Encrypt(unicode.GetBytes(_encriptionKey), Convert.FromBase64String(data)));
         }
 
+        public static long DecryptLong(string id)
+        {
+            return long.Parse(Decrypt(id));
+        }
         private static byte[] Encrypt(byte[] key, byte[] data)
         {
-            if (key==null || key.Length == 0)
+            if (key == null || key.Length == 0)
             {
                 throw new ArgumentNullException(nameof(key), "Can't encrypt null value");
             }
