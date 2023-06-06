@@ -29,7 +29,7 @@ namespace EnigmaBudget.Persistence.Contexts.EfCore.Enigma.EntitiesConfiguration
             entity.Property(e => e.TdaFechaBaja).HasColumnName("tda_fecha_baja");
             entity.Property(e => e.TdaFechaModif).HasColumnName("tda_fecha_modif");
             entity.Property(e => e.TdaName)
-                .HasMaxLength(16)
+                .HasMaxLength(32)
                 .HasColumnName("tda_name");
 
         }
