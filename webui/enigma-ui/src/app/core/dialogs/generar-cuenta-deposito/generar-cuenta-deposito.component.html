@@ -1,7 +1,24 @@
-<p>generar-cuenta-deposito works!</p>
-
 <h1 mat-dialog-title>Nueva Cuenta Depósito</h1>
-<form mat-dialog-content [formGroup]="newAccountForm">
+
+<form mat-dialog-content [formGroup]="newAccountForm" (onSubmit)="submit()">
+
+  <section>
+    <h5 class="mat-label">Elija el tipo de cuenta</h5>
+
+    <mat-button-toggle-group controlName="type" vertical="false">
+      <mat-button-toggle value="WALLET">
+        <mat-icon>wallet</mat-icon>
+      </mat-button-toggle>
+      <mat-button-toggle value="SAVINGS">
+        <mat-icon>savings</mat-icon>
+      </mat-button-toggle>
+      <mat-button-toggle value="CHECKING">
+        <mat-icon>account_balance</mat-icon>
+      </mat-button-toggle>
+    </mat-button-toggle-group>
+
+  </section>
+
   <mat-form-field>
     <mat-label>Nombre de Cuenta</mat-label>
     <input
@@ -13,6 +30,7 @@
       formControlName="AccountAlias"
     />
   </mat-form-field>
+
   <mat-form-field>
     <mat-label>Descripción</mat-label>
     <input
@@ -27,37 +45,67 @@
 
   <mat-form-field>
     <mat-label>País</mat-label>
-    <input title="a" type="text" matInput formControlName="Country" [matAutocomplete]="countryAutoComplete">
-    <mat-autocomplete name="Country"   #countryAutoComplete="matAutocomplete" [displayWith]="getCountryValue">
-      <cdk-virtual-scroll-viewport appendOnly itemSize="24" [style.height.px]="countriesLength*48">
+    <input
+      title="a"
+      type="text"
+      matInput
+      formControlName="Country"
+      [matAutocomplete]="countryAutoComplete"
+    />
+    <mat-autocomplete
+      name="Country"
+      #countryAutoComplete="matAutocomplete"
+      [displayWith]="getCountryValue"
+    >
+      <cdk-virtual-scroll-viewport
+        appendOnly
+        itemSize="24"
+        [style.height.px]="countriesLength * 48"
+      >
         <mat-option
-        *cdkVirtualFor="let country of $countries | async"
-        [value]="country">
-        <span class="fi fi-{{ country.alpha2 | lowercase }}"></span>
-         {{ country.name }}
-      </mat-option>
+          *cdkVirtualFor="let country of $countries | async"
+          [value]="country"
+        >
+          <span class="fi fi-{{ country.alpha2 | lowercase }}"></span>
+          {{ country.name }}
+        </mat-option>
       </cdk-virtual-scroll-viewport>
-
     </mat-autocomplete>
   </mat-form-field>
-  <!-- <mat-form-field>
+
+  <mat-form-field>
     <mat-label>Moneda</mat-label>
-    <input title="a" type="text" matInput formControlName="Currency" [matAutocomplete]="currenciesAutoComplete" >
-    <mat-autocomplete name="Currency"   #currenciesAutoComplete="matAutocomplete" [displayWith]="getCurrencyValue">
-    <mat-select name="Currency" matInput formControlName="Currency">
-      <cdk-virtual-scroll-viewport appendOnly itemSize="24" [style.height.px]="currenciesLength*48">
+    <input
+      title="New Account Currency"
+      type="text"
+      matInput
+      formControlName="Currency"
+      [matAutocomplete]="currenciesAutoComplete"
+    />
+    <mat-autocomplete
+      name="Currency"
+      #currenciesAutoComplete="matAutocomplete"
+      [displayWith]="getCurrencyDisplay"
+    >
+      <cdk-virtual-scroll-viewport
+        appendOnly
+        itemSize="24"
+        [style.height.px]="currenciesLength * 48"
+      >
         <mat-option
-        *cdkVirtualFor="let currency of $currencies | async"
-        [value]="currency">
-         {{ currency.name }} ( {{ getCurrency(currency.code) }} )
-      </mat-option>
+          *cdkVirtualFor="let currency of $currencies | async"
+          [value]="currency"
+        >
+          {{ currency.name }} ( {{ getCurrency(currency.code) }} )
+        </mat-option>
       </cdk-virtual-scroll-viewport>
-    </mat-select>
-  </mat-form-field> -->
+    </mat-autocomplete>
+  </mat-form-field>
+
   <mat-form-field>
     <mat-label>Fondos Iniciales</mat-label>
-    <span matPrefix >
-      {{getCurrency(newAccountForm.controls['Currency'].value?.code ?? '$')}}
+    <span matPrefix>
+      {{ getCurrency(newAccountForm.controls["Currency"].value?.code ?? "$") }}
     </span>
     <input
       matInput
@@ -68,4 +116,18 @@
       formControlName="InitialFunds"
     />
   </mat-form-field>
+
+  <div align="end" id="new-account-form-actions" class="button-group">
+    <button type="reset" title="Reset New Account Data" mat-button>
+      Reiniciar
+    </button>
+    <button
+      type="submit"
+      color="primary"
+      title="Create New Account"
+      mat-raised-button
+    >
+      Crear
+    </button>
+  </div>
 </form>

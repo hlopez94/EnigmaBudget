@@ -1,23 +1,37 @@
-import { firstValueFrom } from 'rxjs';
+import { Observable, firstValueFrom } from 'rxjs';
 import { environment } from 'src/environments/environment';
-import { ApiResponse } from 'src/app/core/model/ApiResponse';
+import { ApiResponse, TypedApiResponse } from 'src/app/core/model/ApiResponse';
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { CuentaDeposito } from 'src/app/core/model/cuenta-deposito';
 
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class CuentasDepositoService {
+  constructor(private httpClient: HttpClient) {}
 
-  constructor(private httpClient: HttpClient) { }
-
-  async cargarCuentasUsuario() : Promise<CuentaDeposito[]>{
-    var res = await firstValueFrom(
-      this.httpClient.get<ApiResponse<CuentaDeposito[]>>(
-        `${environment.settings.apiUrl}/DepositAccounts`
-      )
+  cargarCuentasUsuario(): Observable<TypedApiResponse<CuentaDeposito[]>> {
+    return this.httpClient.get<TypedApiResponse<CuentaDeposito[]>>(
+      `${environment.settings.apiUrl}/DepositAccounts`
     );
-    return res.data;
+  }
+
+  crearCuentaDeposito(nuevaCuenta:CuentaDeposito): Observable<TypedApiResponse<CuentaDeposito>>{
+    return this.httpClient.post<TypedApiResponse<CuentaDeposito>>(
+      `${environment.settings.apiUrl}/DepositAccounts`, nuevaCuenta
+    );
+  }
+
+  modificarCuentaDeposito(idCuenta: number,cuentaDeposito:CuentaDeposito): Observable<TypedApiResponse<CuentaDeposito>>{
+    return this.httpClient.put<TypedApiResponse<CuentaDeposito>>(
+      `${environment.settings.apiUrl}/DepositAccounts/${idCuenta}`, cuentaDeposito
+    );
+  }
+
+  eliminarCuentaDeposito(idCuenta: number): Observable<ApiResponse>{
+    return this.httpClient.delete<TypedApiResponse<CuentaDeposito>>(
+      `${environment.settings.apiUrl}/DepositAccounts/${idCuenta}`
+    );
   }
 }

@@ -15,6 +15,7 @@ export class CountriesStore {
   constructor(private countriesService: CountriesService) {
     this.$countries = new BehaviorSubject<Pais[]>([]);
     this.countries = this.$countries.asObservable();
+
     this.$filteredCountries= new BehaviorSubject<Pais[]>([]);
     this.filteredCountries= this.$filteredCountries.asObservable();
 

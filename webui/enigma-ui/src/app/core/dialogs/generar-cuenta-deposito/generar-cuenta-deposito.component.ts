@@ -1,13 +1,8 @@
 import { CountriesStore } from './../../stores/countries.store';
 import { CurrenciesStore } from './../../stores/currencies.store';
-import { firstValueFrom, map, Observable, startWith } from 'rxjs';
-import { Moneda } from './../../model/moneda';
-import {
-  FormGroup,
-  FormControl,
-  FormBuilder,
-  Validators,
-} from '@angular/forms';
+import { Observable } from 'rxjs';
+import { Divisa } from './../../model/divisa';
+import { FormGroup, FormControl, FormBuilder } from '@angular/forms';
 import { Component } from '@angular/core';
 import { getCurrencySymbol } from '@angular/common';
 import { Pais } from '../../model/pais';
@@ -20,7 +15,7 @@ import { Pais } from '../../model/pais';
 export class GenerarCuentaDepositoComponent {
   newAccountForm: FormGroup;
 
-  $currencies: Observable<Moneda[]>;
+  $currencies: Observable<Divisa[]>;
   $countries: Observable<Pais[]>;
   countriesLength: number = 5;
   currenciesLength: number = 5;
@@ -30,7 +25,7 @@ export class GenerarCuentaDepositoComponent {
     private currenciesStore: CurrenciesStore,
     private countriesStore: CountriesStore
   ) {
-    this.$currencies = currenciesStore.divisas;
+    this.$currencies = currenciesStore.filteredDivisas;
     this.$countries = countriesStore.filteredCountries;
 
     this.$countries.subscribe(
@@ -57,9 +52,12 @@ export class GenerarCuentaDepositoComponent {
     this.newAccountForm.controls['Country'].valueChanges.subscribe((change) =>
       this.countriesStore.filterCountries(change)
     );
+    this.newAccountForm.controls['Currency'].valueChanges.subscribe((change) =>
+      this.currenciesStore.filterCurrencies(change)
+    );
   }
 
-  getCurrency(code: string) {
+  getCurrency(code: string): string {
     return getCurrencySymbol(code, 'wide');
   }
 
@@ -67,12 +65,16 @@ export class GenerarCuentaDepositoComponent {
     return option?.name;
   }
 
-  async getCurrenciesAutoCompleteHeight(list: any[]) {
-    this.$currencies.pipe(
-      map((value) => {
-        return value.length * 48;
-      })
-    );
+  getCurrencyDisplay(option: Divisa): string {
+    return option
+      ? `${getCurrencySymbol(option.code, 'narrow')} - ${option.name} [${
+          option.code
+        }]`
+      : '';
+  }
+
+  async submit(){
+    //this.acc
   }
 }
 
@@ -81,7 +83,7 @@ export interface CreateDepositAccountForm {
   Description: FormControl<string>;
   InitialFunds: FormControl<number>;
   Country: FormControl<Pais>;
-  Currency: FormControl<Moneda>;
+  Currency: FormControl<Divisa>;
   Type: FormControl<DepositAccountType>;
 }
 

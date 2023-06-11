@@ -1,4 +1,4 @@
-import { ApiResponse } from 'src/app/core/model/ApiResponse';
+import { TypedApiResponse } from 'src/app/core/model/ApiResponse';
 import { environment } from 'src/environments/environment';
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
@@ -14,7 +14,7 @@ export class CountriesService {
 
   async getAllCountries() : Promise<Pais[]> {
     var countries = await firstValueFrom(
-      this.httpClient.get<ApiResponse<Pais[]>>(`${environment.settings.apiUrl}/countries`)
+      this.httpClient.get<TypedApiResponse<Pais[]>>(`${environment.settings.apiUrl}/countries`)
     )
     return countries.data;
   }

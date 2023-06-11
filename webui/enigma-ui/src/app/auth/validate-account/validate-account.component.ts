@@ -2,7 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import {  MatSnackBar } from '@angular/material/snack-bar';
 import { ActivatedRoute, Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
-import { ApiResponse } from 'src/app/core/model/ApiResponse';
+import { TypedApiResponse } from 'src/app/core/model/ApiResponse';
 import { AuthService } from '../auth.service';
 
 @Component({
@@ -32,7 +32,7 @@ export class ValidateAccountComponent implements OnInit {
   }
 
   async validarMail(token: string){
-    var res : ApiResponse<boolean> = await this._authService.verifyAccountMail(token);
+    var res : TypedApiResponse<boolean> = await this._authService.verifyAccountMail(token);
 
     if(res.isSuccess){
       this._authService.logout();

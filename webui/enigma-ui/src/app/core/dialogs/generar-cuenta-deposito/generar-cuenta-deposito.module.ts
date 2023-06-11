@@ -10,6 +10,7 @@ import { CommonModule } from '@angular/common';
 import { GenerarCuentaDepositoComponent } from './generar-cuenta-deposito.component';
 import {ScrollingModule} from '@angular/cdk/scrolling';
 import {MatAutocompleteModule} from '@angular/material/autocomplete';
+import {MatButtonToggleModule} from '@angular/material/button-toggle';
 
 
 
@@ -28,7 +29,8 @@ import {MatAutocompleteModule} from '@angular/material/autocomplete';
     MatFormFieldModule,
     MatInputModule,
     ScrollingModule,
-    MatIconModule
+    MatIconModule,
+    MatButtonToggleModule
   ],
   exports:[
     GenerarCuentaDepositoComponent

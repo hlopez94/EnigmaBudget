@@ -1,6 +1,6 @@
 <ul class="lista-cuentas">
   <li *ngFor="let i of counter(3)">
-    <mat-card>
+ <   <mat-card>
       <mat-card-header>
         <mat-card-title>Pesos Argentinos</mat-card-title>
         <mat-card-subtitle>ARS</mat-card-subtitle>
@@ -22,6 +22,29 @@
         </div>
       </mat-card-content>
     </mat-card>
+
+    <mat-card>
+      <mat-card-header>
+        <mat-card-title>Pesos Argentinos</mat-card-title>
+        <mat-card-subtitle>ARS</mat-card-subtitle>
+      </mat-card-header>
+
+      <mat-card-content>
+        <div style="display: flex">
+          <h1 class="mat-display-1">
+            {{ 1000 | currency : "ARS" : "symbol-narrow" : "4.2-2" }}
+          </h1>
+          <button
+            mat-icon-button
+            title="Ocultar/mostrar balance"
+            aria-label="Ocultar/mostrar balance"
+            type="button"
+          >
+            <mat-icon>visibility_on</mat-icon>
+          </button>
+        </div>
+      </mat-card-content>
+    </mat-card>>
   </li>
 </ul>
 <p></p>

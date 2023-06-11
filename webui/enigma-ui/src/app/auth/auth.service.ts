@@ -6,7 +6,7 @@ import {
   Observable
 } from 'rxjs';
 import { environment } from 'src/environments/environment';
-import { ApiResponse } from '../core/model/ApiResponse';
+import { ApiResponse, TypedApiResponse } from '../core/model/ApiResponse';
 import { LoginRequest } from './login/login-request';
 import { LoginResponse } from './model/login-response';
 import { Pais } from './model/pais';
@@ -34,14 +34,14 @@ export class AuthService {
     return this._IsUserLoggedIn.value;
   }
 
-  async verifyAccountMail(token: string): Promise<ApiResponse<boolean>>  {
-    return await firstValueFrom(this._httpClient.post<ApiResponse<boolean>>(`${environment.settings.apiUrl}/user/verify-email-account`, token))
+  async verifyAccountMail(token: string): Promise<TypedApiResponse<boolean>>  {
+    return await firstValueFrom(this._httpClient.post<TypedApiResponse<boolean>>(`${environment.settings.apiUrl}/user/verify-email-account`, token))
 
   }
 
   async getProfile(): Promise<Profile> {
     var res = await firstValueFrom(
-      this._httpClient.get<ApiResponse<Profile>>(
+      this._httpClient.get<TypedApiResponse<Profile>>(
         `${environment.settings.apiUrl}/user/profile`
       )
     );
@@ -55,7 +55,7 @@ export class AuthService {
 
   async updateProfile(perfil: Profile): Promise<boolean> {
     var res = await firstValueFrom(
-      this._httpClient.post<ApiResponse<boolean>>(
+      this._httpClient.post<TypedApiResponse<boolean>>(
         `${environment.settings.apiUrl}/user/profile`,
         perfil
       )
@@ -68,7 +68,7 @@ export class AuthService {
     request: LoginRequest
   ): Promise<LoginResponse> {
     var res = await firstValueFrom(
-      this._httpClient.post<ApiResponse<LoginResponse>>(
+      this._httpClient.post<TypedApiResponse<LoginResponse>>(
         `${environment.settings.apiUrl}/user/login`,
         request
       )
@@ -90,7 +90,7 @@ export class AuthService {
 
   public async paises() : Promise<Pais[]>{
     var res = await firstValueFrom(
-      this._httpClient.get<ApiResponse<Pais[]>>(
+      this._httpClient.get<TypedApiResponse<Pais[]>>(
         `${environment.settings.apiUrl}/user/countries`
       )
     );
@@ -137,7 +137,7 @@ export class AuthService {
     return false;
   }
 
-  public async SignUp(signupInfo: any) : Promise<ApiResponse<any>>{
-    return await firstValueFrom(this._httpClient.post<ApiResponse<any>>(`${environment.settings.apiUrl}/user/signup`, signupInfo))
+  public async SignUp(signupInfo: any) : Promise<TypedApiResponse<any>>{
+    return await firstValueFrom(this._httpClient.post<TypedApiResponse<any>>(`${environment.settings.apiUrl}/user/signup`, signupInfo))
  }
 }

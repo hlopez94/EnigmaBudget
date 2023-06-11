@@ -1,3 +1,3 @@
-export class CuentaDeposito{
-
+export interface CuentaDeposito{
+  id:number
 }

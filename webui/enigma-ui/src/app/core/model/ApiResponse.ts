@@ -1,8 +1,11 @@
 import { ApiError } from "./ApiError";
 
-export interface ApiResponse<T> {
+export interface ApiResponse {
   isSuccess: boolean;
-  data: T;
   errorText: string;
   errors: ApiError[];
+}
+
+export interface TypedApiResponse<T> extends ApiResponse{
+  data: T;
 }

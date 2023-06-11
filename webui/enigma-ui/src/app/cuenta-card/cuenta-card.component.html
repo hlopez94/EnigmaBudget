@@ -1,0 +1,97 @@
+<mat-card *ngIf="type === 'account'">
+  <mat-card-header>
+    <mat-card-title>BBVA </mat-card-title>
+    <mat-card-subtitle>Caja Ahorros</mat-card-subtitle>
+    <button
+      mat-icon-button
+      [matMenuTriggerFor]="menu"
+      class="mat-card-top-right-menu"
+      aria-label="Example icon-button with a menu"
+    >
+      <mat-icon>more_vert</mat-icon>
+    </button>
+    <mat-menu #menu="matMenu">
+      <button mat-menu-item>
+        <mat-icon>sort</mat-icon>
+        <span>Ver Movimientos</span>
+      </button>
+      <button mat-menu-item disabled>
+        <mat-icon>edit</mat-icon>
+        <span>Editar Detalles</span>
+      </button>
+    </mat-menu>
+  </mat-card-header>
+
+  <mat-card-content>
+    <div style="display: flex">
+      <h1 class="mat-display-1">
+        {{ 1000 | currency : "ARS" : "symbol-narrow" : "4.2-2" }}
+      </h1>
+      <button
+        mat-icon-button
+        title="Ocultar/mostrar balance"
+        aria-label="Ocultar/mostrar balance"
+        type="button"
+      >
+        <mat-icon>visibility_on</mat-icon>
+      </button>
+    </div>
+    <mat-card-actions style="display: flex">
+      <button mat-button style="color: green">
+        <mat-icon>arrow_circle_up</mat-icon>&nbsp;Crédito
+      </button>
+      <button mat-button color="warn">
+        <mat-icon>arrow_circle_down</mat-icon>&nbsp;Débito
+      </button>
+    </mat-card-actions>
+  </mat-card-content>
+</mat-card>
+
+<mat-card *ngIf="type === 'placeholder'">
+  <mat-card-header>
+    <mat-card-title>&nbsp; </mat-card-title>
+    <mat-card-subtitle>&nbsp;</mat-card-subtitle>
+    <button
+      mat-icon-button
+      [matMenuTriggerFor]="menu"
+      class="mat-card-top-right-menu"
+      aria-label="Example icon-button with a menu"
+    >
+      <mat-icon>more_vert</mat-icon>
+    </button>
+    <mat-menu #menu="matMenu">
+      <button mat-menu-item>
+        <mat-icon>sort</mat-icon>
+        <span>Ver Movimientos</span>
+      </button>
+      <button mat-menu-item disabled>
+        <mat-icon>edit</mat-icon>
+        <span>Editar Detalles</span>
+      </button>
+    </mat-menu>
+  </mat-card-header>
+
+  <mat-card-content>
+    <div style="display: flex">
+      <h1 class="mat-display-1">
+        {{ 1000 | currency : "ARS" : "symbol-narrow" : "4.2-2" }}
+      </h1>
+      <button
+        mat-icon-button
+        title="Ocultar/mostrar balance"
+        aria-label="Ocultar/mostrar balance"
+        type="button"
+      >
+        <mat-icon>visibility_on</mat-icon>
+      </button>
+    </div>
+    <mat-card-actions style="display: flex">
+      <button mat-button style="color: green">
+        <mat-icon>arrow_circle_up</mat-icon>&nbsp;Crédito
+      </button>
+      <button mat-button color="warn">
+        <mat-icon>arrow_circle_down</mat-icon>&nbsp;Débito
+      </button>
+    </mat-card-actions>
+  </mat-card-content>
+</mat-card>

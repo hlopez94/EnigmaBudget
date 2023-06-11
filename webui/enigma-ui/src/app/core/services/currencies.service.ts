@@ -1,9 +1,9 @@
 import { environment } from 'src/environments/environment';
-import { ApiResponse } from 'src/app/core/model/ApiResponse';
+import { TypedApiResponse } from 'src/app/core/model/ApiResponse';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { Injectable } from '@angular/core';
-import { Moneda } from '../model/moneda';
+import { Divisa } from '../model/divisa';
 
 @Injectable({
   providedIn: 'root',
@@ -11,9 +11,9 @@ import { Moneda } from '../model/moneda';
 export class CurrenciesService {
   constructor(private httpClient: HttpClient) {}
 
-  async ObtenerTodas(): Promise<Moneda[]> {
+  async ObtenerTodas(): Promise<Divisa[]> {
     var res = await firstValueFrom(
-      this.httpClient.get<ApiResponse<Moneda[]>>(
+      this.httpClient.get<TypedApiResponse<Divisa[]>>(
         `${environment.settings.apiUrl}/currencies`
       )
     );

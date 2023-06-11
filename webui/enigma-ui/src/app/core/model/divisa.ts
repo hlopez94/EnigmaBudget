@@ -1,6 +1,6 @@
 import { Pais } from "./pais";
 
-export interface Moneda {
+export interface Divisa {
   code:string
   num:number
   name:string
