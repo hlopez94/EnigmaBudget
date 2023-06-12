@@ -24,12 +24,17 @@ namespace EnigmaBudget.WebApi.Configuration
         }
         public static void ConfigDataBases(this WebApplicationBuilder builder)
         {
-            MariaDBConfig MariaDbConfig = builder.Configuration.GetRequiredSection("MariaDB").Get<MariaDBConfig>();
+            MariaDBConfig MariaDbConfig = builder.Configuration.GetRequiredSection("MariaDB").Get<MariaDBConfig>()!;
 
             builder.Services.AddScoped(_ => new MySqlConnection(MariaDbConfig.ConnectionString));
 
             builder.Services.AddDbContext<EnigmaContext>(
-                options => options.UseMySql(MariaDbConfig.ConnectionString, ServerVersion.AutoDetect(MariaDbConfig.ConnectionString)));
+                options => options.UseMySql(
+                                    MariaDbConfig.ConnectionString,
+                                    ServerVersion.AutoDetect(MariaDbConfig.ConnectionString),
+                                    x => x.MigrationsAssembly($"EnigmaBudget.Persistence.Contexts.EfCore.Enigma.Migrations.{MariaDbConfig.Environment}")
+                            )
+                );
         }
     }
 }

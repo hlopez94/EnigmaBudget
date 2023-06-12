@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
 
-namespace EnigmaBudget.Persistence.Contexts.EfCore.Enigma.Migrations
+namespace EnigmaBudget.Persistence.Contexts.EfCore.Enigma.Migrations.Dev.Migrations
 {
     [DbContext(typeof(EnigmaContext))]
     partial class EnigmaContextModelSnapshot : ModelSnapshot
@@ -67,8 +67,8 @@ namespace EnigmaBudget.Persistence.Contexts.EfCore.Enigma.Migrations
                         .HasComment("Fecha de modificación de cuenta deposito");
 
                     b.Property<decimal>("DeaFunds")
-                        .HasPrecision(10)
-                        .HasColumnType("decimal(10)")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("decimal(19,4)")
                         .HasColumnName("dea_funds")
                         .HasComment("Fondos actuales");
 
@@ -150,6 +150,44 @@ namespace EnigmaBudget.Persistence.Contexts.EfCore.Enigma.Migrations
                         .IsUnique();
 
                     b.ToTable("types_deposit_account", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            TdaId = 1L,
+                            TdaDescription = "Caja de Ahorro",
+                            TdaEnumName = "CAJA_AHORRO",
+                            TdaFechaAlta = new DateOnly(2023, 6, 11),
+                            TdaFechaModif = new DateOnly(2023, 6, 11),
+                            TdaName = "Caja de Ahorro"
+                        },
+                        new
+                        {
+                            TdaId = 2L,
+                            TdaDescription = "Cuenta Corriente",
+                            TdaEnumName = "CUENTA_CORRIENTE",
+                            TdaFechaAlta = new DateOnly(2023, 6, 11),
+                            TdaFechaModif = new DateOnly(2023, 6, 11),
+                            TdaName = "Cuenta Corriente"
+                        },
+                        new
+                        {
+                            TdaId = 3L,
+                            TdaDescription = "Billetera Física",
+                            TdaEnumName = "BILLETERA_FISICA",
+                            TdaFechaAlta = new DateOnly(2023, 6, 11),
+                            TdaFechaModif = new DateOnly(2023, 6, 11),
+                            TdaName = "Billetera Física"
+                        },
+                        new
+                        {
+                            TdaId = 4L,
+                            TdaDescription = "Billetera Virtual",
+                            TdaEnumName = "BILLETERA_VIRTUAL",
+                            TdaFechaAlta = new DateOnly(2023, 6, 11),
+                            TdaFechaModif = new DateOnly(2023, 6, 11),
+                            TdaName = "Billetera Virtual"
+                        });
                 });
 
             modelBuilder.Entity("EnigmaBudget.Persistence.Contexts.EfCore.Enigma.Entities.UsuarioEntity", b =>

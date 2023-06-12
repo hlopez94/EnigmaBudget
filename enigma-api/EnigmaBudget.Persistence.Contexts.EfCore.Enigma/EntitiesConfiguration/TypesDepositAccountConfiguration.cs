@@ -1,6 +1,7 @@
 ﻿using EnigmaBudget.Persistence.Contexts.EfCore.Enigma.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace EnigmaBudget.Persistence.Contexts.EfCore.Enigma.EntitiesConfiguration
 {
@@ -30,8 +31,15 @@ namespace EnigmaBudget.Persistence.Contexts.EfCore.Enigma.EntitiesConfiguration
             entity.Property(e => e.TdaFechaModif).HasColumnName("tda_fecha_modif");
             entity.Property(e => e.TdaName)
                 .HasMaxLength(32)
-                .HasColumnName("tda_name");
+            .HasColumnName("tda_name");
 
+
+            entity.HasData(
+                    new TypesDepositAccountEntity { TdaId = 1, TdaDescription = "Caja de Ahorro", TdaName = "Caja de Ahorro", TdaEnumName = "CAJA_AHORRO", TdaFechaAlta = DateOnly.FromDateTime(DateTime.Now.Date), TdaFechaModif = DateOnly.FromDateTime(DateTime.Now) },
+                    new TypesDepositAccountEntity { TdaId = 2, TdaDescription = "Cuenta Corriente", TdaName = "Cuenta Corriente", TdaEnumName = "CUENTA_CORRIENTE", TdaFechaAlta = DateOnly.FromDateTime(DateTime.Now), TdaFechaModif = DateOnly.FromDateTime(DateTime.Now) },
+                    new TypesDepositAccountEntity { TdaId = 3, TdaDescription = "Billetera Física", TdaName = "Billetera Física", TdaEnumName = "BILLETERA_FISICA", TdaFechaAlta = DateOnly.FromDateTime(DateTime.Now), TdaFechaModif = DateOnly.FromDateTime(DateTime.Now) },
+                    new TypesDepositAccountEntity { TdaId = 4, TdaDescription = "Billetera Virtual", TdaName = "Billetera Virtual", TdaEnumName = "BILLETERA_VIRTUAL", TdaFechaAlta = DateOnly.FromDateTime(DateTime.Now), TdaFechaModif = DateOnly.FromDateTime(DateTime.Now) }
+                    );
         }
     }
 }

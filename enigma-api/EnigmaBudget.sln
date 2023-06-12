@@ -36,7 +36,9 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "persistence", "persistence"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "contexts", "contexts", "{BFD042D9-E784-46A0-9AB7-37BB7CA22EC0}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EnigmaBudget.Persistence.Repositories.EFCore", "EnigmaBudget.Persistence.Repositories.EFCore\EnigmaBudget.Persistence.Repositories.EFCore.csproj", "{326C1042-AD33-4F49-8F58-2DEFBAF6C6AF}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "EnigmaBudget.Persistence.Repositories.EFCore", "EnigmaBudget.Persistence.Repositories.EFCore\EnigmaBudget.Persistence.Repositories.EFCore.csproj", "{326C1042-AD33-4F49-8F58-2DEFBAF6C6AF}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EnigmaBudget.Persistence.Contexts.EfCore.Enigma.Migrations.Dev", "EnigmaBudget.Persistence.Contexts.EfCore.Enigma.Migrations.Dev\EnigmaBudget.Persistence.Contexts.EfCore.Enigma.Migrations.Dev.csproj", "{95D23EDB-610D-4B82-BAD1-FB4DEC0DF79F}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -76,6 +78,10 @@ Global
 		{326C1042-AD33-4F49-8F58-2DEFBAF6C6AF}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{326C1042-AD33-4F49-8F58-2DEFBAF6C6AF}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{326C1042-AD33-4F49-8F58-2DEFBAF6C6AF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{95D23EDB-610D-4B82-BAD1-FB4DEC0DF79F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{95D23EDB-610D-4B82-BAD1-FB4DEC0DF79F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{95D23EDB-610D-4B82-BAD1-FB4DEC0DF79F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{95D23EDB-610D-4B82-BAD1-FB4DEC0DF79F}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -91,6 +97,7 @@ Global
 		{9091E16F-B8AA-4BFE-B3B6-549DB5462EBA} = {BFD042D9-E784-46A0-9AB7-37BB7CA22EC0}
 		{BFD042D9-E784-46A0-9AB7-37BB7CA22EC0} = {6D00237A-E4EE-456F-8680-63DCE17064BD}
 		{326C1042-AD33-4F49-8F58-2DEFBAF6C6AF} = {33BE885F-33FD-4E66-8600-C0A00F041CD1}
+		{95D23EDB-610D-4B82-BAD1-FB4DEC0DF79F} = {BFD042D9-E784-46A0-9AB7-37BB7CA22EC0}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {759F1391-BBCD-41BC-A901-93098D676DE2}

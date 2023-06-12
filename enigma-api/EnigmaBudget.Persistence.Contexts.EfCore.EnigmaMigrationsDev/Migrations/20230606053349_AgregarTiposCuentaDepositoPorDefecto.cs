@@ -2,7 +2,7 @@
 
 #nullable disable
 
-namespace EnigmaBudget.Persistence.Contexts.EfCore.Enigma.Migrations
+namespace EnigmaBudget.Persistence.Contexts.EfCore.EnigmaMigrationsDev.Migrations
 {
     /// <inheritdoc />
     public partial class AgregarTiposCuentaDepositoPorDefecto : Migration

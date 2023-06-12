@@ -11,5 +11,7 @@
 
         public string ConnectionString => $"Server={Server};Port={Port};user={User};Password={Password};Database={Database}";
 
+        public string Environment { get; set; }
+
     }
 }
