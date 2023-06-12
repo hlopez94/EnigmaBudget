@@ -44,7 +44,6 @@
               "src/assets"
             ],
             "styles": [
-              "./node_modules/flag-icons/sass/flag-icons.scss",
               "src/theme.scss",
               "src/styles.scss"
             ],
@@ -56,7 +55,7 @@
                 {
                   "type": "initial",
                   "maximumWarning": "700kb",
-                  "maximumError": "1mb"
+                  "maximumError": "2mb"
                 },
                 {
                   "type": "anyComponentStyle",

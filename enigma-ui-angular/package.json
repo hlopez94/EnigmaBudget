@@ -7,7 +7,7 @@
     "build": "ng build -c production --base-href /",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
-    "sme": "ng build --source-map=true --named-chunks==true && source-map-explorer dist/**/*.js"
+    "sme": "ng build -c production --source-map=true --named-chunks==true && source-map-explorer dist/**/*.js"
   },
   "private": true,
   "dependencies": {

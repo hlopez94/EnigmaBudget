@@ -1,12 +1,12 @@
 import { HttpClient } from '@angular/common/http';
-import { Injectable, OnDestroy } from '@angular/core';
+import { Injectable } from '@angular/core';
 import {
   BehaviorSubject,
   firstValueFrom,
   Observable
 } from 'rxjs';
 import { environment } from 'src/environments/environment';
-import { ApiResponse, TypedApiResponse } from '../core/model/ApiResponse';
+import {  TypedApiResponse } from '../core/model/ApiResponse';
 import { LoginRequest } from './login/login-request';
 import { LoginResponse } from './model/login-response';
 import { Pais } from './model/pais';
@@ -118,6 +118,7 @@ export class AuthService {
     const expiryInSeconds = JSON.parse(atob(token.split('.')[1])).exp;
     return new Date(expiryInSeconds * 1000);
   }
+
   private tokenExpired(token: string): boolean {
     const expiryInSeconds = JSON.parse(atob(token.split('.')[1])).exp;
     return Math.floor(new Date().getTime() / 1000) >= expiryInSeconds;

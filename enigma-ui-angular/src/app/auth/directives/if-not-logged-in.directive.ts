@@ -9,6 +9,7 @@ import { AuthService } from '../auth.service';
 
 @Directive({
   selector: '[ifNotLoggedIn]',
+  standalone:true
 })
 export class IfNotLoggedInDirective implements OnInit, OnDestroy {
   susbscription: Subscription | undefined;

@@ -4,6 +4,7 @@ import { AuthService } from '../auth.service';
 
 @Directive({
   selector: '[ifLoggedIn]',
+  standalone:true
 })
 export class IfLoggedInDirective {
   susbscription: Subscription | undefined;

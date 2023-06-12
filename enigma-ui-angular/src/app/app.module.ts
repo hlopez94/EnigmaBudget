@@ -17,12 +17,11 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { AuthInterceptor } from './auth/auth-interceptor';
 import { MatCardModule } from '@angular/material/card';
-import { MatRippleModule } from '@angular/material/core';
 import { MatMenuModule } from '@angular/material/menu';
-import { MatListModule } from '@angular/material/list';
 import { WelcomePageComponent } from './shell/welcome-page/welcome-page.component';
-import { AuthDirectivesModule } from './auth/auth-directives.module';
 import { AuthDropdownModule } from './auth/auth-dropdown.module';
+import { AuthService } from './auth/auth.service';
+import { AppStateService } from './core/services/app-state.service';
 
 @NgModule({
   declarations: [
@@ -37,7 +36,6 @@ import { AuthDropdownModule } from './auth/auth-dropdown.module';
     BrowserAnimationsModule,
     HttpClientModule,
     AppRoutingModule,
-    AuthDirectivesModule,
     AuthDropdownModule,
 
     //MaterialModules
@@ -49,6 +47,8 @@ import { AuthDropdownModule } from './auth/auth-dropdown.module';
     MatMenuModule,
   ],
   providers: [
+    AuthService,
+    AppStateService,
     {
       provide: HTTP_INTERCEPTORS,
       useClass: AuthInterceptor,
