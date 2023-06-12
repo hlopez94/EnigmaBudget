@@ -22,7 +22,7 @@ To get more help on the Angular CLI use `ng help` or go check out the [Angular C
 ## Serve app with SSL
 To be able to test PWA features, you'll need to serve your app through a SSL connection. To do that, add your self-signed certificates which you must generate depending on your host operating system, on the folder *.\ssl*  named as follow:
   - **cert.pem** with your public key 
-  - **cert.pem** with your private key
+  - **key.pem** with your private key
   
   Then serve your app with the command `ng serve --ssl` 
 
@@ -31,5 +31,7 @@ To be able to test PWA features, you'll need to serve your app through a SSL con
 ## Credits
 - [Angular](https://github.com/angular/angular): 
     The modern web developer’s platform.
+- [Angular Material](https://github.com/angular/components): 
+    Material Design UI components for Angular applications.
 - [Flag-Icons](https://github.com/lipis/flag-icons): 
     A curated collection of all country flags in SVG — plus the CSS for easier integration.

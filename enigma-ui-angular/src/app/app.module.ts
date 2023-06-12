@@ -23,7 +23,6 @@ import { MatRippleModule } from '@angular/material/core';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatListModule } from '@angular/material/list';
 import { WelcomePageComponent } from './shell/welcome-page/welcome-page.component';
-import { CuentaCardComponent } from './cuenta-card/cuenta-card.component';
 
 @NgModule({
   declarations: [
@@ -32,7 +31,6 @@ import { CuentaCardComponent } from './cuenta-card/cuenta-card.component';
     FooterComponent,
     SidebarComponent,
     WelcomePageComponent,
-    CuentaCardComponent,
   ],
   imports: [
     BrowserModule,
