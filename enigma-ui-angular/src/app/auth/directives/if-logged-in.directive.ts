@@ -1,5 +1,5 @@
 import { Directive, ElementRef } from '@angular/core';
-import { firstValueFrom, Subscription } from 'rxjs';
+import { Subscription } from 'rxjs';
 import { AuthService } from '../auth.service';
 
 @Directive({

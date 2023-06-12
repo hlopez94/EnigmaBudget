@@ -17,20 +17,15 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatDividerModule } from '@angular/material/divider';
-import { AuthDropdownComponent } from './auth-dropdown/auth-dropdown.component';
-import { IfLoggedInDirective } from './directives/if-logged-in.directive';
-import { IfNotLoggedInDirective } from './directives/if-not-logged-in.directive';
 import { UnverifiedAccountComponent } from './unverified-account/unverified-account.component';
 import { ValidateAccountComponent } from './validate-account/validate-account.component';
+import { AuthDirectivesModule } from './auth-directives.module';
 
 @NgModule({
   declarations: [
     LoginComponent,
     SignupComponent,
     ProfileComponent,
-    AuthDropdownComponent,
-    IfLoggedInDirective,
-    IfNotLoggedInDirective,
     UnverifiedAccountComponent,
     ValidateAccountComponent,
   ],
@@ -48,6 +43,7 @@ import { ValidateAccountComponent } from './validate-account/validate-account.co
     MatDividerModule,
     MatSelectModule,
     MatAutocompleteModule,
+    AuthDirectivesModule
   ],
   providers: [
     AuthGuard,
@@ -56,6 +52,6 @@ import { ValidateAccountComponent } from './validate-account/validate-account.co
       useValue: { appearance: 'outline' },
     },
   ],
-  exports: [AuthDropdownComponent, IfLoggedInDirective, IfNotLoggedInDirective],
+  exports: [],
 })
 export class AuthModule {}

@@ -6,7 +6,8 @@
     "start": "ng serve --ssl",
     "build": "ng build -c production --base-href /",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test"
+    "test": "ng test",
+    "sme": "ng build --source-map=true --named-chunks==true && source-map-explorer dist/**/*.js"
   },
   "private": true,
   "dependencies": {
@@ -31,13 +32,15 @@
     "@angular/compiler-cli": "^16.0.5",
     "@angular/localize": "16.0.5",
     "@types/jasmine": "~3.10.7",
-    "@types/node": "^12.20.55",
+    "@types/node": "14",
     "jasmine-core": "~4.0.1",
     "karma": "~6.3.20",
     "karma-chrome-launcher": "~3.1.1",
     "karma-coverage": "~2.1.1",
     "karma-jasmine": "~4.0.2",
     "karma-jasmine-html-reporter": "~1.7.0",
+    "source-map-explorer": "^2.5.3",
+    "ts-node": "10",
     "typescript": "~4.9.5"
   }
 }
