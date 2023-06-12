@@ -3,6 +3,7 @@ using System;
 using EnigmaBudget.Persistence.Contexts.EfCore.Enigma;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace EnigmaBudget.Persistence.Contexts.EfCore.Enigma.Migrations.Dev.Migrations
 {
     [DbContext(typeof(EnigmaContext))]
-    partial class EnigmaContextModelSnapshot : ModelSnapshot
+    [Migration("20230612022739_CampoIconoTipoCuenta_ValoresDefectoTablaUsuario")]
+    partial class CampoIconoTipoCuenta_ValoresDefectoTablaUsuario
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

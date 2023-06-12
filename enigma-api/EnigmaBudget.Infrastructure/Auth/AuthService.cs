@@ -180,7 +180,8 @@ namespace EnigmaBudget.Infrastructure.Auth
 
             var token = HashHelper.CreateSalt();
 
-            var sql = "INSERT INTO enigma.usuarios_validacion_email (uve_usu_id, uve_fecha_alta, uve_fecha_baja, uve_salt, uve_nuevo_correo) VALUES (@id, @alta, @baja, @salt, @correo)";
+            var sql = @"INSERT INTO enigma.usuarios_validacion_email (uve_usu_id, uve_fecha_alta, uve_fecha_baja, uve_salt, uve_nuevo_correo, uve_validado) 
+                        VALUES (@id, @alta, @baja, @salt, @correo, @validado)";
 
 
             _connection.Open();
@@ -193,6 +194,7 @@ namespace EnigmaBudget.Infrastructure.Auth
                 cmd.Parameters.AddWithValue("baja", DateTime.Now.AddDays(1));
                 cmd.Parameters.AddWithValue("salt", token);
                 cmd.Parameters.AddWithValue("correo", nuevoCorreo);
+                cmd.Parameters.AddWithValue("validado", true);
 
                 try
                 {
@@ -232,8 +234,8 @@ namespace EnigmaBudget.Infrastructure.Auth
                 throw new CryptographicException("Error al generar hash de password, no coinciden.");
             }
 
-            var sql = @"INSERT INTO usuarios (usu_usuario, usu_correo, usu_password, usu_seed) 
-                        VALUES (@usuario, @correo, @password, @seed);";
+            var sql = @"INSERT INTO usuarios (usu_usuario, usu_correo, usu_password, usu_seed, usu_fecha_alta, usu_fecha_modif, usu_correo_validado) 
+                        VALUES (@usuario, @correo, @password, @seed, @fechaAlta, @fechaModif, @correoValidado);";
 
             AuthResult<SignUpInfo> result = new AuthResult<SignUpInfo>();
 
@@ -246,6 +248,9 @@ namespace EnigmaBudget.Infrastructure.Auth
                 cmd.Parameters.AddWithValue("correo", signup.Email);
                 cmd.Parameters.AddWithValue("password", hash);
                 cmd.Parameters.AddWithValue("seed", seed);
+                cmd.Parameters.AddWithValue("fechaAlta", DateOnly.FromDateTime(DateTime.Now));
+                cmd.Parameters.AddWithValue("fechaModif", DateOnly.FromDateTime(DateTime.Now));
+                cmd.Parameters.AddWithValue("correoValidado", true);
 
                 try
                 {

@@ -15,6 +15,7 @@ public partial class TypesDepositAccountEntity
     public DateOnly TdaFechaModif { get; set; }
 
     public DateOnly? TdaFechaBaja { get; set; }
+    public string TdaIcon { get; set; }
 
     public virtual ICollection<DepositAccountEntity> DepositAccounts { get; set; } = new List<DepositAccountEntity>();
 }

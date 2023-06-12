@@ -13,7 +13,7 @@ namespace EnigmaBudget.Persistence.Contexts.EfCore.Enigma.EntitiesConfiguration
             entity.ToTable("usuario_perfil");
 
             entity.Property(e => e.UspUsuId)
-                .ValueGeneratedNever()
+                .ValueGeneratedOnAdd()
                 .HasColumnType("bigint(20)")
                 .HasColumnName("usp_usu_id");
             entity.Property(e => e.UspFechaAlta)
@@ -21,10 +21,12 @@ namespace EnigmaBudget.Persistence.Contexts.EfCore.Enigma.EntitiesConfiguration
                 .HasColumnName("usp_fecha_alta");
             entity.Property(e => e.UspFechaBaja)
                 .HasColumnType("datetime")
-                .HasColumnName("usp_fecha_baja");
+                .HasColumnName("usp_fecha_baja")
+                .HasDefaultValueSql("sysdate()");
             entity.Property(e => e.UspFechaModif)
                 .HasColumnType("datetime")
-                .HasColumnName("usp_fecha_modif");
+                .HasColumnName("usp_fecha_modif")
+                .HasDefaultValueSql("sysdate()");
             entity.Property(e => e.UspFechaNacimiento).HasColumnName("usp_fecha_nacimiento");
             entity.Property(e => e.UspNombre)
                 .HasMaxLength(100)

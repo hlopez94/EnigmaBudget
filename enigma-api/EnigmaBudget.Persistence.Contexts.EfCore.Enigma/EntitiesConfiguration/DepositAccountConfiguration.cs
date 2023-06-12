@@ -47,7 +47,7 @@ namespace EnigmaBudget.Persistence.Contexts.EfCore.Enigma.EntitiesConfiguration
                 .HasColumnType("datetime")
                 .HasColumnName("dea_fecha_modif");
             entity.Property(e => e.DeaFunds)
-                .HasPrecision(19,4)
+                .HasPrecision(19, 4)
                 .HasComment("Fondos actuales")
                 .HasColumnName("dea_funds");
             entity.Property(e => e.DeaName)
