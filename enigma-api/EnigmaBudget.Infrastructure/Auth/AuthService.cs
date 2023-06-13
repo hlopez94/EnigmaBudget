@@ -386,7 +386,7 @@ namespace EnigmaBudget.Infrastructure.Auth
         {
             var user = _httpContextAccessor.HttpContext.User;
             ClaimsIdentity identity = (ClaimsIdentity)user.Identity!;
-            return long.Parse(identity!.Claims.First(c => c.Type == "id").Value);
+            return EncodeDecodeHelper.DecryptLong(identity!.Claims.First(c => c.Type == "id").Value);
         }
 
         private usuarios GetUserById(long id)

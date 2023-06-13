@@ -16,7 +16,7 @@ namespace EnigmaBudget.WebApi.Middlewares
         {
 
             Stream originalBody = context.Response.Body;
-            AppResult appResult = null;
+            AppResult appResult;
             try
             {
                 using (var memStream = new MemoryStream())

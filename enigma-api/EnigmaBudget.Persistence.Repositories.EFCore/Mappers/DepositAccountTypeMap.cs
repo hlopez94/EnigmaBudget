@@ -15,6 +15,7 @@ namespace EnigmaBudget.Persistence.Repositories.EFCore.Mappers
                 .ForMember(p => p.TypeEnum, opt => opt.MapFrom(q => Enum.Parse<DepositAccountTypesEnum>(q.TdaEnumName)))
                 .ForMember(p => p.Name, opt => opt.MapFrom(q => q.TdaName))
                 .ForMember(p => p.Description, opt => opt.MapFrom(q => q.TdaDescription))
+                .ForMember(p => p.IconString, opt => opt.MapFrom(q => q.TdaIcon))
             ;
         }
     }

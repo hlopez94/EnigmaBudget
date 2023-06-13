@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using System.Text;
+using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -66,7 +67,11 @@ builder.Services.AddSwaggerGen(option =>
 builder.Services.AddHttpContextAccessor();
 
 
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+                .AddJsonOptions(opt => {
+                    opt.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+                    opt.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
+                });
 builder.Services.AddEndpointsApiExplorer();
 
 EncodeDecodeHelper.Init(builder.Configuration["Encoder:Key"]);

@@ -65,7 +65,7 @@ namespace EnigmaBudget.Persistence.Contexts.EfCore.Enigma.Migrations.Dev.Migrati
                 keyColumn: "tda_id",
                 keyValue: 4L,
                 column: "tda_icon",
-                value: "finance_chip");
+                value: "contactless");
         }
 
         /// <inheritdoc />

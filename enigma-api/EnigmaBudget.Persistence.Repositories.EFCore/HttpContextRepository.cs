@@ -18,7 +18,7 @@ namespace EnigmaBudget.Persistence.Repositories.EFCore
 
             var user = _httpContextAccessor.HttpContext.User;
             ClaimsIdentity identity = (ClaimsIdentity)user.Identity!;
-            return long.Parse(EncodeDecodeHelper.Decrypt(identity!.Claims.First(c => c.Type == "id").Value));
+            return EncodeDecodeHelper.DecryptLong(identity!.Claims.First(c => c.Type == "id").Value);
         }
 
         public string GetLoggedUserUUID()

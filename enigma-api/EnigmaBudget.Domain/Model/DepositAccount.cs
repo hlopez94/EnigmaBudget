@@ -7,6 +7,7 @@ namespace EnigmaBudget.Domain.Model
     {
         public string Id { get; set; }
         public string Description { get; set; }
+        public string Name { get; set; }
         public decimal Funds { get; set; }
         public Country Country { get; set; }
         public Currency Currency { get; set; }

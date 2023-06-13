@@ -40,7 +40,7 @@ namespace EnigmaBudget.WebApi.Controllers
         }
 
         [HttpPost()]
-        public async Task<AppResult<DepositAccount>> PostDepositAccount(CreateDepositAccountRequest body)
+        public async Task<AppResult<DepositAccount>> PostDepositAccount([FromBody]CreateDepositAccountRequest body)
         {
             return await _depositAccountsService.CreateDepositAccount(body);
         }

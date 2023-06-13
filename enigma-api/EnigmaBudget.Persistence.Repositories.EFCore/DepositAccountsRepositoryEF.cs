@@ -27,8 +27,8 @@ namespace EnigmaBudget.Persistence.Repositories.EFCore
             {
                 var addTrx = _context.DepositAccounts.Add(new DepositAccountEntity()
                 {
-                    DeaUsuId = EncodeDecodeHelper.DecryptLong(model.OwnerId),
-                    DeaTdaId = long.Parse(model.Type.Id),
+                    DeaUsuId = _contextRepository.GetLoggedUserID()!.Value,
+                    DeaTdaId = EncodeDecodeHelper.DecryptLong(model.Type.Id),
                     DeaFechaAlta = DateTime.Now,
                     DeaFechaModif = DateTime.Now,
                     DeaFechaBaja = null,
@@ -36,10 +36,11 @@ namespace EnigmaBudget.Persistence.Repositories.EFCore
                     DeaFunds = model.Funds,
                     DeaCountryCode = model.Country.Alpha3,
                     DeaCurrencyCode = model.Currency.Num,
+                    DeaName = model.Name                    
                 });
-                _context.SaveChanges();
+                await _context.SaveChangesAsync();
                 newDepositAccount = addTrx.Entity;
-                trx.Commit();
+                await trx.CommitAsync();
             }
 
             return _mapper.Map<DepositAccountEntity, DepositAccount>(newDepositAccount);

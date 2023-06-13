@@ -23,13 +23,13 @@ namespace EnigmaBudget.Application.Services
             {
                 Currency = request.Currency,
                 Country = request.Country,
-                OwnerId = _authService.GetProfile().Data.Id,
                 Description = request.Description,
                 Funds = request.InitialFunds,
-                Type = request.Type
+                Type = request.Type,
+                Name = request.AccountAlias
             };
 
-            _depositAccountRepository.Create(newAccount);
+            await _depositAccountRepository.Create(newAccount);
             result.Data = newAccount;
             return result;
         }
