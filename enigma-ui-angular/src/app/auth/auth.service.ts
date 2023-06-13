@@ -16,13 +16,13 @@ import { Profile } from './model/profile';
   providedIn: 'root',
 })
 export class AuthService {
-  private _IsUserLoggedIn: BehaviorSubject<boolean>;
-  public IsUserLoggedIn: Observable<boolean>;
+  private _isUserLoggedIn: BehaviorSubject<boolean>;
+  public $isUserLoggedIn: Observable<boolean>;
 
 
   constructor(private _httpClient: HttpClient) {
-    this._IsUserLoggedIn = new BehaviorSubject<boolean>(false);
-    this.IsUserLoggedIn = this._IsUserLoggedIn.asObservable();
+    this._isUserLoggedIn = new BehaviorSubject<boolean>(false);
+    this.$isUserLoggedIn = this._isUserLoggedIn.asObservable();
 
     var token = localStorage.getItem('token');
     if (token) {
@@ -31,7 +31,7 @@ export class AuthService {
   }
 
   isUserLoggedInSync(): boolean {
-    return this._IsUserLoggedIn.value;
+    return this._isUserLoggedIn.value;
   }
 
   async verifyAccountMail(token: string): Promise<TypedApiResponse<boolean>>  {
@@ -88,24 +88,15 @@ export class AuthService {
     this.limpiarToken();
   }
 
-  public async paises() : Promise<Pais[]>{
-    var res = await firstValueFrom(
-      this._httpClient.get<TypedApiResponse<Pais[]>>(
-        `${environment.settings.apiUrl}/user/countries`
-      )
-    );
-
-    return res.data;
-  }
   private limpiarToken() {
     localStorage.removeItem('token');
-    this._IsUserLoggedIn.next(false);
+    this._isUserLoggedIn.next(false);
   }
 
   private setearToken(token: string) {
     if (!this.tokenExpired(token)) {
       localStorage.setItem('token', token);
-      this._IsUserLoggedIn.next(true);
+      this._isUserLoggedIn.next(true);
       this.programarVencimientoToken(token);
     } else {
       this.limpiarToken();

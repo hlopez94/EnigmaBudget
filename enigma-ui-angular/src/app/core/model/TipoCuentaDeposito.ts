@@ -3,5 +3,6 @@ import { TipoCuentaDepositoEnum } from "./TipoCuentaDepositoEnum";
 
 
 export interface TipoCuentaDeposito extends TipoBase<TipoCuentaDepositoEnum>{
+  iconString: string;
 }
 

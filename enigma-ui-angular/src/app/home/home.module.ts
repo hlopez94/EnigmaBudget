@@ -1,5 +1,4 @@
 import { HomeComponent } from './home.component';
-import { GenerarCuentaDepositoModule } from './../core/dialogs/generar-cuenta-deposito/generar-cuenta-deposito.module';
 import { MatDialogModule } from '@angular/material/dialog';
 import { MatListModule } from '@angular/material/list';
 import { MatIconModule } from '@angular/material/icon';
@@ -10,19 +9,20 @@ import { CommonModule } from '@angular/common';
 
 import { HomeRoutingModule } from './home-routing.module';
 import { MatMenuModule } from '@angular/material/menu';
+import { GenerarCuentaDepositoComponent } from '../core/dialogs/generar-cuenta-deposito/generar-cuenta-deposito.component';
 
 
 @NgModule({
   declarations: [HomeComponent],
   imports: [
     CommonModule,
+    GenerarCuentaDepositoComponent,
     HomeRoutingModule,
     MatCardModule,
     MatButtonModule,
     MatIconModule,
     MatListModule,
     MatDialogModule,
-    GenerarCuentaDepositoModule,
     MatMenuModule
   ]
 })

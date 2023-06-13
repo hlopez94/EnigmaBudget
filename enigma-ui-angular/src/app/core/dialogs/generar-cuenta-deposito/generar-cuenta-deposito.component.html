@@ -1,21 +1,19 @@
 <h1 mat-dialog-title>Nueva Cuenta Depósito</h1>
 
-<form mat-dialog-content [formGroup]="newAccountForm" (onSubmit)="submit()">
+<form mat-dialog-content [formGroup]="newAccountForm" (ngSubmit)="submit()">
 
   <section>
-    <h5 class="mat-label">Elija el tipo de cuenta</h5>
+    <mat-label color="primary">Tipo de cuenta</mat-label>
 
-    <mat-button-toggle-group controlName="type" vertical="false">
-      <mat-button-toggle value="WALLET">
-        <mat-icon>wallet</mat-icon>
-      </mat-button-toggle>
-      <mat-button-toggle value="SAVINGS">
-        <mat-icon>savings</mat-icon>
-      </mat-button-toggle>
-      <mat-button-toggle value="CHECKING">
-        <mat-icon>account_balance</mat-icon>
-      </mat-button-toggle>
-    </mat-button-toggle-group>
+    <mat-chip-listbox aria-label="Fish selection"
+    matInput
+    controlName="Type"
+    formControlName="Type">
+      <mat-chip-option  *ngFor="let tipo of $tiposCuenta | async" [value]="tipo">
+        <mat-icon matChipAvatar>{{tipo.iconString}}</mat-icon>
+        {{tipo.name}}
+      </mat-chip-option>
+    </mat-chip-listbox>
 
   </section>
 
@@ -103,10 +101,10 @@
   </mat-form-field>
 
   <mat-form-field>
-    <mat-label>Fondos Iniciales</mat-label>
     <span matPrefix>
       {{ getCurrency(newAccountForm.controls["Currency"].value?.code ?? "$") }}
     </span>
+    <mat-label>Fondos Iniciales</mat-label>
     <input
       matInput
       controlName="name"

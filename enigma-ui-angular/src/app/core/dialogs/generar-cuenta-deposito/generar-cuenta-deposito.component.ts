@@ -2,38 +2,63 @@ import { CountriesStore } from './../../stores/countries.store';
 import { CurrenciesStore } from './../../stores/currencies.store';
 import { Observable } from 'rxjs';
 import { Divisa } from './../../model/divisa';
-import { FormGroup, FormControl, FormBuilder } from '@angular/forms';
+import { FormGroup, FormControl, FormBuilder, Validators, ReactiveFormsModule } from '@angular/forms';
 import { Component } from '@angular/core';
-import { getCurrencySymbol } from '@angular/common';
+import { CommonModule, getCurrencySymbol } from '@angular/common';
 import { Pais } from '../../model/pais';
+import { TipoCuentaDeposito } from '../../model/TipoCuentaDeposito';
+import { CuentasDepositoStore } from '../../stores/cuentas-deposito.store';
+import { ScrollingModule } from '@angular/cdk/scrolling';
+import { MatAutocompleteModule } from '@angular/material/autocomplete';
+import { MatButtonModule } from '@angular/material/button';
+import { MatButtonToggleModule } from '@angular/material/button-toggle';
+import { MatChipsModule } from '@angular/material/chips';
+import { MatDialogModule } from '@angular/material/dialog';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatIconModule } from '@angular/material/icon';
+import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
 
 @Component({
   selector: 'app-generar-cuenta-deposito',
   templateUrl: './generar-cuenta-deposito.component.html',
   styleUrls: ['./generar-cuenta-deposito.component.scss'],
+  standalone:true,
+  imports:[
+    CommonModule,
+    MatChipsModule,
+    MatAutocompleteModule,
+    MatDialogModule,
+    MatButtonModule,
+    ReactiveFormsModule,
+    MatInputModule,
+    MatSelectModule,
+    MatFormFieldModule,
+    MatInputModule,
+    ScrollingModule,
+    MatIconModule,
+    MatButtonToggleModule
+  ],
+  providers:[
+
+  ]
 })
 export class GenerarCuentaDepositoComponent {
   newAccountForm: FormGroup;
 
-  $currencies: Observable<Divisa[]>;
-  $countries: Observable<Pais[]>;
+  readonly $currencies: Observable<Divisa[]> = this.currenciesStore.filteredDivisas;
+  readonly $countries: Observable<Pais[]> = this.countriesStore.filteredCountries;
+  readonly $tiposCuenta: Observable<TipoCuentaDeposito[]> = this.cuentasStore.tiposCuentaDeposito;
+
   countriesLength: number = 5;
   currenciesLength: number = 5;
 
   constructor(
     fb: FormBuilder,
     private currenciesStore: CurrenciesStore,
-    private countriesStore: CountriesStore
+    private countriesStore: CountriesStore,
+    private cuentasStore: CuentasDepositoStore
   ) {
-    this.$currencies = currenciesStore.filteredDivisas;
-    this.$countries = countriesStore.filteredCountries;
-
-    this.$countries.subscribe(
-      (arr) => (this.countriesLength = arr.length > 5 ? 5 : arr.length)
-    );
-    this.$currencies.subscribe(
-      (arr) => (this.currenciesLength = arr.length > 5 ? 5 : arr.length)
-    );
 
     this.newAccountForm = fb.group<CreateDepositAccountForm>({
       AccountAlias: new FormControl(),
@@ -43,11 +68,20 @@ export class GenerarCuentaDepositoComponent {
       Currency: new FormControl(),
       Type: new FormControl(),
     });
+
+    this.$countries.subscribe(
+      (arr) => (this.countriesLength = arr.length > 5 ? 5 : arr.length)
+    );
+    this.$currencies.subscribe(
+      (arr) => (this.currenciesLength = arr.length > 5 ? 5 : arr.length)
+    );
+
   }
 
   async ngOnInit() {
     await this.currenciesStore.cargarDivisas();
     await this.countriesStore.loadCountries();
+    await this.cuentasStore.cargarTiposCuentaDeposito();
 
     this.newAccountForm.controls['Country'].valueChanges.subscribe((change) =>
       this.countriesStore.filterCountries(change)
@@ -74,7 +108,7 @@ export class GenerarCuentaDepositoComponent {
   }
 
   async submit(){
-    //this.acc
+    await this.cuentasStore.crearCuentaDeposito(this.newAccountForm.value)
   }
 }
 
@@ -84,20 +118,5 @@ export interface CreateDepositAccountForm {
   InitialFunds: FormControl<number>;
   Country: FormControl<Pais>;
   Currency: FormControl<Divisa>;
-  Type: FormControl<DepositAccountType>;
+  Type: FormControl<TipoCuentaDeposito>;
 }
-
-export interface BaseType<TEnum> {
-  Id: string;
-  Name: string;
-  TypeEnum: TEnum;
-  Description: string;
-}
-
-export enum DepositAccountTypesEnum {
-  SAVINGS_ACCOUNT,
-  CURRENT_ACCOUNT,
-  WALLET,
-}
-
-export interface DepositAccountType extends BaseType<DepositAccountTypesEnum> {}

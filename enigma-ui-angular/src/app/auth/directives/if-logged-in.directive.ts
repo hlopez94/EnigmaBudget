@@ -4,7 +4,8 @@ import { AuthService } from '../auth.service';
 
 @Directive({
   selector: '[ifLoggedIn]',
-  standalone:true
+  standalone:true,
+  providers:[AuthService]
 })
 export class IfLoggedInDirective {
   susbscription: Subscription | undefined;
@@ -15,7 +16,7 @@ export class IfLoggedInDirective {
   ) {}
 
   ngOnInit(): void {
-    this.susbscription = this.authSvc.IsUserLoggedIn.subscribe((loggedIn) => {
+    this.susbscription = this.authSvc.$isUserLoggedIn.subscribe((loggedIn) => {
       this.elementRef.nativeElement.style.display = loggedIn ? null : 'none';
     });
   }

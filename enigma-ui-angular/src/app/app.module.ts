@@ -22,6 +22,8 @@ import { WelcomePageComponent } from './shell/welcome-page/welcome-page.componen
 import { AuthDropdownModule } from './auth/auth-dropdown.module';
 import { AuthService } from './auth/auth.service';
 import { AppStateService } from './core/services/app-state.service';
+import { IfLoggedInDirective } from './auth/directives/if-logged-in.directive';
+import { IfNotLoggedInDirective } from './auth/directives/if-not-logged-in.directive';
 
 @NgModule({
   declarations: [
@@ -29,14 +31,17 @@ import { AppStateService } from './core/services/app-state.service';
     NavbarComponent,
     FooterComponent,
     SidebarComponent,
-    WelcomePageComponent,
   ],
   imports: [
+    WelcomePageComponent,
     BrowserModule,
     BrowserAnimationsModule,
     HttpClientModule,
     AppRoutingModule,
     AuthDropdownModule,
+
+    IfLoggedInDirective,
+    IfNotLoggedInDirective,
 
     //MaterialModules
     MatToolbarModule,

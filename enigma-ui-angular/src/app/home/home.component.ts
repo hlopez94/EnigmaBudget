@@ -21,6 +21,8 @@ export class HomeComponent implements OnInit {
     this.cuentasUsuario = this.cuentasDepositoStore.cuentasUser;
   }
 
+  $tiposCuentaDeposito = this.cuentasDepositoStore.tiposCuentaDeposito;
+
   async ngOnInit() {
     await this.cuentasDepositoStore.cargarCuentasUsuario();
   }

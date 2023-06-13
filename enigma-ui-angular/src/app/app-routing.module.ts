@@ -1,4 +1,3 @@
-import { WelcomePageComponent } from './shell/welcome-page/welcome-page.component';
 import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
 import { canActivateAuth } from './auth/auth-guard';
@@ -6,7 +5,7 @@ import { canActivateAuth } from './auth/auth-guard';
 const routes: Routes = [
   {
     path:'',
-    component:WelcomePageComponent
+    loadComponent:() => import('./shell/welcome-page/welcome-page.component').then(c=>c.WelcomePageComponent)
   },
   {
     path:'user-dashboard',
@@ -36,6 +35,10 @@ const routes: Routes = [
   {
     path:'auth',
     loadChildren: () => import('./auth/auth.module').then(m => m.AuthModule)
+  },
+  {
+    path: '*',
+    redirectTo: ''
   }
 ];
 

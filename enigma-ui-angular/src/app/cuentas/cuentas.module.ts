@@ -1,4 +1,3 @@
-import { GenerarCuentaDepositoModule } from './../core/dialogs/generar-cuenta-deposito/generar-cuenta-deposito.module';
 import { NgModule } from '@angular/core';
 import { CommonModule } from '@angular/common';
 
@@ -13,7 +12,6 @@ import { CuentasComponent } from './cuentas.component';
   imports: [
     CommonModule,
     CuentasRoutingModule,
-    GenerarCuentaDepositoModule
   ]
 })
 export class CuentasModule { }

@@ -1,7 +1,6 @@
 import { NgModule } from '@angular/core';
 import { CommonModule } from '@angular/common';
 
-import { AuthGuard } from './auth-guard';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatMenuModule } from '@angular/material/menu';
@@ -23,8 +22,7 @@ import { RouterModule } from '@angular/router';
     AuthDirectivesModule
   ],
   providers: [
-    AuthService,
-    AuthGuard
+    AuthService
   ],
   exports: [AuthDropdownComponent],
 })

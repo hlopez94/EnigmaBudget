@@ -35,7 +35,6 @@ export class ProfileComponent implements OnInit {
   }
 
   async cargarPerfil() {
-    this.paises = await this._userService.paises();
     var profile = await this._userService.getProfile();
 
     this.perfil = profile;

@@ -5,7 +5,6 @@ import { AuthRoutingModule } from './auth-routing.module';
 import { LoginComponent } from './login/login.component';
 import { SignupComponent } from './signup/signup.component';
 import { ProfileComponent } from './profile/profile.component';
-import { AuthGuard } from './auth-guard';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
@@ -46,11 +45,10 @@ import { AuthDirectivesModule } from './auth-directives.module';
     AuthDirectivesModule
   ],
   providers: [
-    AuthGuard,
     {
       provide: MAT_FORM_FIELD_DEFAULT_OPTIONS,
       useValue: { appearance: 'outline' },
-    },
+    }
   ],
   exports: [],
 })

@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { FormControl, FormGroup, Validators } from '@angular/forms';
 import { AuthService } from '../auth.service';
-import { MatSnackBar,  MatSnackBarConfig } from '@angular/material/snack-bar';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { ActivatedRoute, Params, Router } from '@angular/router';
 import { MAT_FORM_FIELD_DEFAULT_OPTIONS } from '@angular/material/form-field';
 import { LoginRequest } from './login-request';
@@ -60,28 +60,28 @@ export class LoginComponent implements OnInit {
       );
       this._snackBar.open(`Bienvenido ${resLogin.userName}`, undefined, {
         duration: 3000,
-        panelClass: ['mat-primary']
+        panelClass: ['mat-primary'],
       });
 
-     var urlPaths : string[]= [];
-     urlPaths.concat(this.originUrl!);
+      var urlPaths: string[] = [];
+      urlPaths.concat(this.originUrl!);
 
       if (this.originUrl && this.originUrl.length > 0)
-        this._router.navigate(
-           urlPaths.concat(this.originUrl!),
-          {
-            queryParams: this.originParams,
-            queryParamsHandling: '',
-          }
-        );
-      else this._router.navigate(['/']);
+        this._router.navigate(urlPaths.concat(this.originUrl!), {
+          queryParams: this.originParams,
+          queryParamsHandling: '',
+        });
+      else this._router.navigate(['..']);
     } catch (err: any) {
-      switch(err.status){
+      switch (err.status) {
         case 0:
-          this._snackBar.open('El servidor no responde.', undefined, { duration: 3000, panelClass: ['mat-toolbar', 'mat-warn'] });
+          this._snackBar.open('El servidor no responde.', undefined, {
+            duration: 3000,
+            panelClass: ['mat-toolbar', 'mat-warn'],
+          });
           break;
         default:
-            this._snackBar.open('error', undefined, { duration: 3000 });
+          this._snackBar.open('error', undefined, { duration: 3000 });
       }
     }
   }

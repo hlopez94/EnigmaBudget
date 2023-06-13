@@ -9,7 +9,10 @@ import { AuthService } from '../auth.service';
 
 @Directive({
   selector: '[ifNotLoggedIn]',
-  standalone:true
+  standalone:true,
+  providers: [
+    AuthService
+  ]
 })
 export class IfNotLoggedInDirective implements OnInit, OnDestroy {
   susbscription: Subscription | undefined;
@@ -20,7 +23,7 @@ export class IfNotLoggedInDirective implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
-    this.susbscription = this.authSvc.IsUserLoggedIn.subscribe((loggedIn) => {
+    this.susbscription = this.authSvc.$isUserLoggedIn.subscribe((loggedIn) => {
       this.elementRef.nativeElement.style.display = loggedIn ? 'none' : null;
     });
   }
