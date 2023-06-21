@@ -1,5 +1,5 @@
 import { CountriesService } from './../services/countries.service';
-import { BehaviorSubject, Observable, ObservedValueOf } from 'rxjs';
+import { BehaviorSubject, Observable } from 'rxjs';
 import { Injectable } from '@angular/core';
 import { Pais } from '../model/pais';
 

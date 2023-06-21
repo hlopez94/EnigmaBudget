@@ -1,57 +1,36 @@
-<ul class="lista-cuentas">
-  <li *ngFor="let i of counter(3)">
- <   <mat-card>
-      <mat-card-header>
-        <mat-card-title>Pesos Argentinos</mat-card-title>
-        <mat-card-subtitle>ARS</mat-card-subtitle>
-      </mat-card-header>
+<section id="listado-balances">
+  <h1>Balances Generales</h1>
+  <ul class="lista-tarjetas">
+    <li *ngFor="let i of counter(3)">
+      <mat-card>
+        <mat-card-header>
+          <mat-card-title>Pesos Argentinos</mat-card-title>
+          <mat-card-subtitle>ARS</mat-card-subtitle>
+        </mat-card-header>
 
-      <mat-card-content>
-        <div style="display: flex">
-          <h1 class="mat-display-1">
-            {{ 1000 | currency : "ARS" : "symbol-narrow" : "4.2-2" }}
-          </h1>
-          <button
-            mat-icon-button
-            title="Ocultar/mostrar balance"
-            aria-label="Ocultar/mostrar balance"
-            type="button"
-          >
-            <mat-icon>visibility_on</mat-icon>
-          </button>
-        </div>
-      </mat-card-content>
-    </mat-card>
-
-    <mat-card>
-      <mat-card-header>
-        <mat-card-title>Pesos Argentinos</mat-card-title>
-        <mat-card-subtitle>ARS</mat-card-subtitle>
-      </mat-card-header>
-
-      <mat-card-content>
-        <div style="display: flex">
-          <h1 class="mat-display-1">
-            {{ 1000 | currency : "ARS" : "symbol-narrow" : "4.2-2" }}
-          </h1>
-          <button
-            mat-icon-button
-            title="Ocultar/mostrar balance"
-            aria-label="Ocultar/mostrar balance"
-            type="button"
-          >
-            <mat-icon>visibility_on</mat-icon>
-          </button>
-        </div>
-      </mat-card-content>
-    </mat-card>>
-  </li>
-</ul>
-<p></p>
+        <mat-card-content>
+          <div style="display: flex">
+            <h1 class="mat-display-1">
+              {{ 1000 | currency : "ARS" : "symbol-narrow" : "4.2-2" }}
+            </h1>
+            <button
+              mat-icon-button
+              title="Ocultar/mostrar balance"
+              aria-label="Ocultar/mostrar balance"
+              type="button"
+            >
+              <mat-icon>visibility_on</mat-icon>
+            </button>
+          </div>
+        </mat-card-content>
+      </mat-card>
+    </li>
+  </ul>
+</section>
 
 <section id="listado-cuentas">
   <h1>Cuentas</h1>
-  <ul class="lista-cuentas">
+  <ul class="lista-tarjetas">
     <li *ngFor="let i of counter(4)">
       <mat-card>
         <mat-card-header>
@@ -104,19 +83,25 @@
     </li>
   </ul>
   <div>
-    <button mat-mini-fab color="default" title="Agregar Cuenta">
+    <button
+      mat-mini-fab
+      color="default"
+      title="Agregar Cuenta"
+      (click)="agregarCuenta()"
+    >
       <mat-icon>add</mat-icon>
     </button>
   </div>
 </section>
 
-<app-generar-cuenta-deposito></app-generar-cuenta-deposito>
-<h1>Últimos movimientos</h1>
-<mat-card>
-  <mat-list>
-    <ng-container *ngFor="let i of counter(10); let last = last">
-      <mat-list-item> Pepper </mat-list-item>
-      <mat-divider *ngIf="!last"></mat-divider>
-    </ng-container>
-  </mat-list>
-</mat-card>
+<section>
+  <h1>Últimos movimientos</h1>
+  <mat-card>
+    <mat-list>
+      <ng-container *ngFor="let i of counter(10); let last = last">
+        <mat-list-item> Pepper </mat-list-item>
+        <mat-divider *ngIf="!last"></mat-divider>
+      </ng-container>
+    </mat-list>
+  </mat-card>
+</section>

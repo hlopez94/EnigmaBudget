@@ -9,10 +9,14 @@
     matInput
     controlName="Type"
     formControlName="Type">
-      <mat-chip-option  *ngFor="let tipo of $tiposCuenta | async" [value]="tipo">
-        <mat-icon matChipAvatar>{{tipo.iconString}}</mat-icon>
+
+      <mat-chip-option
+        *ngFor="let tipo of $tiposCuenta | async"
+        [value]="tipo">
+          <mat-icon matChipAvatar>{{tipo.iconString}}</mat-icon>
         {{tipo.name}}
       </mat-chip-option>
+
     </mat-chip-listbox>
 
   </section>

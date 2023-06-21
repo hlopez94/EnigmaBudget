@@ -28,11 +28,11 @@ import { IfNotLoggedInDirective } from './auth/directives/if-not-logged-in.direc
 @NgModule({
   declarations: [
     AppComponent,
-    NavbarComponent,
     FooterComponent,
     SidebarComponent,
   ],
   imports: [
+    NavbarComponent,
     WelcomePageComponent,
     BrowserModule,
     BrowserAnimationsModule,

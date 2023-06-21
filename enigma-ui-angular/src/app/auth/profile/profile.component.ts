@@ -2,8 +2,10 @@ import { Component, OnInit } from '@angular/core';
 import { FormControl, FormGroup, Validators } from '@angular/forms';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { AuthService } from '../auth.service';
-import { Pais } from '../model/pais';
 import { Profile } from '../model/profile';
+import { CountriesStore } from 'src/app/core/stores/countries.store';
+import { Observable } from 'rxjs';
+import { Pais } from 'src/app/core/model/pais';
 
 @Component({
   selector: 'app-profile',
@@ -12,7 +14,7 @@ import { Profile } from '../model/profile';
 })
 export class ProfileComponent implements OnInit {
   public perfil: Profile | undefined;
-  public paises: Pais[] | undefined;
+  readonly $paises: Observable<Pais[]> = this._countiesStore.countries;
 
   perfilForm: FormGroup = new FormGroup({
     idUnicoUsuario: new FormControl('', [Validators.required]),
@@ -27,11 +29,13 @@ export class ProfileComponent implements OnInit {
 
   constructor(
     private _userService: AuthService,
-    private _snackBar: MatSnackBar
+    private _snackBar: MatSnackBar,
+    private _countiesStore: CountriesStore
   ) {}
 
   async ngOnInit() {
-    this.cargarPerfil();
+    await this.cargarPerfil();
+    await this._countiesStore.loadCountries();
   }
 
   async cargarPerfil() {
@@ -50,18 +54,6 @@ export class ProfileComponent implements OnInit {
 
   editar() {
     this.perfilForm.enable();
-  }
-
-  public _filter(value: string): Pais[] {
-    const filterValue = value.toLowerCase();
-
-    return this.paises!.filter((pais) =>
-      Object.values(pais)
-        .concat(',')
-        .toString()
-        .toLowerCase()
-        .includes(filterValue.toLowerCase())
-    );
   }
 
   async submit() {

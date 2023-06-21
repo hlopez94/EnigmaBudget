@@ -19,8 +19,19 @@ button {
 .rotating-object:checked,
 .rotating-object:active,
 .rotating-object:future {
-  transform: rotate(360deg);
-  transition: transform 450ms ease-in-out;
+  animation: rotation 450ms ease-in-out;
+}
+
+@keyframes rotation {
+  0% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(180deg);
+  }
+  100% {
+    transform: rotate(90deg);
+  }
 }
 
 p mat-form-field {

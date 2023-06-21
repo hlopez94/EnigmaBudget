@@ -1,10 +1,9 @@
 
 <form [formGroup]="perfilForm" *ngIf="perfil"  (ngSubmit)="submit()">
   <mat-card class="profile-form-card">
-    <h1 class="mat-heading-1">Perfil de Usuario</h1>
     <mat-card-header>
       <img matCardAvatar />
-      <mat-card-title>{{perfil.usuario}}</mat-card-title>
+      <mat-card-title class="mat-heading-1">Perfil de Usuario</mat-card-title>
       <mat-card-subtitle>{{perfil.correo}}</mat-card-subtitle>
     </mat-card-header>
     <mat-card-content>
@@ -33,8 +32,8 @@
             formControlName="telefonoCodigoPais"
             [matAutocomplete]="auto">
             <mat-autocomplete #auto="matAutocomplete">
-              <mat-option *ngFor="let pais of _filter(telefonoCodigoPais.value)" [value]="pais.codigoTelefonico">
-                <span class="fi fi-{{pais.isO_2.toLowerCase()}}"></span> (+{{pais.codigoTelefonico}}) {{pais.nombre | uppercase}}
+              <mat-option *ngFor="let pais of $paises | async" [value]="pais.numericCode">
+                <span class="fi fi-{{pais.alpha3}}"></span> (+{{pais.numericCode}}) {{pais.name | uppercase}}
               </mat-option>
             </mat-autocomplete>
           </mat-form-field>

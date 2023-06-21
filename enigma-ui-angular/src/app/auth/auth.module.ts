@@ -19,6 +19,8 @@ import { MatDividerModule } from '@angular/material/divider';
 import { UnverifiedAccountComponent } from './unverified-account/unverified-account.component';
 import { ValidateAccountComponent } from './validate-account/validate-account.component';
 import { AuthDirectivesModule } from './auth-directives.module';
+import { CountriesStore } from '../core/stores/countries.store';
+import { CountriesService } from '../core/services/countries.service';
 
 @NgModule({
   declarations: [
@@ -45,6 +47,8 @@ import { AuthDirectivesModule } from './auth-directives.module';
     AuthDirectivesModule
   ],
   providers: [
+    CountriesStore,
+    CountriesService,
     {
       provide: MAT_FORM_FIELD_DEFAULT_OPTIONS,
       useValue: { appearance: 'outline' },

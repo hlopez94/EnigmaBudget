@@ -20,8 +20,6 @@ export class ValidateAccountComponent implements OnInit {
   async ngOnInit() {
 
       var params = await firstValueFrom(this._route.queryParams);
-      console.log(params['mail-token'])
-      console.log(params['token'])
 
       var mailToken = params['token'];
 
