@@ -24,10 +24,6 @@ export class AuthService {
     }
   }
 
-  isUserLoggedInSync(): boolean {
-    return this._isUserLoggedIn.value;
-  }
-
   async verifyAccountMail(token: string): Promise<TypedApiResponse<boolean>>  {
     return await firstValueFrom(this._httpClient.post<TypedApiResponse<boolean>>(`${environment.settings.apiUrl}/user/verify-email-account`, token))
 
@@ -40,7 +36,7 @@ export class AuthService {
       )
     );
 
-    if(res.data.fechaNacimiento )
+    if(res.data.fechaNacimiento)
       res.data.fechaNacimiento = new Date(Date.parse(res.data.fechaNacimiento.toString()));
       else res.data.fechaNacimiento=null;
 
@@ -82,6 +78,9 @@ export class AuthService {
     this.limpiarToken();
   }
 
+  public isUserLoggedIn() : boolean{
+    return localStorage.getItem('token') != null;
+  }
   private limpiarToken() {
     localStorage.removeItem('token');
     this._isUserLoggedIn.next(false);
@@ -103,6 +102,7 @@ export class AuthService {
     const expiryInSeconds = JSON.parse(atob(token.split('.')[1])).exp;
     return Math.floor(new Date().getTime() / 1000) >= expiryInSeconds;
   }
+
 
   public cuentaVerificada() : Boolean{
     var token = localStorage.getItem('token');

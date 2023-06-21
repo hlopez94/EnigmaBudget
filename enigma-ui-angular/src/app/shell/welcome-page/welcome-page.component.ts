@@ -19,6 +19,7 @@ import { CommonModule } from '@angular/common';
 })
 export class WelcomePageComponent implements OnDestroy {
   private isLoggedInSubscription: Subscription;
+
   constructor(private authService: AuthService, private router: Router) {
     this.isLoggedInSubscription = this.authService.$isUserLoggedIn.subscribe(
       (isLoggedIn) => {

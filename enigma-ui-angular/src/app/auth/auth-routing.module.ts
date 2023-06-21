@@ -7,7 +7,7 @@ import { SignupComponent } from './signup/signup.component';
 import { UnverifiedAccountComponent } from './unverified-account/unverified-account.component';
 import { ValidateAccountComponent } from './validate-account/validate-account.component';
 
-const routes: Routes = [
+export const AUTH_ROUTES: Routes = [
   {
     path: 'login',
     component: LoginComponent,
@@ -32,7 +32,7 @@ const routes: Routes = [
 ];
 
 @NgModule({
-  imports: [RouterModule.forChild(routes)],
+  imports: [RouterModule.forChild(AUTH_ROUTES)],
   exports: [RouterModule],
 })
 export class AuthRoutingModule {}

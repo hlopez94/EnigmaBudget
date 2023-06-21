@@ -1,27 +1,50 @@
 import { Component, OnInit } from '@angular/core';
-import { FormControl, FormGroup, Validators } from '@angular/forms';
-import { MatSnackBar } from '@angular/material/snack-bar';
+import { FormControl, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
+import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { AuthService } from '../auth.service';
 import { Profile } from '../model/profile';
 import { CountriesStore } from 'src/app/core/stores/countries.store';
 import { Observable } from 'rxjs';
 import { Pais } from 'src/app/core/model/pais';
+import { MatIconModule } from '@angular/material/icon';
+import { MatButtonModule } from '@angular/material/button';
+import { MatOptionModule } from '@angular/material/core';
+import { MatAutocompleteModule } from '@angular/material/autocomplete';
+import { MatInputModule } from '@angular/material/input';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatCardModule } from '@angular/material/card';
+import { NgIf, NgFor, AsyncPipe, UpperCasePipe } from '@angular/common';
 
 @Component({
-  selector: 'app-profile',
-  templateUrl: './profile.component.html',
-  styleUrls: ['./profile.component.scss'],
+    selector: 'app-profile',
+    templateUrl: './profile.component.html',
+    styleUrls: ['./profile.component.scss'],
+    standalone: true,
+    imports: [
+        NgIf,
+        ReactiveFormsModule,
+        MatCardModule,
+        MatFormFieldModule,
+        MatInputModule,
+        MatAutocompleteModule,
+        MatSnackBarModule,
+        NgFor,
+        MatOptionModule,
+        MatButtonModule,
+        MatIconModule,
+        AsyncPipe,
+        UpperCasePipe,
+    ],
 })
 export class ProfileComponent implements OnInit {
   public perfil: Profile | undefined;
   readonly $paises: Observable<Pais[]> = this._countiesStore.countries;
 
   perfilForm: FormGroup = new FormGroup({
-    idUnicoUsuario: new FormControl('', [Validators.required]),
-    usuario: new FormControl('', [Validators.required]),
-    correo: new FormControl('', [Validators.required]),
+    usuario: new FormControl('', []),
+    correo: new FormControl('', []),
     nombre: new FormControl('', []),
-    fechaNacimiento: new FormControl('', [Validators.required]),
+    fechaNacimiento: new FormControl('', []),
     telefonoCodigoPais: new FormControl('', [Validators.pattern('[0-9]+')]),
     telefonoCodigoArea: new FormControl('', [Validators.pattern('[0-9]+')]),
     telefonoNumero: new FormControl('', [Validators.pattern('[0-9]+')]),
@@ -42,7 +65,7 @@ export class ProfileComponent implements OnInit {
     var profile = await this._userService.getProfile();
 
     this.perfil = profile;
-    this.perfilForm.setValue(profile);
+    this.perfilForm.patchValue(profile);
 
     if(profile.fechaNacimiento){
       console.log(profile.fechaNacimiento.toISOString())

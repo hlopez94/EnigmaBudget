@@ -1,6 +1,6 @@
 <mat-toolbar>
-  <button mat-icon-button class="rotating-object" (click)="toggleSidebar()" title="Acceder a Barra lateral" type="button"><mat-icon>menu</mat-icon></button>
-  <img src="assets/brand/logo_color.svg" height="85%" alt="Enigma - Tus Finanzas en Orden" loading="lazy" routerLink="/"/>
+    <img src="assets/brand/logo_color.svg" height="85%" alt="Enigma - Tus Finanzas en Orden" loading="lazy" routerLink="/"/>
+
   <span class="spacer"></span>
   <button #toggleThemeBtn id="toggleThemeBtn" mat-icon-button class="rotating-object" title="Cambiar tema claro/oscuro" (click)="intercambiarTema()" *ngIf="$activeTheme | async; let theme"><mat-icon>{{theme  == 'light' ? 'dark_mode' : 'light_mode'}}</mat-icon></button>
   <app-auth-dropdown></app-auth-dropdown>

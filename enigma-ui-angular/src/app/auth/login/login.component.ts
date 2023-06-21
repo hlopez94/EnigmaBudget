@@ -1,10 +1,23 @@
 import { Component, OnInit } from '@angular/core';
-import { FormControl, FormGroup, Validators } from '@angular/forms';
+import {
+  FormControl,
+  FormGroup,
+  Validators,
+  ReactiveFormsModule,
+} from '@angular/forms';
 import { AuthService } from '../auth.service';
-import { MatSnackBar } from '@angular/material/snack-bar';
-import { ActivatedRoute, Params, Router } from '@angular/router';
-import { MAT_FORM_FIELD_DEFAULT_OPTIONS } from '@angular/material/form-field';
+import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
+import { ActivatedRoute, Params, Router, RouterModule } from '@angular/router';
+import {
+  MAT_FORM_FIELD_DEFAULT_OPTIONS,
+  MatFormFieldModule,
+} from '@angular/material/form-field';
 import { LoginRequest } from './login-request';
+import { MatButtonModule } from '@angular/material/button';
+import { MatInputModule } from '@angular/material/input';
+import { MatCardModule } from '@angular/material/card';
+import { CommonModule } from '@angular/common';
+import { HttpClientModule } from '@angular/common/http';
 
 @Component({
   selector: 'app-login',
@@ -14,13 +27,26 @@ import { LoginRequest } from './login-request';
       provide: MAT_FORM_FIELD_DEFAULT_OPTIONS,
       useValue: { appearance: 'outline' },
     },
+    AuthService,
   ],
   styleUrls: ['./login.component.scss'],
+  standalone: true,
+  imports: [
+    CommonModule,
+    HttpClientModule,
+    ReactiveFormsModule,
+    MatCardModule,
+    MatFormFieldModule,
+    MatSnackBarModule,
+    MatInputModule,
+    MatButtonModule,
+    RouterModule,
+  ],
 })
 export class LoginComponent implements OnInit {
   loginForm: FormGroup;
 
-  originUrl: string[] | string | null = null;
+  originUrl: string[] | null = null;
   originParams: Params | null = null;
 
   constructor(
@@ -42,15 +68,22 @@ export class LoginComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    if (this._authService.isUserLoggedInSync()) {
-      this._router.navigate(['profile']);
-    }
+    var queryParams = this._route.snapshot.queryParams;
+    if (queryParams['originParams'] && queryParams['originParams'] != '{}')
+      this.originParams = JSON.parse(queryParams['originParams']);
+    if (queryParams['origin']) this.originUrl = queryParams['origin'];
+    else this.originUrl = [''];
 
-    this._route.queryParams.subscribe((params: Params) => {
-      this.originUrl = params['origin'] ?? '/';
-      if (params['originParams'])
-        this.originParams = JSON.parse(params['originParams']);
+    this._authService.$isUserLoggedIn.subscribe((isLoggedIn) => {
+      if (isLoggedIn)
+        this.navigateAfterLogin();
     });
+  }
+
+  navigateAfterLogin() {
+    //if (this.originUrl == null || this.originUrl.length == 0)
+    this._router.navigate(['/'], { relativeTo: null });
+    //else this._router.navigate(this.originUrl, {queryParams: this.originParams} )
   }
 
   async login() {
@@ -62,17 +95,8 @@ export class LoginComponent implements OnInit {
         duration: 3000,
         panelClass: ['mat-primary'],
       });
-
-      var urlPaths: string[] = [];
-      urlPaths.concat(this.originUrl!);
-
-      if (this.originUrl && this.originUrl.length > 0)
-        this._router.navigate(urlPaths.concat(this.originUrl!), {
-          queryParams: this.originParams,
-          queryParamsHandling: '',
-        });
-      else this._router.navigate(['..']);
     } catch (err: any) {
+      console.log(err);
       switch (err.status) {
         case 0:
           this._snackBar.open('El servidor no responde.', undefined, {

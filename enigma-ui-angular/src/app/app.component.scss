@@ -11,7 +11,5 @@ main {
 
 .app-content-container {
   display: grid;
-  width: 100vw;
-  grid-template-rows: 1fr auto;
-  grid-template-columns: 1fr;
+  overflow: auto;
 }

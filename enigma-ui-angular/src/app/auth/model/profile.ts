@@ -1,5 +1,4 @@
 export interface Profile {
-  idUnicoUsuario: string;
   usuario: string;
   correo: string;
   nombre: string | null;

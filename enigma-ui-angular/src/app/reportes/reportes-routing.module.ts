@@ -1,10 +1,11 @@
-import { NgModule } from '@angular/core';
-import { RouterModule, Routes } from '@angular/router';
+import { Routes } from '@angular/router';
+import { canActivateAuth } from '../auth/auth-guard';
 
-const routes: Routes = [];
-
-@NgModule({
-  imports: [RouterModule.forChild(routes)],
-  exports: [RouterModule]
-})
-export class ReportesRoutingModule { }
+export const REPORTES_ROUTES: Routes = [
+  {
+    path: '',
+    loadComponent: () =>
+      import('./reportes.component').then((c) => c.ReportesComponent),
+    canActivate: [canActivateAuth],
+  },
+];

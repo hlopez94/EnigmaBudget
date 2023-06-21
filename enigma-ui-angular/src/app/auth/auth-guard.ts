@@ -1,3 +1,4 @@
+import { firstValueFrom } from 'rxjs';
 import { inject } from '@angular/core';
 import {
   ActivatedRouteSnapshot,
@@ -7,13 +8,13 @@ import {
 } from '@angular/router';
 import { AuthService } from './auth.service';
 
-export const canActivateAuth: CanActivateFn = (
+export const canActivateAuth: CanActivateFn = async (
   route: ActivatedRouteSnapshot,
   _: RouterStateSnapshot
 ) => {
   var _authService = inject(AuthService);
   var _router = inject(Router);
-  if (_authService.isUserLoggedInSync()) {
+  if (_authService.isUserLoggedIn()) {
     var noVerificado: Boolean = _authService.cuentaVerificada();
     if (!noVerificado) {
       debugger;
@@ -29,7 +30,7 @@ export const canActivateAuth: CanActivateFn = (
 
     return true;
   } else {
-    _router.navigate(['/login'], {
+    _router.navigate(['/auth/login'], {
       queryParams: {
         origin: route.url,
         originParams: JSON.stringify(route.queryParams ?? ''),

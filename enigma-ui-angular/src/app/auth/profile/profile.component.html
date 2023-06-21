@@ -48,7 +48,6 @@
             <input formControlName="telefonoNumero" type="tel" matInput placeholder="N° de celular sin 15"/>
           </mat-form-field>
       </div>
-      <p class="mat-caption" style="color: rgba(128, 128, 128, 0.50); text-align: end;">{{perfil.idUnicoUsuario}}</p>
     </mat-card-content>
     <mat-card-actions style="display: flex">
       <button mat-button color="accent" (click)="cambiarClave()" type="button" *ngIf="!perfilForm.enabled">

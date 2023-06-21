@@ -1,13 +1,5 @@
 <app-navbar></app-navbar>
-<mat-sidenav-container>
-  <mat-sidenav #sidebarDrawer>
-    <app-sidebar></app-sidebar>
-  </mat-sidenav>
-  <mat-sidenav-content class="app-content-container mat-drawer-content">
-    <main>
-      <router-outlet></router-outlet>
-    </main>
-  </mat-sidenav-content>
-</mat-sidenav-container>
-<app-footer style="z-index: 1;"></app-footer>
-
+<main class="app-content-container mat-drawer-content">
+  <router-outlet></router-outlet>
+</main>
+<app-footer style="z-index: 1"></app-footer>

@@ -4,12 +4,32 @@ import { Observable } from 'rxjs';
 import { Divisa } from '../core/model/divisa';
 import { CuentaDeposito } from '../core/model/cuenta-deposito';
 import { CuentasDepositoStore } from '../core/stores/cuentas-deposito.store';
-import { MatDialog } from '@angular/material/dialog';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { GenerarCuentaDepositoDialog } from '../core/dialogs/generar-cuenta-deposito/generar-cuenta-deposito.component';
+import { MatDividerModule } from '@angular/material/divider';
+import { MatListModule } from '@angular/material/list';
+import { MatMenuModule } from '@angular/material/menu';
+import { MatIconModule } from '@angular/material/icon';
+import { MatButtonModule } from '@angular/material/button';
+import { MatCardModule } from '@angular/material/card';
+import { NgFor, NgIf, CurrencyPipe } from '@angular/common';
 @Component({
-  selector: 'app-home',
-  templateUrl: './home.component.html',
-  styleUrls: ['./home.component.scss'],
+    selector: 'app-home',
+    templateUrl: './home.component.html',
+    styleUrls: ['./home.component.scss'],
+    standalone: true,
+    imports: [
+        NgFor,
+        MatCardModule,
+        MatButtonModule,
+        MatIconModule,
+        MatMenuModule,
+        MatListModule,
+        MatDialogModule,
+        NgIf,
+        MatDividerModule,
+        CurrencyPipe,
+    ],
 })
 export class HomeComponent implements OnInit {
   cuentasUsuario: Observable<CuentaDeposito[]>;

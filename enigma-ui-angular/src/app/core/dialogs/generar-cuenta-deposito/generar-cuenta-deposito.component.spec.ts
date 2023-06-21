@@ -8,8 +8,8 @@ describe('GenerarCuentaDepositoComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [ GenerarCuentaDepositoComponent ]
-    })
+    imports: [GenerarCuentaDepositoComponent]
+})
     .compileComponents();
 
     fixture = TestBed.createComponent(GenerarCuentaDepositoComponent);

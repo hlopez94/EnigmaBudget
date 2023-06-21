@@ -6,9 +6,10 @@ import { TypedApiResponse } from 'src/app/core/model/ApiResponse';
 import { AuthService } from '../auth.service';
 
 @Component({
-  selector: 'app-validate-account',
-  templateUrl: './validate-account.component.html',
-  styleUrls: ['./validate-account.component.scss']
+    selector: 'app-validate-account',
+    templateUrl: './validate-account.component.html',
+    styleUrls: ['./validate-account.component.scss'],
+    standalone: true
 })
 export class ValidateAccountComponent implements OnInit {
 

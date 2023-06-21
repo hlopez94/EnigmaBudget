@@ -2,8 +2,10 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
+import { MatMenuModule } from '@angular/material/menu';
 import { MatToolbarModule } from '@angular/material/toolbar';
-import { AuthDropdownModule } from 'src/app/auth/auth-dropdown.module';
+import { RouterModule } from '@angular/router';
+import { AuthDropdownComponent } from 'src/app/auth/auth-dropdown/auth-dropdown.component';
 import { AppStateService } from 'src/app/core/services/app-state.service';
 
 @Component({
@@ -16,7 +18,9 @@ import { AppStateService } from 'src/app/core/services/app-state.service';
     MatButtonModule,
     MatIconModule,
     MatToolbarModule,
-    AuthDropdownModule
+    RouterModule,
+    MatMenuModule,
+    AuthDropdownComponent
   ],
   providers:[
     AppStateService

@@ -1,12 +1,11 @@
-import { HomeComponent } from './home.component';
-import { NgModule } from '@angular/core';
-import { RouterModule, Routes } from '@angular/router';
+import { Routes } from '@angular/router';
 import { canActivateAuth } from '../auth/auth-guard';
 
-const routes: Routes = [{ path: '', component: HomeComponent,canActivate:[canActivateAuth] }];
-
-@NgModule({
-  imports: [RouterModule.forChild(routes)],
-  exports: [RouterModule],
-})
-export class HomeRoutingModule {}
+export const HOME_ROUTES: Routes = [
+  {
+    path: '',
+    loadComponent: () =>
+      import('./home.component').then((c) => c.HomeComponent),
+    canActivate: [canActivateAuth],
+  },
+];
