@@ -272,11 +272,11 @@ namespace EnigmaBudget.Infrastructure.Auth
                 }
                 catch (MySqlException e)
                 {
-                    if (e.Message.Contains("UNI_usuarios_usu_correo"))
+                    if (e.Message.Contains("IDX_usuarios_usu_correo"))
                     {
                         result.AddInputDataError("Ya existe una cuenta con el correo indicado.");
                     }
-                    else if (e.Message.Contains("UNI_usuarios_usu_usuario"))
+                    else if (e.Message.Contains("IDX_usuarios_usu_usuario"))
                     {
                         result.AddInputDataError("Ya existe una cuenta con nombre de usuario indicado.");
                     }
