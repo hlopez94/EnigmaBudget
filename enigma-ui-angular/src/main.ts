@@ -1,4 +1,7 @@
-import { BrowserAnimationsModule, provideAnimations } from '@angular/platform-browser/animations';
+import {
+  BrowserAnimationsModule,
+  provideAnimations,
+} from '@angular/platform-browser/animations';
 import { enableProdMode } from '@angular/core';
 import { environment } from './environments/environment';
 import { environmentLoader as environmentLoaderPromise } from './environments/environmentLoader';
@@ -41,6 +44,6 @@ bootstrapApplication(AppComponent, {
       provide: HTTP_INTERCEPTORS,
       useClass: AuthInterceptor,
       multi: true,
-    }
+    },
   ],
 }).catch((err) => console.error(err));
