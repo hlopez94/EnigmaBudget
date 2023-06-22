@@ -1,38 +1,35 @@
-import { NgModule } from '@angular/core';
-import { RouterModule, Routes } from '@angular/router';
+import { Routes } from '@angular/router';
 import { canActivateAuth } from './auth-guard';
-import { LoginComponent } from './login/login.component';
-import { ProfileComponent } from './profile/profile.component';
-import { SignupComponent } from './signup/signup.component';
-import { UnverifiedAccountComponent } from './unverified-account/unverified-account.component';
-import { ValidateAccountComponent } from './validate-account/validate-account.component';
 
 export const AUTH_ROUTES: Routes = [
   {
     path: 'login',
-    component: LoginComponent,
+    loadComponent: () =>
+      import('./login/login.component').then((c) => c.LoginComponent),
   },
   {
     path: 'unverified-account',
-    component: UnverifiedAccountComponent,
+    loadComponent: () =>
+      import('./unverified-account/unverified-account.component').then(
+        (c) => c.UnverifiedAccountComponent
+      ),
   },
   {
     path: 'profile',
-    component: ProfileComponent,
+    loadComponent: () =>
+      import('./profile/profile.component').then((c) => c.ProfileComponent),
     canActivate: [canActivateAuth],
   },
   {
     path: 'signup',
-    component: SignupComponent,
+    loadComponent: () =>
+      import('./signup/signup.component').then((c) => c.SignupComponent),
   },
   {
     path: 'validate-mail',
-    component: ValidateAccountComponent,
+    loadComponent: () =>
+      import('./validate-account/validate-account.component').then(
+        (c) => c.ValidateAccountComponent
+      ),
   },
 ];
-
-@NgModule({
-  imports: [RouterModule.forChild(AUTH_ROUTES)],
-  exports: [RouterModule],
-})
-export class AuthRoutingModule {}
