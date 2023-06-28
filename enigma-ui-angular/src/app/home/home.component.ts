@@ -16,6 +16,7 @@ import { NgFor, NgIf, CurrencyPipe, AsyncPipe, UpperCasePipe } from '@angular/co
 import { CuentaCardComponent } from '../cuenta-card/cuenta-card.component';
 import { Balance } from '../core/model/balance';
 import { BalancesStore } from '../core/stores/balances.store';
+import { MonedaPipe } from '../core/pipes/monedaPipe';
 @Component({
     selector: 'app-home',
     templateUrl: './home.component.html',
@@ -34,7 +35,8 @@ import { BalancesStore } from '../core/stores/balances.store';
         AsyncPipe,
         CurrencyPipe,
         CuentaCardComponent,
-        UpperCasePipe
+        UpperCasePipe,
+        MonedaPipe
     ],
 })
 export class HomeComponent implements OnInit {
