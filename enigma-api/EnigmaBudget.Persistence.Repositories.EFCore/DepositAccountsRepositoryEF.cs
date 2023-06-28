@@ -67,7 +67,8 @@ namespace EnigmaBudget.Persistence.Repositories.EFCore
         public async IAsyncEnumerable<Balance> GetBalances()
         {
             var query = await _context.DepositAccounts
-                                .Where(da => da.DeaUsuId == _contextRepository.GetLoggedUserID())
+                                .Where(da => da.DeaUsuId == _contextRepository.GetLoggedUserID() &&
+                                        (!da.DeaFechaBaja.HasValue || (da.DeaFechaBaja.HasValue && DateTime.Now < da.DeaFechaBaja.Value)))
                                 .GroupBy(da => da.DeaCurrencyCode)
                                 .ToListAsync()
                                 ;
@@ -108,7 +109,9 @@ namespace EnigmaBudget.Persistence.Repositories.EFCore
         public async IAsyncEnumerable<DepositAccount> ListUserDepositAccounts()
         {
             var query = await _context.DepositAccounts
-                                .Where(da => da.DeaUsuId == _contextRepository.GetLoggedUserID())
+                                .Where(da => da.DeaUsuId == _contextRepository.GetLoggedUserID() && 
+                                        (!da.DeaFechaBaja.HasValue || (da.DeaFechaBaja.HasValue && DateTime.Now < da.DeaFechaBaja.Value))
+                                        )
                                 .Include(da => da.DeaTda)
                                 .AsNoTracking()
                                 .ToListAsync()
