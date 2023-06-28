@@ -1,26 +1,18 @@
 <section id="listado-balances">
   <h1>Balances Generales</h1>
-  <ul class="lista-tarjetas" *ngIf="$balancesUsuario | async; let balances;">
-    <li *ngFor=" let balance of balances">
+  <ul class="lista-tarjetas" *ngIf="$balancesUsuario | async; let balances">
+    <li *ngFor="let balance of balances">
       <mat-card>
         <mat-card-header>
-          <mat-card-title>{{balance.moneda.name | uppercase}}</mat-card-title>
-          <mat-card-subtitle>{{balance.moneda.code}}</mat-card-subtitle>
+          <mat-card-title>{{ balance.moneda.name | uppercase }}</mat-card-title>
+          <mat-card-subtitle>{{ balance.moneda.code }}</mat-card-subtitle>
         </mat-card-header>
 
         <mat-card-content>
           <div style="display: flex">
             <h1 class="mat-display-1">
-              {{ balance.totalBalance | moneda: balance.moneda | async}}
+              {{ balance.totalBalance | moneda : balance.moneda | async }}
             </h1>
-            <button
-              mat-icon-button
-              title="Ocultar/mostrar balance"
-              aria-label="Ocultar/mostrar balance"
-              type="button"
-            >
-              <mat-icon>visibility_on</mat-icon>
-            </button>
           </div>
         </mat-card-content>
       </mat-card>
@@ -31,12 +23,6 @@
 <section id="listado-cuentas">
   <h1>Cuentas</h1>
   <ul class="lista-tarjetas">
-    <li>
-      <app-cuenta-card [type]="'placeholder'"></app-cuenta-card>
-    </li>
-    <li>
-      <app-cuenta-card [type]="'loading'"></app-cuenta-card>
-    </li>
     <li *ngFor="let cuenta of $cuentasUsuario | async">
       <app-cuenta-card [type]="'account'" [account]="cuenta"></app-cuenta-card>
     </li>
@@ -58,7 +44,11 @@
   <mat-card>
     <mat-list>
       <ng-container *ngFor="let i of counter(10); let last = last">
-        <mat-list-item> Pepper </mat-list-item>
+        <mat-list-item>
+          <div matListItemTitle>Descripción Movimiento</div>
+          <div matListItemMeta>$0.000,00</div>
+          <div matListItemLine>Nombre Cuenta</div>
+        </mat-list-item>
         <mat-divider *ngIf="!last"></mat-divider>
       </ng-container>
     </mat-list>
