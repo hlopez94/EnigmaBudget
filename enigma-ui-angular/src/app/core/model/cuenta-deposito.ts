@@ -3,7 +3,7 @@ import { Divisa } from './divisa';
 import { Pais } from './pais';
 
 export interface CuentaDeposito {
-  id: number;
+  id: string;
   description: string;
   funds: number;
   country: Pais;

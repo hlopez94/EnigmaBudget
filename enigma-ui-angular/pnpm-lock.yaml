@@ -15,6 +15,7 @@ specifiers:
   '@angular/platform-browser': ^16.0.5
   '@angular/platform-browser-dynamic': ^16.0.5
   '@angular/router': ^16.0.5
+  '@ngneat/content-loader': ^7.0.0
   '@types/jasmine': ~3.10.7
   '@types/node': '14'
   flag-icons: ^6.6.6
@@ -42,6 +43,7 @@ dependencies:
   '@angular/platform-browser': 16.0.5_fgrhal5a2xhvk72xhq4nx6awrm
   '@angular/platform-browser-dynamic': 16.0.5_rz6shu4schnzqf3jdyauivwhwy
   '@angular/router': 16.0.5_4qq3iruz7kfh6amajr4i2lp45e
+  '@ngneat/content-loader': 7.0.0_@angular+core@16.0.5
   flag-icons: 6.6.6
   rxjs: 7.5.7
   tslib: 2.5.0
@@ -2800,6 +2802,15 @@ packages:
     dependencies:
       '@material/feature-targeting': 15.0.0-canary.90291f2e2.0
       '@material/theme': 15.0.0-canary.90291f2e2.0
+      tslib: 2.5.0
+    dev: false
+
+  /@ngneat/content-loader/7.0.0_@angular+core@16.0.5:
+    resolution: {integrity: sha512-CfwsDxh2hsQfUwca3SWnyjQD5jcG6Vb6Ew0JIztj/spr3YIC9Obz7AqEVMDYPKch4QzPJiJ6OVRuLRM2DKiG9g==}
+    peerDependencies:
+      '@angular/core': '>= 13.0.0'
+    dependencies:
+      '@angular/core': 16.0.5_rxjs@7.5.7+zone.js@0.13.0
       tslib: 2.5.0
     dev: false
 

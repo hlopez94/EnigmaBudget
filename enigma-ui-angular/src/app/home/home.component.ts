@@ -12,7 +12,8 @@ import { MatMenuModule } from '@angular/material/menu';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
-import { NgFor, NgIf, CurrencyPipe } from '@angular/common';
+import { NgFor, NgIf, CurrencyPipe, AsyncPipe } from '@angular/common';
+import { CuentaCardComponent } from '../cuenta-card/cuenta-card.component';
 @Component({
     selector: 'app-home',
     templateUrl: './home.component.html',
@@ -28,11 +29,13 @@ import { NgFor, NgIf, CurrencyPipe } from '@angular/common';
         MatDialogModule,
         NgIf,
         MatDividerModule,
+        AsyncPipe,
         CurrencyPipe,
+        CuentaCardComponent
     ],
 })
 export class HomeComponent implements OnInit {
-  cuentasUsuario: Observable<CuentaDeposito[]>;
+  $cuentasUsuario: Observable<CuentaDeposito[]>;
   divisas: Observable<Divisa[]>;
 
   constructor(
@@ -41,7 +44,7 @@ export class HomeComponent implements OnInit {
     private dialog: MatDialog
   ) {
     this.divisas = this.divisasStore.divisas;
-    this.cuentasUsuario = this.cuentasDepositoStore.cuentasUser;
+    this.$cuentasUsuario = this.cuentasDepositoStore.cuentasUser;
   }
 
   $tiposCuentaDeposito = this.cuentasDepositoStore.tiposCuentaDeposito;

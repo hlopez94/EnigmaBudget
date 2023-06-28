@@ -1,6 +1,6 @@
 <mat-card *ngIf="type === 'account'">
   <mat-card-header>
-    <mat-card-title>BBVA </mat-card-title>
+    <mat-card-title>{{account!.description}}</mat-card-title>
     <mat-card-subtitle>Caja Ahorros</mat-card-subtitle>
     <button
       mat-icon-button
@@ -25,7 +25,7 @@
   <mat-card-content>
     <div style="display: flex">
       <h1 class="mat-display-1">
-        {{ 1000 | currency : "ARS" : "symbol-narrow" : "4.2-2" }}
+        {{ account!.funds | currency : "ARS" : "symbol-narrow" : "4.2-2" }}
       </h1>
       <button
         mat-icon-button
@@ -48,27 +48,13 @@
 </mat-card>
 
 <mat-card *ngIf="type === 'placeholder'">
-  <mat-card-header>
-    <mat-card-title>&nbsp; </mat-card-title>
-    <mat-card-subtitle>&nbsp;</mat-card-subtitle>
-    <button
-      mat-icon-button
-      [matMenuTriggerFor]="menu"
-      class="mat-card-top-right-menu"
-      aria-label="Example icon-button with a menu"
-    >
-      <mat-icon>more_vert</mat-icon>
-    </button>
-    <mat-menu #menu="matMenu">
-      <button mat-menu-item>
-        <mat-icon>sort</mat-icon>
-        <span>Ver Movimientos</span>
-      </button>
-      <button mat-menu-item disabled>
-        <mat-icon>edit</mat-icon>
-        <span>Editar Detalles</span>
-      </button>
-    </mat-menu>
+  <mat-card-header >
+    <mat-card-title  style="width: 8ch;">
+    <div class="load-wraper" style="width: 8ch;">
+      <span class="activity">&nbsp;</span>
+    </div>
+    </mat-card-title>
+    <mat-card-subtitle class="load-wraper" style="width: 12ch;"><span class="activity">&nbsp;</span></mat-card-subtitle>
   </mat-card-header>
 
   <mat-card-content>
