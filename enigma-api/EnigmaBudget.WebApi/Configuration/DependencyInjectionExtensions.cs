@@ -32,6 +32,7 @@ namespace EnigmaBudget.WebApi.Configuration
             services.AddTransient<ICountriesService, CountriesService>();
             services.AddTransient<IDepositAccountsService, DepositAccountsService>();
             services.AddTransient<IDepositAccounTypesService, DepositAccountTypesService>();
+            services.AddTransient<IBalancesService, BalancesService>();
         }
     }
 }

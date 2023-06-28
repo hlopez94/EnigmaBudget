@@ -5,5 +5,6 @@ namespace EnigmaBudget.Domain.Repositories
     public interface IDepositAccountRepository : IBaseRepository<DepositAccount, string>
     {
         public IAsyncEnumerable<DepositAccount> ListUserDepositAccounts();
+        public IAsyncEnumerable<Balance> GetBalances();
     }
 }

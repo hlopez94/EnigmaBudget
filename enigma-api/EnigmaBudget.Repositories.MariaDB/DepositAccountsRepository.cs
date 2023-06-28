@@ -61,6 +61,11 @@ namespace EnigmaBudget.Persistence.Repositories.MariaDB
             return result == 1;
         }
 
+        public IAsyncEnumerable<Balance> GetBalances()
+        {
+            throw new NotImplementedException();
+        }
+
         public async Task<DepositAccount> GetById(string id)
         {
             var sql = "SELECT * FROM deposit_accounts where dea_id = @deaId";

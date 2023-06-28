@@ -5,6 +5,7 @@ using EnigmaBudget.Infrastructure.Helpers;
 using EnigmaBudget.Persistence.Contexts.EfCore.Enigma;
 using EnigmaBudget.Persistence.Contexts.EfCore.Enigma.Entities;
 using Microsoft.EntityFrameworkCore;
+using System.Linq;
 
 namespace EnigmaBudget.Persistence.Repositories.EFCore
 {
@@ -23,7 +24,7 @@ namespace EnigmaBudget.Persistence.Repositories.EFCore
         public async Task<DepositAccount> Create(DepositAccount model)
         {
             DepositAccountEntity newDepositAccount;
-            using (var trx = _context.Database.BeginTransaction())
+            using(var trx = _context.Database.BeginTransaction())
             {
                 var addTrx = _context.DepositAccounts.Add(new DepositAccountEntity()
                 {
@@ -36,7 +37,7 @@ namespace EnigmaBudget.Persistence.Repositories.EFCore
                     DeaFunds = model.Funds,
                     DeaCountryCode = model.Country.Alpha3,
                     DeaCurrencyCode = model.Currency.Num,
-                    DeaName = model.Name                    
+                    DeaName = model.Name
                 });
                 await _context.SaveChangesAsync();
                 newDepositAccount = addTrx.Entity;
@@ -48,11 +49,11 @@ namespace EnigmaBudget.Persistence.Repositories.EFCore
 
         public async Task<bool> Delete(string id)
         {
-            using (var trx = _context.Database.BeginTransaction())
+            using(var trx = _context.Database.BeginTransaction())
             {
                 var daEntity = await _context.DepositAccounts.SingleOrDefaultAsync(da => da.DeaId == EncodeDecodeHelper.DecryptLong(id) && !da.DeaFechaBaja.HasValue);
 
-                if (daEntity == null)
+                if(daEntity == null)
                     return false;
 
                 daEntity.DeaFechaBaja = DateTime.Now;
@@ -61,6 +62,24 @@ namespace EnigmaBudget.Persistence.Repositories.EFCore
             }
 
             return true;
+        }
+
+        public async IAsyncEnumerable<Balance> GetBalances()
+        {
+            var query = await _context.DepositAccounts
+                                .Where(da => da.DeaUsuId == _contextRepository.GetLoggedUserID())
+                                .GroupBy(da => da.DeaCurrencyCode)
+                                .ToListAsync()
+                                ;
+
+            foreach(var group in query)
+            {
+                yield return new Balance()
+                {
+                    TotalBalance = group.Sum(account => account.DeaFunds),
+                    Moneda = new Currency() { Code = group.Key }
+                };
+            }
         }
 
         public async Task<DepositAccount> GetById(string id)
@@ -80,7 +99,7 @@ namespace EnigmaBudget.Persistence.Repositories.EFCore
                                 .ToListAsync()
                                 ;
 
-            foreach (var item in query)
+            foreach(var item in query)
             {
                 yield return _mapper.Map<DepositAccountEntity, DepositAccount>(item);
             }
@@ -95,7 +114,7 @@ namespace EnigmaBudget.Persistence.Repositories.EFCore
                                 .ToListAsync()
                                 ;
 
-            foreach (var item in query)
+            foreach(var item in query)
             {
                 yield return _mapper.Map<DepositAccountEntity, DepositAccount>(item);
             }
@@ -103,7 +122,7 @@ namespace EnigmaBudget.Persistence.Repositories.EFCore
 
         public async Task<bool> Update(DepositAccount model)
         {
-            using (var trx = await _context.Database.BeginTransactionAsync())
+            using(var trx = await _context.Database.BeginTransactionAsync())
             {
                 DepositAccountEntity newDepositAccount = await _context.DepositAccounts.SingleAsync(da => da.DeaId == EncodeDecodeHelper.DecryptLong(model.Id));
 
