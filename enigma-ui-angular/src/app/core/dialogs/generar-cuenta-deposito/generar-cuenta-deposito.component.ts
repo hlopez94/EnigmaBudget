@@ -2,7 +2,12 @@ import { CountriesStore } from './../../stores/countries.store';
 import { CurrenciesStore } from './../../stores/currencies.store';
 import { Observable } from 'rxjs';
 import { Divisa } from './../../model/divisa';
-import { FormGroup, FormControl, FormBuilder, Validators, ReactiveFormsModule } from '@angular/forms';
+import {
+  FormGroup,
+  FormControl,
+  FormBuilder,
+  ReactiveFormsModule,
+} from '@angular/forms';
 import { Component, EventEmitter, Output } from '@angular/core';
 import { CommonModule, getCurrencySymbol } from '@angular/common';
 import { Pais } from '../../model/pais';
@@ -23,8 +28,8 @@ import { MatSelectModule } from '@angular/material/select';
   selector: 'app-generar-cuenta-deposito',
   templateUrl: './generar-cuenta-deposito.component.html',
   styleUrls: ['./generar-cuenta-deposito.component.scss'],
-  standalone:true,
-  imports:[
+  standalone: true,
+  imports: [
     CommonModule,
     MatChipsModule,
     MatAutocompleteModule,
@@ -37,13 +42,13 @@ import { MatSelectModule } from '@angular/material/select';
     MatInputModule,
     ScrollingModule,
     MatIconModule,
-    MatButtonToggleModule
-  ]
+    MatButtonToggleModule,
+  ],
 })
 export class GenerarCuentaDepositoComponent {
   newAccountForm: FormGroup;
 
-  @Output('resultado') resultadoEvent: EventEmitter<'creado'|'error'> = new EventEmitter();
+  @Output('resultado') resultadoEvent: EventEmitter<'creado' | 'error'> = new EventEmitter();
 
   readonly $currencies: Observable<Divisa[]> = this.currenciesStore.filteredDivisas;
   readonly $countries: Observable<Pais[]> = this.countriesStore.filteredCountries;
@@ -58,7 +63,6 @@ export class GenerarCuentaDepositoComponent {
     private countriesStore: CountriesStore,
     private cuentasStore: CuentasDepositoStore
   ) {
-
     this.newAccountForm = fb.group<CreateDepositAccountForm>({
       AccountAlias: new FormControl(),
       Description: new FormControl(),
@@ -74,7 +78,6 @@ export class GenerarCuentaDepositoComponent {
     this.$currencies.subscribe(
       (arr) => (this.currenciesLength = arr.length > 5 ? 5 : arr.length)
     );
-
   }
 
   async ngOnInit() {
@@ -106,8 +109,8 @@ export class GenerarCuentaDepositoComponent {
       : '';
   }
 
-  async submit(){
-    var res =await this.cuentasStore.crearCuentaDeposito(this.newAccountForm.value);
+  async submit() {
+    var res = await this.cuentasStore.crearCuentaDeposito(this.newAccountForm.value);
     this.resultadoEvent.emit('creado');
   }
 }
@@ -123,22 +126,35 @@ export interface CreateDepositAccountForm {
 
 @Component({
   selector: 'generar-cuenta-deposito-dialog',
-  template: '<button mat-icon-button aria-label="Cerrar" style="float:right" (click)="onNoClick()"> <mat-icon>close</mat-icon> </button> <app-generar-cuenta-deposito (resultado)="resultadoForm($event)"></app-generar-cuenta-deposito>',
+  template: `<button
+      mat-icon-button
+      aria-label="Cerrar"
+      class="mat-card-top-right-menu"
+      (click)="onNoClick()">
+      <mat-icon>close</mat-icon>
+    </button>
+    <app-generar-cuenta-deposito (resultado)="resultadoForm($event)">
+    </app-generar-cuenta-deposito>`,
   standalone: true,
-  imports: [GenerarCuentaDepositoComponent, MatDialogModule,  MatButtonModule,MatIconModule],
+  imports: [
+    GenerarCuentaDepositoComponent,
+    MatDialogModule,
+    MatButtonModule,
+    MatIconModule,
+  ],
 })
 export class GenerarCuentaDepositoDialog {
   constructor(
-    public dialogRef: MatDialogRef<GenerarCuentaDepositoComponent>,
-   // @Inject(MAT_DIALOG_DATA) public data: DialogData,
-  ) {}
+    public dialogRef: MatDialogRef<GenerarCuentaDepositoComponent>
+  )
+  {}
 
   onNoClick(): void {
     this.dialogRef.close();
   }
 
-  resultadoForm(evento : 'creado' | 'error'){
-    if(evento == 'creado')
+  resultadoForm(evento: 'creado' | 'error') {
+    if (evento == 'creado')
       this.onNoClick();
   }
 }

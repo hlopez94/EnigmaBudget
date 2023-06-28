@@ -79,6 +79,7 @@ namespace EnigmaBudget.Persistence.Repositories.EFCore
                                 .AsNoTracking()
                                 .ToListAsync()
                                 ;
+
             foreach (var item in query)
             {
                 yield return _mapper.Map<DepositAccountEntity, DepositAccount>(item);
@@ -89,9 +90,11 @@ namespace EnigmaBudget.Persistence.Repositories.EFCore
         {
             var query = await _context.DepositAccounts
                                 .Where(da => da.DeaUsuId == _contextRepository.GetLoggedUserID())
+                                .Include(da => da.DeaTda)
                                 .AsNoTracking()
                                 .ToListAsync()
                                 ;
+
             foreach (var item in query)
             {
                 yield return _mapper.Map<DepositAccountEntity, DepositAccount>(item);
