@@ -1,17 +1,17 @@
 <section id="listado-balances">
   <h1>Balances Generales</h1>
-  <ul class="lista-tarjetas">
-    <li *ngFor="let i of counter(3)">
+  <ul class="lista-tarjetas" *ngIf="$balancesUsuario | async; let balances;">
+    <li *ngFor=" let balance of balances">
       <mat-card>
         <mat-card-header>
-          <mat-card-title>Pesos Argentinos</mat-card-title>
-          <mat-card-subtitle>ARS</mat-card-subtitle>
+          <mat-card-title>{{balance.moneda.name | uppercase}}</mat-card-title>
+          <mat-card-subtitle>{{balance.moneda.code}}</mat-card-subtitle>
         </mat-card-header>
 
         <mat-card-content>
           <div style="display: flex">
             <h1 class="mat-display-1">
-              {{ 1000 | currency : "ARS" : "symbol-narrow" : "4.2-2" }}
+              {{ balance.totalBalance | currency : balance.moneda.code : "symbol" : "4.2-2" }}
             </h1>
             <button
               mat-icon-button

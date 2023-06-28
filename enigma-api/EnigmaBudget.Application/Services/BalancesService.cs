@@ -8,10 +8,13 @@ namespace EnigmaBudget.Application.Services
     {
 
         private readonly IDepositAccountRepository _depositAccountRepository;
+        private readonly ICountriesService _countriesService;
 
-        public BalancesService(IDepositAccountRepository depositAccountsService)
+        public BalancesService(IDepositAccountRepository depositAccountsService,
+            ICountriesService countriesService)
         {
             _depositAccountRepository = depositAccountsService;
+            _countriesService = countriesService;
         }
 
         public async Task<AppResult<List<Balance>>> ObtenerBalances()
@@ -20,6 +23,10 @@ namespace EnigmaBudget.Application.Services
 
             appResult.Data = await _depositAccountRepository.GetBalances().ToListAsync();
 
+            foreach(var balance in appResult.Data)
+            {
+                balance.Moneda = _countriesService.GetCurrencyById(balance.Moneda.Code).Data;
+            }
             return appResult;
         }
     }

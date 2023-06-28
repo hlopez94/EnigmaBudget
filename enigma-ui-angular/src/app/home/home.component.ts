@@ -12,8 +12,10 @@ import { MatMenuModule } from '@angular/material/menu';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
-import { NgFor, NgIf, CurrencyPipe, AsyncPipe } from '@angular/common';
+import { NgFor, NgIf, CurrencyPipe, AsyncPipe, UpperCasePipe } from '@angular/common';
 import { CuentaCardComponent } from '../cuenta-card/cuenta-card.component';
+import { Balance } from '../core/model/balance';
+import { BalancesStore } from '../core/stores/balances.store';
 @Component({
     selector: 'app-home',
     templateUrl: './home.component.html',
@@ -31,26 +33,31 @@ import { CuentaCardComponent } from '../cuenta-card/cuenta-card.component';
         MatDividerModule,
         AsyncPipe,
         CurrencyPipe,
-        CuentaCardComponent
+        CuentaCardComponent,
+        UpperCasePipe
     ],
 })
 export class HomeComponent implements OnInit {
   $cuentasUsuario: Observable<CuentaDeposito[]>;
+  $balancesUsuario : Observable<Balance[]>;
   divisas: Observable<Divisa[]>;
 
   constructor(
     private divisasStore: CurrenciesStore,
     private cuentasDepositoStore: CuentasDepositoStore,
+    private balancesStore: BalancesStore,
     private dialog: MatDialog
   ) {
     this.divisas = this.divisasStore.divisas;
     this.$cuentasUsuario = this.cuentasDepositoStore.cuentasUser;
+    this.$balancesUsuario = this.balancesStore.balances;
   }
 
   $tiposCuentaDeposito = this.cuentasDepositoStore.tiposCuentaDeposito;
 
   async ngOnInit() {
     await this.cuentasDepositoStore.cargarCuentasUsuario();
+    await this.balancesStore.cargarBalances();
   }
 
   counter(i: number) {
