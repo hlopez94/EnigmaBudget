@@ -27,16 +27,8 @@
   <mat-card-content>
     <div style="display: flex">
       <h1 class="mat-display-1">
-        {{ account.funds | currency : "ARS" : "symbol-narrow" : "4.2-2" }}
+        {{ account.funds | moneda : account.currency : (mostrarBalances | async) }}
       </h1>
-      <button
-        mat-icon-button
-        title="Ocultar/mostrar balance"
-        aria-label="Ocultar/mostrar balance"
-        type="button"
-      >
-        <mat-icon>visibility_on</mat-icon>
-      </button>
     </div>
     <mat-card-actions style="display: flex">
       <button mat-button style="color: green">

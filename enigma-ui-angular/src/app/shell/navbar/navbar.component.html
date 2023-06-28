@@ -2,6 +2,7 @@
     <img src="assets/brand/logo_color.svg" height="85%" alt="Enigma - Tus Finanzas en Orden" loading="lazy" routerLink="/"/>
 
   <span class="spacer"></span>
+  <button #toggleBalancesViewBtn id="toggleBalancesViewBtn" mat-icon-button class="rotating-object" title="Mostrar/Ocultar Balances" (click)="intercambiarMostrarBalances()" ><mat-icon>{{($mostrarBalances | async) == 'mostrar' ? 'visibility_on' : 'visibility_off'}}</mat-icon></button>
   <button #toggleThemeBtn id="toggleThemeBtn" mat-icon-button class="rotating-object" title="Cambiar tema claro/oscuro" (click)="intercambiarTema()" *ngIf="$activeTheme | async; let theme"><mat-icon>{{theme  == 'light' ? 'dark_mode' : 'light_mode'}}</mat-icon></button>
   <app-auth-dropdown></app-auth-dropdown>
 </mat-toolbar>

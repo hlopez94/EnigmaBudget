@@ -21,13 +21,11 @@ import { AppStateService } from 'src/app/core/services/app-state.service';
     RouterModule,
     MatMenuModule,
     AuthDropdownComponent
-  ],
-  providers:[
-    AppStateService
   ]
 })
 export class NavbarComponent implements OnInit {
   $activeTheme = this._appStateService.activeTheme;
+  $mostrarBalances = this._appStateService.mostrarBalances;
   constructor(private _appStateService: AppStateService) {}
 
   ngOnInit(): void {}
@@ -39,4 +37,9 @@ export class NavbarComponent implements OnInit {
   async intercambiarTema(){
     await this._appStateService.toggleTheme();
   }
+
+  async intercambiarMostrarBalances(){
+    await this._appStateService.toggleMostrarBalances();
+  }
+
 }

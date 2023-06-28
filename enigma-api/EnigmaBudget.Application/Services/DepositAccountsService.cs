@@ -9,10 +9,12 @@ namespace EnigmaBudget.Application.Services
     {
         private readonly IDepositAccountRepository _depositAccountRepository;
         private readonly IAuthService _authService;
-        public DepositAccountsService(IDepositAccountRepository depositAccountRepository, IAuthService authService)
+        private readonly ICountriesService _countriesService;
+        public DepositAccountsService(IDepositAccountRepository depositAccountRepository, IAuthService authService, ICountriesService countriesService)
         {
             _depositAccountRepository = depositAccountRepository;
             _authService = authService;
+            _countriesService = countriesService;
         }
         public async Task<AppResult<DepositAccount>> CreateDepositAccount(CreateDepositAccountRequest request)
         {
@@ -64,6 +66,12 @@ namespace EnigmaBudget.Application.Services
         {
             var appResult = new AppResult<List<DepositAccount>>();
             appResult.Data = await _depositAccountRepository.ListUserDepositAccounts().ToListAsync();
+
+            foreach(var account in appResult.Data)
+            {
+                account.Currency = _countriesService.GetCurrencyById(account.Currency.Num).Data;
+                account.Country = _countriesService.GetCountryById(account.Country.Alpha3).Data;
+            }
             return appResult;
         }
 
