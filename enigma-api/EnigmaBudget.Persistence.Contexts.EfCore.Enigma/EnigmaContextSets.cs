@@ -14,4 +14,6 @@ public partial class EnigmaContext : DbContext
     public virtual DbSet<UsuarioPerfilEntity> UsuarioPerfiles { get; set; }
 
     public virtual DbSet<UsuariosValidacionEmailEntity> UsuariosValidacionEmails { get; set; }
+
+    public virtual DbSet<DepositAccountTransactionEntity> Transactions { get; set;}
 }

@@ -55,4 +55,5 @@ public partial class UsuarioEntity
     public virtual UsuarioPerfilEntity? UsuarioPerfil { get; set; }
 
     public virtual ICollection<UsuariosValidacionEmailEntity> UsuariosValidacionEmails { get; set; } = new List<UsuariosValidacionEmailEntity>();
+    public virtual ICollection<DepositAccountTransactionEntity> DepositAccountsTransactions { get; internal set; }
 }

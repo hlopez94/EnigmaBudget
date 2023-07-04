@@ -1,4 +1,6 @@
-﻿namespace EnigmaBudget.Persistence.Contexts.EfCore.Enigma.Entities;
+﻿using System.Collections.ObjectModel;
+
+namespace EnigmaBudget.Persistence.Contexts.EfCore.Enigma.Entities;
 
 /// <summary>
 /// Tabla con datos de cuentas depÃ³sito
@@ -63,4 +65,5 @@ public partial class DepositAccountEntity
     public virtual TypesDepositAccountEntity DeaTda { get; set; } = null!;
 
     public virtual UsuarioEntity DeaUsu { get; set; } = null!;
+    public virtual Collection<DepositAccountTransactionEntity> DeaTrd { get; set; } = null!;
 }

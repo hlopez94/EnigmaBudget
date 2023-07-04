@@ -74,15 +74,5 @@ namespace EnigmaBudget.Application.Services
             }
             return appResult;
         }
-
-        public Task<AppResult<AccountMovement>> MakeDepositOnAccount(DepositOnAccountRequest request)
-        {
-            throw new NotImplementedException();
-        }
-
-        public Task<AppResult<AccountMovement>> MakeWithdrawOnAccount(WithdrawRequest request)
-        {
-            throw new NotImplementedException();
-        }
     }
 }

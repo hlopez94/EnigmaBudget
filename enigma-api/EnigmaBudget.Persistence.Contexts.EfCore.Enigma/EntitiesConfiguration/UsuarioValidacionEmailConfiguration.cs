@@ -42,7 +42,7 @@ namespace EnigmaBudget.Persistence.Contexts.EfCore.Enigma.EntitiesConfiguration
             entity.HasOne(d => d.UveUsu).WithMany(p => p.UsuariosValidacionEmails)
                 .HasForeignKey(d => d.UveUsuId)
                 .OnDelete(DeleteBehavior.Restrict)
-                .HasConstraintName("usuarios_validacion_email_FK");
+                .HasConstraintName("FK_usv_usu");
 
         }
     }

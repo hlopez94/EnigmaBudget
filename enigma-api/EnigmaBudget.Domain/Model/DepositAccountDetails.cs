@@ -2,6 +2,6 @@
 {
     public class DepositAccountDetails : DepositAccount
     {
-        public IEnumerable<AccountMovement> FundMovements { get; set; }
+        public IEnumerable<DepositAccountTransaction> Transactions { get; set; }
     }
 }

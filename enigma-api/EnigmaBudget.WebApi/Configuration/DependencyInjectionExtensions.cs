@@ -6,6 +6,7 @@ using EnigmaBudget.Infrastructure.Auth;
 using EnigmaBudget.Infrastructure.SendInBlue;
 using EnigmaBudget.Persistence.Repositories.EFCore;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 
 namespace EnigmaBudget.WebApi.Configuration
 {
