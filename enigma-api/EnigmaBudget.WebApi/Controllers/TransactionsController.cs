@@ -21,6 +21,12 @@ namespace EnigmaBudget.WebApi.Controllers
         {
             return await _transactionsService.GetUserTransactions(request);
         }
+        [HttpGet]
+        [Route("/accounts/{accountId}")]
+        public async Task<AppResult<PagedResponse<DepositAccountTransaction>>> GetLatestTransactionsOnAccount([FromQuery] AccountTransactionsRequest request)
+        {
+            return await _transactionsService.GetAccountTransactions(request);
+        }
 
         [HttpPost("/accounts/{accountId}/withdraw")]
         public async Task<AppResult<DepositAccountTransaction>> MakeWithdrawalOnAccount([FromRoute] string accountId, [FromBody] WithdrawRequest withdrawRequest)
