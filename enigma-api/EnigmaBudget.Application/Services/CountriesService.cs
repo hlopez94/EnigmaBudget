@@ -13,11 +13,11 @@ namespace EnigmaBudget.Application.Services
             AppResult<Currency> result = new AppResult<Currency>();
             var country = CountryCodesResolver.GetByAlpha3Code(alpha3).MapToCountry();
 
-            if (country is null)
+            if(country is null)
                 result.AddNotFoundError("País no encontrado");
 
             var currency = CurrencyCodesResolver.Codes.FirstOrDefault(cur => cur.Num == country.NumericCode).MapToCurrency();
-            if (currency is null)
+            if(currency is null)
                 result.AddNotFoundError("El país seleccionado no posee moneda internacional definida.");
             else
                 result.Data = currency;
@@ -29,7 +29,7 @@ namespace EnigmaBudget.Application.Services
             AppResult<Country> result = new AppResult<Country>();
             var country = CountryCodesResolver.GetByAlpha3Code(alpha3).MapToCountry();
 
-            if (country is null)
+            if(country is null)
                 result.AddNotFoundError("País no encontrado");
             else
                 result.Data = country;
@@ -41,7 +41,7 @@ namespace EnigmaBudget.Application.Services
             AppResult<Country> result = new AppResult<Country>();
             var country = CountryCodesResolver.GetByAlpha3Code(alpha3).MapToCountry();
 
-            if (country is null)
+            if(country is null)
                 result.AddNotFoundError("País no encontrado");
             else
                 result.Data = country;
@@ -54,7 +54,7 @@ namespace EnigmaBudget.Application.Services
             AppResult<Currency> result = new AppResult<Currency>();
             var currency = CurrencyCodesResolver.Codes.FirstOrDefault(cur => cur.Num == num).MapToCurrency();
 
-            if (currency is null)
+            if(currency is null)
                 result.AddNotFoundError("País no encontrado");
             else
                 result.Data = currency;

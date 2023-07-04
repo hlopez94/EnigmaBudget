@@ -43,7 +43,7 @@ namespace EnigmaBudget.Infrastructure.Auth
         {
             AuthResult<LoginInfo> result = new AuthResult<LoginInfo>();
 
-            if (request == null || request.UserName == null)
+            if(request == null || request.UserName == null)
             {
                 result.AddInputDataError("Solicitud Inválida");
                 return result;
@@ -51,7 +51,7 @@ namespace EnigmaBudget.Infrastructure.Auth
 
             string sql = "SELECT * FROM usuarios WHERE usu_usuario = @usuario AND usu_fecha_baja IS NULL";
 
-            using (MySqlCommand cmd = new MySqlCommand(sql, _connection))
+            using(MySqlCommand cmd = new MySqlCommand(sql, _connection))
             {
 
                 cmd.Parameters.Add(new MySqlParameter("usuario", request.UserName));
@@ -59,13 +59,13 @@ namespace EnigmaBudget.Infrastructure.Auth
 
                 _connection.Open();
 
-                using (MySqlDataReader reader = cmd.ExecuteReader())
+                using(MySqlDataReader reader = cmd.ExecuteReader())
                 {
-                    if (reader.Read())
+                    if(reader.Read())
                     {
                         usuarios entity = _mapper.Map<DbDataReader, usuarios>(reader);
 
-                        if (entity.usu_password.HashedPasswordIsValid(request.Password, entity.usu_seed))
+                        if(entity.usu_password.HashedPasswordIsValid(request.Password, entity.usu_seed))
                         {
                             result = new AuthResult<LoginInfo>(
                                 new LoginInfo()
@@ -146,26 +146,26 @@ namespace EnigmaBudget.Infrastructure.Auth
             _connection.Open();
 
             usuarios_validacion_email validacion = null;
-            using (var cmdSel = new MySqlCommand(sql, _connection))
+            using(var cmdSel = new MySqlCommand(sql, _connection))
             {
                 cmdSel.Parameters.AddWithValue("token", token);
-                using (var reader = cmdSel.ExecuteReader())
+                using(var reader = cmdSel.ExecuteReader())
                 {
-                    if (reader.Read())
+                    if(reader.Read())
                     {
                         validacion = _mapper.Map<DbDataReader, usuarios_validacion_email>(reader);
                     }
                 }
             }
 
-            if (validacion is null)
+            if(validacion is null)
             {
                 result.AddBusinessError("Token inválido");
             }
 
-            if (!validacion.valida)
+            if(!validacion.valida)
             {
-                if (validacion.uve_fecha_baja < DateTime.Now)
+                if(validacion.uve_fecha_baja < DateTime.Now)
                     result.AddBusinessError("Token inválido");
             }
 
@@ -186,8 +186,8 @@ namespace EnigmaBudget.Infrastructure.Auth
 
             _connection.Open();
 
-            using (MySqlTransaction trx = _connection.BeginTransaction())
-            using (MySqlCommand cmd = new MySqlCommand(sql, _connection, trx))
+            using(MySqlTransaction trx = _connection.BeginTransaction())
+            using(MySqlCommand cmd = new MySqlCommand(sql, _connection, trx))
             {
                 cmd.Parameters.AddWithValue("id", usuario.usu_id);
                 cmd.Parameters.AddWithValue("alta", DateTime.Now);
@@ -201,7 +201,7 @@ namespace EnigmaBudget.Infrastructure.Auth
                     cmd.ExecuteNonQuery();
                     trx.Commit();
                 }
-                catch (MySqlException e)
+                catch(MySqlException e)
                 {
                     trx.Rollback();
                     throw;
@@ -229,7 +229,7 @@ namespace EnigmaBudget.Infrastructure.Auth
             var seed = HashHelper.CreateSalt();
             var hash = signup.Password.HashPassword(seed);
 
-            if (!hash.HashedPasswordIsValid(signup.Password, seed))
+            if(!hash.HashedPasswordIsValid(signup.Password, seed))
             {
                 throw new CryptographicException("Error al generar hash de password, no coinciden.");
             }
@@ -241,8 +241,8 @@ namespace EnigmaBudget.Infrastructure.Auth
 
             _connection.Open();
 
-            using (MySqlTransaction trx = _connection.BeginTransaction())
-            using (MySqlCommand cmd = new MySqlCommand(sql, _connection, trx))
+            using(MySqlTransaction trx = _connection.BeginTransaction())
+            using(MySqlCommand cmd = new MySqlCommand(sql, _connection, trx))
             {
                 cmd.Parameters.AddWithValue("usuario", signup.UserName);
                 cmd.Parameters.AddWithValue("correo", signup.Email);
@@ -270,13 +270,13 @@ namespace EnigmaBudget.Infrastructure.Auth
 
                     result = new AuthResult<SignUpInfo>(new SignUpInfo() { Email = signup.Email, UserName = signup.UserName });
                 }
-                catch (MySqlException e)
+                catch(MySqlException e)
                 {
-                    if (e.Message.Contains("IDX_usuarios_usu_correo"))
+                    if(e.Message.Contains("IDX_usuarios_usu_correo"))
                     {
                         result.AddInputDataError("Ya existe una cuenta con el correo indicado.");
                     }
-                    else if (e.Message.Contains("IDX_usuarios_usu_usuario"))
+                    else if(e.Message.Contains("IDX_usuarios_usu_usuario"))
                     {
                         result.AddInputDataError("Ya existe una cuenta con nombre de usuario indicado.");
                     }
@@ -305,15 +305,15 @@ namespace EnigmaBudget.Infrastructure.Auth
 
             UserProfile perfil = new UserProfile();
 
-            using (MySqlCommand cmd = new MySqlCommand(sql, _connection))
+            using(MySqlCommand cmd = new MySqlCommand(sql, _connection))
             {
                 _connection.Open();
 
                 cmd.Parameters.Add(new MySqlParameter("id", (usu.usu_id)));
 
-                using (MySqlDataReader reader = cmd.ExecuteReader())
+                using(MySqlDataReader reader = cmd.ExecuteReader())
                 {
-                    if (reader.Read())
+                    if(reader.Read())
                     {
                         usuario_perfil entity = _mapper.Map<DbDataReader, usuario_perfil>(reader);
                         perfil = _mapper.Map<usuario_perfil, UserProfile>(entity);
@@ -332,7 +332,7 @@ namespace EnigmaBudget.Infrastructure.Auth
         {
             var loggedUser = GetUserById(GetAuthenticatedId());
 
-            if (loggedUser is null)
+            if(loggedUser is null)
             {
                 throw new UnauthorizedAccessException();
             }
@@ -351,8 +351,8 @@ namespace EnigmaBudget.Infrastructure.Auth
 
             _connection.Open();
 
-            using (MySqlTransaction trx = _connection.BeginTransaction())
-            using (MySqlCommand cmd = new MySqlCommand(sql, _connection, trx))
+            using(MySqlTransaction trx = _connection.BeginTransaction())
+            using(MySqlCommand cmd = new MySqlCommand(sql, _connection, trx))
             {
                 try
                 {
@@ -367,7 +367,7 @@ namespace EnigmaBudget.Infrastructure.Auth
                     var aalgo = cmd.ExecuteNonQuery();
                     trx.Commit();
                 }
-                catch (Exception)
+                catch(Exception)
                 {
                     trx.Rollback();
                     throw;
@@ -395,15 +395,15 @@ namespace EnigmaBudget.Infrastructure.Auth
 
             usuarios usuario = null;
 
-            using (MySqlCommand cmd = new MySqlCommand(sql, _connection))
+            using(MySqlCommand cmd = new MySqlCommand(sql, _connection))
             {
                 _connection.Open();
 
                 cmd.Parameters.Add(new MySqlParameter("id", (id)));
 
-                using (MySqlDataReader reader = cmd.ExecuteReader())
+                using(MySqlDataReader reader = cmd.ExecuteReader())
                 {
-                    if (reader.Read())
+                    if(reader.Read())
                     {
                         usuario = _mapper.Map<DbDataReader, usuarios>(reader);
                     }
@@ -422,12 +422,12 @@ namespace EnigmaBudget.Infrastructure.Auth
             string sql = @"SELECT * FROM paises;";
 
 
-            using (MySqlCommand cmd = new MySqlCommand(sql, _connection))
+            using(MySqlCommand cmd = new MySqlCommand(sql, _connection))
             {
                 _connection.Open();
-                using (MySqlDataReader reader = cmd.ExecuteReader())
+                using(MySqlDataReader reader = cmd.ExecuteReader())
                 {
-                    while (reader.Read())
+                    while(reader.Read())
                     {
                         paises entity = _mapper.Map<DbDataReader, paises>(reader);
                         result.Add(_mapper.Map<paises, Pais>(entity));
@@ -448,13 +448,13 @@ namespace EnigmaBudget.Infrastructure.Auth
             long loggedID = GetAuthenticatedId();
             usuarios loggedInInfo = GetUserById(loggedID);
             var result = new AuthResult();
-            if (request.OldPassword.Equals(request.NewPassword))
+            if(request.OldPassword.Equals(request.NewPassword))
             {
                 result.AddInputDataError("La nueva contraseña no puede ser igual a la anterior");
                 return result;
             }
 
-            if (!loggedInInfo.usu_password.HashedPasswordIsValid(request.OldPassword, loggedInInfo.usu_seed))
+            if(!loggedInInfo.usu_password.HashedPasswordIsValid(request.OldPassword, loggedInInfo.usu_seed))
             {
                 result.AddInputDataError("La contraseña a cambiar no coincide");
                 return result;
@@ -468,7 +468,7 @@ namespace EnigmaBudget.Infrastructure.Auth
 
             _connection.Open();
             var transaction = _connection.BeginTransaction();
-            using (MySqlCommand cmd = new MySqlCommand(sql, _connection, transaction))
+            using(MySqlCommand cmd = new MySqlCommand(sql, _connection, transaction))
             {
                 cmd.Parameters.Add(new MySqlParameter("pass", hashedPass));
                 cmd.Parameters.Add(new MySqlParameter("seed", salt));
@@ -477,7 +477,7 @@ namespace EnigmaBudget.Infrastructure.Auth
                 try
                 {
                     int rows = cmd.ExecuteNonQuery();
-                    if (rows == 1)
+                    if(rows == 1)
                     {
                         transaction.Commit();
                     }
@@ -488,7 +488,7 @@ namespace EnigmaBudget.Infrastructure.Auth
                     }
 
                 }
-                catch (Exception)
+                catch(Exception)
                 {
                     transaction.Rollback();
                     throw;
@@ -515,7 +515,7 @@ namespace EnigmaBudget.Infrastructure.Auth
                         new Claim("verified-account", entity.usu_correo_verificado.ToString().ToLower())
                     };
 
-            if (roles is not null && roles.Any())
+            if(roles is not null && roles.Any())
             {
                 claims.AddRange(roles.Select(r => { return new Claim(ClaimTypes.Role, r); }));
             }

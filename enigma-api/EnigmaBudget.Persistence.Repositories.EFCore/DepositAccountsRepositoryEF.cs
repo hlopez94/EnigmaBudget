@@ -5,7 +5,6 @@ using EnigmaBudget.Infrastructure.Helpers;
 using EnigmaBudget.Persistence.Contexts.EfCore.Enigma;
 using EnigmaBudget.Persistence.Contexts.EfCore.Enigma.Entities;
 using Microsoft.EntityFrameworkCore;
-using System.Linq;
 
 namespace EnigmaBudget.Persistence.Repositories.EFCore
 {
@@ -109,7 +108,7 @@ namespace EnigmaBudget.Persistence.Repositories.EFCore
         public async IAsyncEnumerable<DepositAccount> ListUserDepositAccounts()
         {
             var query = await _context.DepositAccounts
-                                .Where(da => da.DeaUsuId == _contextRepository.GetLoggedUserID() && 
+                                .Where(da => da.DeaUsuId == _contextRepository.GetLoggedUserID() &&
                                         (!da.DeaFechaBaja.HasValue || (da.DeaFechaBaja.HasValue && DateTime.Now < da.DeaFechaBaja.Value))
                                         )
                                 .Include(da => da.DeaTda)

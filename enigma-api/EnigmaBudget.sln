@@ -38,7 +38,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "contexts", "contexts", "{BF
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "EnigmaBudget.Persistence.Repositories.EFCore", "EnigmaBudget.Persistence.Repositories.EFCore\EnigmaBudget.Persistence.Repositories.EFCore.csproj", "{326C1042-AD33-4F49-8F58-2DEFBAF6C6AF}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EnigmaBudget.Persistence.Contexts.EfCore.Enigma.Migrations.Dev", "EnigmaBudget.Persistence.Contexts.EfCore.Enigma.Migrations.Dev\EnigmaBudget.Persistence.Contexts.EfCore.Enigma.Migrations.Dev.csproj", "{95D23EDB-610D-4B82-BAD1-FB4DEC0DF79F}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "EnigmaBudget.Persistence.Contexts.EfCore.Enigma.Migrations.Dev", "EnigmaBudget.Persistence.Contexts.EfCore.Enigma.Migrations.Dev\EnigmaBudget.Persistence.Contexts.EfCore.Enigma.Migrations.Dev.csproj", "{95D23EDB-610D-4B82-BAD1-FB4DEC0DF79F}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

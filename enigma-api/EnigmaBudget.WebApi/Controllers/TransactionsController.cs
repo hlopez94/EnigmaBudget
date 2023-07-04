@@ -2,7 +2,6 @@
 using EnigmaBudget.Application.Model;
 using EnigmaBudget.Domain.Model;
 using EnigmaBudget.Infrastructure.Pager;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace EnigmaBudget.WebApi.Controllers
@@ -12,12 +11,13 @@ namespace EnigmaBudget.WebApi.Controllers
     public class TransactionsController : ControllerBase
     {
         private readonly ITransactionsService _transactionsService;
-        public TransactionsController(ITransactionsService transactionsService) {
+        public TransactionsController(ITransactionsService transactionsService)
+        {
             _transactionsService = transactionsService;
         }
         [HttpGet]
         [Route("/")]
-        public async Task<AppResult<PagedResponse<DepositAccountTransaction>>> GetLatestTransactions([FromQuery]PagedRequest request)
+        public async Task<AppResult<PagedResponse<DepositAccountTransaction>>> GetLatestTransactions([FromQuery] PagedRequest request)
         {
             return await _transactionsService.GetUserTransactions(request);
         }

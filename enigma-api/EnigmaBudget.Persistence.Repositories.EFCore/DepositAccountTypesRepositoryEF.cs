@@ -38,7 +38,7 @@ namespace EnigmaBudget.Persistence.Repositories.EFCore
         {
             var query = _context.TypesDepositAccounts.Where(da => da.TdaFechaAlta <= DateOnly.FromDateTime(DateTime.Now) && (!da.TdaFechaBaja.HasValue || da.TdaFechaBaja > DateOnly.FromDateTime(DateTime.Now))).ToListAsync();
 
-            foreach (var entity in await query)
+            foreach(var entity in await query)
             {
                 yield return _mapper.Map<TypesDepositAccountEntity, DepositAccountType>(entity);
             }

@@ -18,4 +18,8 @@
     <ProjectReference Include="..\EnigmaBudget.Persistence.Contexts.EfCore.Enigma\EnigmaBudget.Persistence.Contexts.EfCore.Enigma.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Migrations\" />
+  </ItemGroup>
+
 </Project>

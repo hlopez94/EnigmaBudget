@@ -41,7 +41,7 @@ namespace EnigmaBudget.Application.Services
             var result = new AppResult<DepositAccount>();
             var account = await _depositAccountRepository.GetById(request.DepositAccountUUID);
 
-            if (account is null || account.OwnerId != _authService.GetProfile().Data.Id)
+            if(account is null || account.OwnerId != _authService.GetProfile().Data.Id)
             {
                 result.AddNotFoundError("Deposit account not found");
                 return result;

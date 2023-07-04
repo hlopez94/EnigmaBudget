@@ -8,7 +8,7 @@ namespace EnigmaBudget.Infrastructure.Helpers
 
         public static void Init(string key)
         {
-            if (string.IsNullOrEmpty(_encriptionKey))
+            if(string.IsNullOrEmpty(_encriptionKey))
                 _encriptionKey = key;
             else throw new InvalidOperationException("Encription Key already initialized");
         }
@@ -21,7 +21,7 @@ namespace EnigmaBudget.Infrastructure.Helpers
         }
         public static string Encrypt(string data)
         {
-            if (string.IsNullOrEmpty(data))
+            if(string.IsNullOrEmpty(data))
             {
                 throw new ArgumentNullException(nameof(data), "Can't encrypt null value");
             }
@@ -32,7 +32,7 @@ namespace EnigmaBudget.Infrastructure.Helpers
 
         public static string Decrypt(string data)
         {
-            if (string.IsNullOrEmpty(data))
+            if(string.IsNullOrEmpty(data))
             {
                 throw new ArgumentNullException(nameof(data), "Can't encrypt null value");
             }
@@ -47,11 +47,11 @@ namespace EnigmaBudget.Infrastructure.Helpers
         }
         private static byte[] Encrypt(byte[] key, byte[] data)
         {
-            if (key == null || key.Length == 0)
+            if(key == null || key.Length == 0)
             {
                 throw new ArgumentNullException(nameof(key), "Can't encrypt null value");
             }
-            if (data == null || data.Length == 0)
+            if(data == null || data.Length == 0)
             {
                 throw new ArgumentNullException(nameof(data), "Can't encrypt null value");
             }
@@ -64,7 +64,7 @@ namespace EnigmaBudget.Infrastructure.Helpers
               .Select(i => (byte)i)
               .ToArray();
 
-            for (int i = 0, j = 0; i < 256; i++)
+            for(int i = 0, j = 0; i < 256; i++)
             {
                 j = (j + key[i % key.Length] + s[i]) & 255;
 

@@ -19,13 +19,13 @@ namespace EnigmaBudget.WebApi.Middlewares
             AppResult appResult;
             try
             {
-                using (var memStream = new MemoryStream())
+                using(var memStream = new MemoryStream())
                 {
                     context.Response.Body = memStream;
 
                     await _next(context);
 
-                    if (context.Response.ContentType != null && context.Response.ContentType.Contains("application/json"))
+                    if(context.Response.ContentType != null && context.Response.ContentType.Contains("application/json"))
                     {
                         memStream.Position = 0;
                         string responseBody = new StreamReader(memStream).ReadToEnd();
@@ -48,17 +48,17 @@ namespace EnigmaBudget.WebApi.Middlewares
 
         private void ModifyStatusCodeBasedOnAppResult(HttpContext context, AppResult appResult)
         {
-            if (appResult == null || appResult.IsSuccess)
+            if(appResult == null || appResult.IsSuccess)
             {
                 return;
             }
-            if (appResult.Errors.Any(err => err.Type == ErrorTypeEnum.InputDataError || err.Type == ErrorTypeEnum.BusinessError))
+            if(appResult.Errors.Any(err => err.Type == ErrorTypeEnum.InputDataError || err.Type == ErrorTypeEnum.BusinessError))
                 context.Response.StatusCode = StatusCodes.Status400BadRequest;
 
-            if (appResult.Errors.Any(err => err.Type == ErrorTypeEnum.NotFoundError))
+            if(appResult.Errors.Any(err => err.Type == ErrorTypeEnum.NotFoundError))
                 context.Response.StatusCode = StatusCodes.Status404NotFound;
 
-            if (appResult.Errors.Any(err => err.Type == ErrorTypeEnum.InternalError))
+            if(appResult.Errors.Any(err => err.Type == ErrorTypeEnum.InternalError))
                 context.Response.StatusCode = StatusCodes.Status500InternalServerError;
         }
     }

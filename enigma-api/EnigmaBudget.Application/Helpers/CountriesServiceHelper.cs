@@ -7,7 +7,7 @@ namespace EnigmaBudget.Application.Helpers
     {
         internal static Country? MapToCountry(this ISO._3166.Models.CountryCode code)
         {
-            if (code is null)
+            if(code is null)
                 return null;
 
             return new Country()

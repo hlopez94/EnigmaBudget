@@ -91,12 +91,12 @@ namespace EnigmaBudget.Persistence.Contexts.EfCore.Enigma.EntitiesConfiguration
             entity.HasOne(d => d.DatDea).WithMany(p => p.DeaTrd)
                 .HasForeignKey(d => d.DatDeaId)
                 .OnDelete(DeleteBehavior.Restrict)
-                .HasConstraintName("FK_deposit_accounts");
+                .HasConstraintName("FK_dea_tda");
 
             entity.HasOne(d => d.DatUsu).WithMany(p => p.DepositAccountsTransactions)
                 .HasForeignKey(d => d.DatUsuId)
                 .OnDelete(DeleteBehavior.Restrict)
-                .HasConstraintName("FK_depoist_accounts");
+                .HasConstraintName("FK_dea_usu");
 
         }
     }

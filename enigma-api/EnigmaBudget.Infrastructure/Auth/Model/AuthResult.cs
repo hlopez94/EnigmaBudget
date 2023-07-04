@@ -49,7 +49,7 @@ namespace EnigmaBudget.Infrastructure.Auth.Model
 
         internal void AddInputDataErrors(IEnumerable<ValidationResult> validationResults)
         {
-            foreach (var dataError in validationResults)
+            foreach(var dataError in validationResults)
             {
                 AddInputDataError(dataError.ErrorMessage);
             }

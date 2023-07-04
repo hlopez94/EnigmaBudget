@@ -68,7 +68,8 @@ builder.Services.AddHttpContextAccessor();
 
 
 builder.Services.AddControllers()
-                .AddJsonOptions(opt => {
+                .AddJsonOptions(opt =>
+                {
                     opt.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
                     opt.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
                 });
@@ -87,7 +88,7 @@ var app = builder.Build();
 app.UseCors("enigmaapp");
 
 // Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
+if(app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();

@@ -73,15 +73,6 @@ namespace EnigmaBudget.Persistence.Contexts.EfCore.Enigma.EntitiesConfiguration
                 .HasColumnType("bigint(20)")
                 .HasColumnName("dea_usu_id");
 
-            entity.HasOne(d => d.DeaTda).WithMany(p => p.DepositAccounts)
-                .HasForeignKey(d => d.DeaTdaId)
-                .OnDelete(DeleteBehavior.Restrict)
-                .HasConstraintName("FK_deposit_accounts");
-
-            entity.HasOne(d => d.DeaUsu).WithMany(p => p.DepositAccounts)
-                .HasForeignKey(d => d.DeaUsuId)
-                .OnDelete(DeleteBehavior.Restrict)
-                .HasConstraintName("FK_depoist_accounts");
 
         }
     }

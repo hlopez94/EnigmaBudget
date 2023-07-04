@@ -39,7 +39,7 @@ namespace EnigmaBudget.Persistence.Repositories.MariaDB
             long newId = 0;
             var result = await ExecuteNonQuery(sql, parameters.ToArray(), newId);
 
-            if (result > 0)
+            if(result > 0)
                 entity.Id = EncodeDecodeHelper.Encrypt(newId.ToString());
 
             return entity;

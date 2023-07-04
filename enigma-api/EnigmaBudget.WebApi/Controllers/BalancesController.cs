@@ -10,7 +10,8 @@ namespace EnigmaBudget.WebApi.Controllers
     public class BalancesController : BaseController
     {
         private readonly IBalancesService _balancesService;
-        public BalancesController(IBalancesService balancesService) { 
+        public BalancesController(IBalancesService balancesService)
+        {
             _balancesService = balancesService;
         }
 

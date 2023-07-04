@@ -1,4 +1,4 @@
-﻿namespace EnigmaBudget.WebApi.Configuration
+﻿namespace EnigmaBudget.WebApi.Model
 {
     internal class MariaDBConfig
     {

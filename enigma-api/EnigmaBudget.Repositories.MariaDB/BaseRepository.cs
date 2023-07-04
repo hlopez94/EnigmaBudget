@@ -29,8 +29,8 @@ namespace EnigmaBudget.Persistence.Repositories.MariaDB
         {
             _connection.Open();
 
-            using (MySqlTransaction trx = _connection.BeginTransaction())
-            using (MySqlCommand cmd = new MySqlCommand(sql, _connection, trx))
+            using(MySqlTransaction trx = _connection.BeginTransaction())
+            using(MySqlCommand cmd = new MySqlCommand(sql, _connection, trx))
             {
                 cmd.Parameters.AddRange(parameters);
                 try
@@ -40,12 +40,12 @@ namespace EnigmaBudget.Persistence.Repositories.MariaDB
                     trx.Commit();
                     _connection.Close();
 
-                    if (insertedId.HasValue)
+                    if(insertedId.HasValue)
                         insertedId = cmd.LastInsertedId;
 
                     return nonQueryResult;
                 }
-                catch (MySqlException)
+                catch(MySqlException)
                 {
                     trx.Rollback();
                     throw;
@@ -56,8 +56,8 @@ namespace EnigmaBudget.Persistence.Repositories.MariaDB
         {
             await _connection.OpenAsync();
 
-            using (MySqlTransaction trx = await _connection.BeginTransactionAsync())
-            using (MySqlCommand cmd = new MySqlCommand(sql, _connection, trx))
+            using(MySqlTransaction trx = await _connection.BeginTransactionAsync())
+            using(MySqlCommand cmd = new MySqlCommand(sql, _connection, trx))
             {
                 cmd.Parameters.AddRange(parameters);
                 try
@@ -70,7 +70,7 @@ namespace EnigmaBudget.Persistence.Repositories.MariaDB
 
                     return nonQueryResult;
                 }
-                catch (MySqlException)
+                catch(MySqlException)
                 {
                     trx.Rollback();
                     throw;
@@ -81,13 +81,13 @@ namespace EnigmaBudget.Persistence.Repositories.MariaDB
         protected async IAsyncEnumerable<VModel> ExecuteQuery<TEntity, VModel>(string sql)
         {
 
-            using (MySqlCommand cmd = new MySqlCommand(sql, _connection))
+            using(MySqlCommand cmd = new MySqlCommand(sql, _connection))
             {
                 _connection.Open();
 
-                using (MySqlDataReader reader = await cmd.ExecuteReaderAsync())
+                using(MySqlDataReader reader = await cmd.ExecuteReaderAsync())
                 {
-                    while (await reader.ReadAsync())
+                    while(await reader.ReadAsync())
                     {
                         yield return Map<TEntity, VModel>(reader);
                     }
@@ -100,7 +100,7 @@ namespace EnigmaBudget.Persistence.Repositories.MariaDB
         protected async Task<T> ExecuteScalar<T>(string sql, MySqlParameter[] parameters)
         {
 
-            using (MySqlCommand cmd = new MySqlCommand(sql, _connection))
+            using(MySqlCommand cmd = new MySqlCommand(sql, _connection))
             {
                 cmd.Parameters.AddRange(parameters);
 
@@ -114,7 +114,7 @@ namespace EnigmaBudget.Persistence.Repositories.MariaDB
         protected async Task<VModel> ExecuteScalar<TEntity, VModel>(string sql, MySqlParameter[] parameters)
         {
 
-            using (MySqlCommand cmd = new MySqlCommand(sql, _connection))
+            using(MySqlCommand cmd = new MySqlCommand(sql, _connection))
             {
                 cmd.Parameters.AddRange(parameters);
 
@@ -127,14 +127,14 @@ namespace EnigmaBudget.Persistence.Repositories.MariaDB
         }
         protected async IAsyncEnumerable<VModel> ExecuteQuery<TEntity, VModel>(string sql, MySqlParameter[] parameters)
         {
-            using (MySqlCommand cmd = new MySqlCommand(sql, _connection))
+            using(MySqlCommand cmd = new MySqlCommand(sql, _connection))
             {
                 _connection.Open();
                 cmd.Parameters.AddRange(parameters);
 
-                using (MySqlDataReader reader = await cmd.ExecuteReaderAsync())
+                using(MySqlDataReader reader = await cmd.ExecuteReaderAsync())
                 {
-                    while (await reader.ReadAsync())
+                    while(await reader.ReadAsync())
                     {
                         yield return Map<TEntity, VModel>(reader);
                     }

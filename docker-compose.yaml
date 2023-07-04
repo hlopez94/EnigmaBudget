@@ -30,22 +30,6 @@ services:
       - ./db/mysql:/var/lib/mysql
     ports:
       - ${SQL_PORT}:3306  
-  db_seeder:
-    image: mariadb
-    container_name: enigma_db_seeder
-    environment:
-      SQL_DB: enigma
-      SQL_USER: ${SQL_USER}
-      SQL_USER_PASS: ${SQL_USER_PASS}
-      SQL_PORT: ${SQL_PORT}
-      SQL_ROOT_PASS: ${SQL_ROOT_PASS}
-    command: >
-      bash -c "/deploy-script/deploy.sh"
-    volumes:
-      - ./db/deploy-script:/deploy-script
-      - ./db/deploy-sql-scripts:/sql-scripts
-    depends_on:
-      - db
   nginx:
     image: nginx
     container_name: enigma_angular_ui

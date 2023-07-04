@@ -37,7 +37,7 @@ namespace EnigmaBudget.Infrastructure.SendInBlue
                 to = emailTo.ToArray()
             };
 
-            using (var request = new HttpRequestMessage(HttpMethod.Post, _options.ApiUri))
+            using(var request = new HttpRequestMessage(HttpMethod.Post, _options.ApiUri))
             {
                 request.Headers.Add("accept", "application/json");
                 request.Headers.Add("api-key", _options.ApiKey);

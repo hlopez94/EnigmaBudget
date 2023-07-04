@@ -1,4 +1,6 @@
 ﻿using EnigmaBudget.Persistence.Contexts.EfCore.Enigma;
+using EnigmaBudget.WebApi.Filters;
+using EnigmaBudget.WebApi.Model;
 using Microsoft.EntityFrameworkCore;
 using MySqlConnector;
 
@@ -35,6 +37,9 @@ namespace EnigmaBudget.WebApi.Configuration
                                     x => x.MigrationsAssembly($"EnigmaBudget.Persistence.Contexts.EfCore.Enigma.Migrations.{MariaDbConfig.Environment}")
                             )
                 );
+
+            builder.Services.AddTransient<IStartupFilter, MigrationStartupFilter<EnigmaContext>>();
+
         }
     }
 }
