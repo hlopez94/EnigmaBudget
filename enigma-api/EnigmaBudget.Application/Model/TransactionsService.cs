@@ -38,7 +38,7 @@ namespace EnigmaBudget.Application.Model
                 Ammount = request.Ammount,
                 Date = request.Date,
                 Details = request.Description,
-            //    Type = type
+                //    Type = type
             }
             );
 
@@ -58,8 +58,8 @@ namespace EnigmaBudget.Application.Model
                 return result;
             }
 
-          //  var newTransaction = await _transactionsRepository.GetPaginadoPorCuenta(request.AccountId, request);
-          //  result.Data = newTransaction;
+            //  var newTransaction = await _transactionsRepository.GetPaginadoPorCuenta(request.AccountId, request);
+            //  result.Data = newTransaction;
             return result;
         }
 

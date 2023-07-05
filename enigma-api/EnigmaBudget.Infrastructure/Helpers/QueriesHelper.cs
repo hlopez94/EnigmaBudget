@@ -3,9 +3,9 @@ using EnigmaBudget.Infrastructure.Pager;
 
 namespace EnigmaBudget.Domain.Repositories
 {
-    public static class QueriesHelper<TModel,TEntity>
+    public static class QueriesHelper<TModel, TEntity>
     {
-        public static PagedResponse<TModel> PageQuery( IQueryable<TEntity> query, PagedRequest pagingRequest, IMapper mapper) 
+        public static PagedResponse<TModel> PageQuery(IQueryable<TEntity> query, PagedRequest pagingRequest, IMapper mapper)
         {
             var res = new PagedResponse<TModel>(pagingRequest);
             var pagedQuery = query.ToPagedSearch(pagingRequest.PageIndex + 1, pagingRequest.PageSize, pagingRequest.SortBy);

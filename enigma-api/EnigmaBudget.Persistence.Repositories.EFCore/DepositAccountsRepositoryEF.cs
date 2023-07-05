@@ -87,7 +87,7 @@ namespace EnigmaBudget.Persistence.Repositories.EFCore
             var query = await _context.DepositAccounts
                                 .SingleOrDefaultAsync(da => da.DeaId == EncodeDecodeHelper.DecryptLong(id) &&
                                                             da.DeaUsuId == _contextRepository.GetLoggedUserID() &&
-                                                            (!da.DeaFechaBaja.HasValue || 
+                                                            (!da.DeaFechaBaja.HasValue ||
                                                              (da.DeaFechaBaja.HasValue && DateTime.Now < da.DeaFechaBaja.Value)
                                                             )
                                                       );
@@ -149,9 +149,9 @@ namespace EnigmaBudget.Persistence.Repositories.EFCore
         {
             var q = from da in _context.DepositAccounts
                     select da;
-           
-            
+
+
         }
-            
+
     }
 }

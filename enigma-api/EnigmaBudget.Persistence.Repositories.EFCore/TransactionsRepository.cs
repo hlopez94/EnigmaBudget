@@ -1,15 +1,8 @@
 ﻿using AutoMapper;
 using EnigmaBudget.Domain.Model;
 using EnigmaBudget.Domain.Repositories;
-using EnigmaBudget.Infrastructure.Helpers;
 using EnigmaBudget.Persistence.Contexts.EfCore.Enigma;
 using EnigmaBudget.Persistence.Contexts.EfCore.Enigma.Entities;
-using Microsoft.EntityFrameworkCore;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace EnigmaBudget.Persistence.Repositories.EFCore
 {
@@ -39,7 +32,7 @@ namespace EnigmaBudget.Persistence.Repositories.EFCore
                     DatCurrencyCode = "",
                     //DatName = "",
                     DatAmmount = model.Ammount,
-                    DatDeaId=1
+                    DatDeaId = 1
                 });
                 await _context.SaveChangesAsync();
                 newTransaction = addTrx.Entity;
