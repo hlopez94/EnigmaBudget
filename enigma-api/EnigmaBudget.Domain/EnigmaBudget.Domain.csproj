@@ -9,4 +9,8 @@
     <AssemblyVersion>0.3.0</AssemblyVersion>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\EnigmaBudget.Infrastructure\EnigmaBudget.Infrastructure.csproj" />
+  </ItemGroup>
+
 </Project>

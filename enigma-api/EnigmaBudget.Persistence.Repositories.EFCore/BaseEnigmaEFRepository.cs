@@ -12,6 +12,5 @@ namespace EnigmaBudget.Persistence.Repositories.EFCore
             _context = context;
             _mapper = mapper;
         }
-
     }
 }

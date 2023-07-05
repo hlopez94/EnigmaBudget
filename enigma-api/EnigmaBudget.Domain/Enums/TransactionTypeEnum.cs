@@ -1,6 +1,6 @@
 ﻿namespace EnigmaBudget.Domain.Enums
 {
-    public enum FundsMovementTypeEnum
+    public enum TransactionTypeEnum
     {
         DEPOSIT,
         WITHDRAW

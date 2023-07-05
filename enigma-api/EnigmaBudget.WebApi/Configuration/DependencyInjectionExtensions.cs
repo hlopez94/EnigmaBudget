@@ -23,6 +23,7 @@ namespace EnigmaBudget.WebApi.Configuration
             services.AddTransient<IContextRepository, HttpContextRepository>();
             services.AddTransient<IDepositAccountRepository, DepositAccountsRepositoryEF>();
             services.AddTransient<IDepositAccountTypeRepository, DepositAccountTypesRepositoryEF>();
+            services.AddTransient<ITransactionsRepository, TransactionsRepository>();
         }
 
         public static void RegisterApplicationServices(this IServiceCollection services)

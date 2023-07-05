@@ -85,7 +85,12 @@ namespace EnigmaBudget.Persistence.Repositories.EFCore
         public async Task<DepositAccount> GetById(string id)
         {
             var query = await _context.DepositAccounts
-                                .SingleOrDefaultAsync(da => da.DeaId == EncodeDecodeHelper.DecryptLong(id));
+                                .SingleOrDefaultAsync(da => da.DeaId == EncodeDecodeHelper.DecryptLong(id) &&
+                                                            da.DeaUsuId == _contextRepository.GetLoggedUserID() &&
+                                                            (!da.DeaFechaBaja.HasValue || 
+                                                             (da.DeaFechaBaja.HasValue && DateTime.Now < da.DeaFechaBaja.Value)
+                                                            )
+                                                      );
 
             return _mapper.Map<DepositAccountEntity, DepositAccount>(query);
 
@@ -139,5 +144,14 @@ namespace EnigmaBudget.Persistence.Repositories.EFCore
 
             return true;
         }
+
+        public void algo()
+        {
+            var q = from da in _context.DepositAccounts
+                    select da;
+           
+            
+        }
+            
     }
 }

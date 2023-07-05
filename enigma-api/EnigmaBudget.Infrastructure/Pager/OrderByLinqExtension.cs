@@ -22,7 +22,7 @@ namespace EnigmaBudget.Infrastructure.Pager
       /// <param name="pageSize">Tamaño de Página (cantidad de resultados por página)</param>
       /// <param name="orderByColumnAlias">Alias de Columna, seteado en la entidad del repositorio a través del Attributo <seealso cref="OrderColumnAliasAttribute"/> en los parámetros a traves de los que se desee ordenar. Vacío para listar resultados sin orden específico </param>
       /// <returns>Expresión LINQ paginada.</returns>
-        public static IQueryable<T> ToPagedSearch<T>(this IQueryable<T> src, int pageNumber = 1, int pageSize = 10, string? orderByColumnAlias = null) where T : class
+        public static IQueryable<T> ToPagedSearch<T>(this IQueryable<T> src, int pageNumber = 1, int pageSize = 10, string? orderByColumnAlias = null)  
         {
             var queryExpression = src.Expression;
 
