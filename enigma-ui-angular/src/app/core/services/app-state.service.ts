@@ -1,5 +1,6 @@
 import { Injectable } from '@angular/core';
-import { BehaviorSubject, Observable } from 'rxjs';
+import { NavigationStart,  Router, RouterEvent, Event, NavigationEnd, ActivatedRoute, EventType,  } from '@angular/router';
+import { BehaviorSubject, Observable, Subject, filter, map, take, takeUntil } from 'rxjs';
 
 export type AppTheme = 'light' | 'dark';
 
@@ -7,8 +8,6 @@ export type AppTheme = 'light' | 'dark';
   providedIn: 'root',
 })
 export class AppStateService {
-  private _isSidebarOpen: BehaviorSubject<boolean>;
-  public isSidebarOpen: Observable<boolean>;
 
   private _activeTheme: BehaviorSubject<AppTheme>;
   public activeTheme: Observable<AppTheme>;
@@ -16,19 +15,42 @@ export class AppStateService {
 
   private _mostrarBalances: BehaviorSubject<'mostrar'|'ocultar'>;
   public mostrarBalances: Observable<'mostrar'|'ocultar'>;
+ 
   private readonly STORAGE_KEY_MOSTRAR_BALANCE = 'app-mostrar-balance'
 
-  constructor() {
-    this._isSidebarOpen = new BehaviorSubject<boolean>(false);
-    this.isSidebarOpen = this._isSidebarOpen.asObservable();
+  private _rutaMuestraBalances: BehaviorSubject<boolean>;
+  public rutaMuestraBalances: Observable<boolean>;
+
+  constructor(private _router:Router, private actRoute: ActivatedRoute) {
     this._activeTheme = new BehaviorSubject<AppTheme>('light');
     this.activeTheme = this._activeTheme.asObservable();
 
     this._mostrarBalances = new BehaviorSubject<'mostrar'|'ocultar'>('mostrar');
     this.mostrarBalances = this._mostrarBalances.asObservable();
 
-    this.setupMostrarBalance();
+    this._rutaMuestraBalances=new BehaviorSubject<boolean>(false);
+    this.rutaMuestraBalances = this._rutaMuestraBalances.asObservable();
 
+    this.setupMostrarBalance();
+    this.setupTemaUsuario();
+    this.setupMuestraBalances();
+    
+  }
+
+  private destroyed$ = new Subject();
+  setupMuestraBalances() {
+   this._router.events.pipe(
+    filter((event: Event) => event.type == EventType.NavigationEnd),
+    map((e)=> e as NavigationEnd)
+  )
+  .subscribe((_: NavigationEnd) => {    
+    this._rutaMuestraBalances.next(this.actRoute.routeConfig?.data?.['showsBalance'] == 'true' ? true : false )
+  });
+
+
+  }
+
+  private setupTemaUsuario(){
     //If user previously set prefered theme apply it
     if ((localStorage.getItem('app-theme') as AppTheme) != null) {
       this._userThemeActive = true;
@@ -48,7 +70,6 @@ export class AppStateService {
         });
     }
   }
-
   private setupMostrarBalance() {
     var mostrar: 'mostrar' | 'ocultar' | null = localStorage.getItem(this.STORAGE_KEY_MOSTRAR_BALANCE) as 'mostrar' | 'ocultar'  | null;
     if (mostrar == null || mostrar =='mostrar') {
@@ -70,10 +91,6 @@ export class AppStateService {
   private setThemeSelf(theme: AppTheme) {
     if (theme == 'light' || !theme) this.setLightTheme();
     else this.setDarkTheme();
-  }
-
-  public toggleSidebar() {
-    this._isSidebarOpen.next(!this._isSidebarOpen.getValue());
   }
 
   public toggleTheme() {
