@@ -154,7 +154,7 @@ namespace EnigmaBudget.Persistence.Contexts.EfCore.Enigma.Migrations.Dev.Migrati
                 {
                     table.PrimaryKey("PRIMARY", x => x.uve_id);
                     table.ForeignKey(
-                        name: "usuarios_validacion_email_FK",
+                        name: "FK_uve_usu",
                         column: x => x.uve_usu_id,
                         principalTable: "usuarios",
                         principalColumn: "usu_id",
@@ -202,7 +202,7 @@ namespace EnigmaBudget.Persistence.Contexts.EfCore.Enigma.Migrations.Dev.Migrati
                 unique: true);
 
             migrationBuilder.CreateIndex(
-                name: "usuarios_validacion_email_FK",
+                name: "FK_uve_usu",
                 table: "usuarios_validacion_email",
                 column: "uve_usu_id");
 

@@ -362,7 +362,7 @@ namespace EnigmaBudget.Persistence.Contexts.EfCore.Enigma.Migrations.Dev.Migrati
                     b.HasKey("UveId")
                         .HasName("PRIMARY");
 
-                    b.HasIndex(new[] { "UveUsuId" }, "usuarios_validacion_email_FK");
+                    b.HasIndex(new[] { "UveUsuId" }, "FK_uve_usu");
 
                     b.HasIndex(new[] { "UveId" }, "usuarios_validacion_email_uve_ID_IDX");
 
@@ -411,7 +411,7 @@ namespace EnigmaBudget.Persistence.Contexts.EfCore.Enigma.Migrations.Dev.Migrati
                         .HasForeignKey("UveUsuId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
-                        .HasConstraintName("usuarios_validacion_email_FK");
+                        .HasConstraintName("FK_uve_usu");
 
                     b.Navigation("UveUsu");
                 });
