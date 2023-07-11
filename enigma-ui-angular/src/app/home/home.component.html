@@ -23,17 +23,19 @@
 <section id="listado-cuentas">
   <h1>Cuentas</h1>
   <ul class="lista-tarjetas">
+
+    <li *ngIf="$cuentasUsuario | async as cuentas; else cargandoCuentas">
+      <app-cuenta-card [type]="'empty'" *ngIf="cuentas.length == 0"></app-cuenta-card>
+    </li>
+    <ng-template #cargandoCuentas>
+      <app-cuenta-card [type]="'placeholder'"></app-cuenta-card>
+    </ng-template>   
     <li *ngFor="let cuenta of $cuentasUsuario | async">
       <app-cuenta-card [type]="'account'" [account]="cuenta"></app-cuenta-card>
     </li>
   </ul>
   <div>
-    <button
-      mat-mini-fab
-      color="default"
-      title="Agregar Cuenta"
-      (click)="agregarCuenta()"
-    >
+    <button mat-mini-fab color="default" title="Agregar Cuenta" (click)="agregarCuenta()">
       <mat-icon>add</mat-icon>
     </button>
   </div>

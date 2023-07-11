@@ -32,4 +32,4 @@ export class CuentaCardComponent {
   constructor(private appStateService:AppStateService){  }
 }
 
-export type CuentaCardComponentStatus = 'account' | 'placeholder' | 'loading';
+export type CuentaCardComponentStatus = 'account' | 'placeholder' | 'loading' | 'empty';

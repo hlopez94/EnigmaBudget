@@ -9,8 +9,8 @@ import { TipoCuentaDeposito } from '../model/TipoCuentaDeposito';
   providedIn: 'root',
 })
 export class CuentasDepositoStore {
-  private $cuentasUser: BehaviorSubject<CuentaDeposito[]>;
-  cuentasUser: Observable<CuentaDeposito[]>;
+  private $cuentasUser: BehaviorSubject<CuentaDeposito[] | null>;
+  cuentasUser: Observable<CuentaDeposito[] | null>;
 
   private $storeState: BehaviorSubject<StoreStateType>;
   storeState: Observable<StoreStateType>;
@@ -22,7 +22,7 @@ export class CuentasDepositoStore {
   tiposCuentaDeposito : Observable<TipoCuentaDeposito[]>;
 
   constructor(private cuentasDepositoService: CuentasDepositoService) {
-    this.$cuentasUser = new BehaviorSubject<CuentaDeposito[]>([]);
+    this.$cuentasUser = new BehaviorSubject<CuentaDeposito[] | null>(null);
     this.cuentasUser = this.$cuentasUser.asObservable();
 
     this.$storeState = new BehaviorSubject<StoreStateType>(StoreStates.SUCCESS);

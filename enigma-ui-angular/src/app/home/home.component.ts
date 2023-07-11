@@ -40,7 +40,7 @@ import { MonedaPipe } from '../core/pipes/monedaPipe';
     ],
 })
 export class HomeComponent implements OnInit {
-  $cuentasUsuario: Observable<CuentaDeposito[]>;
+  $cuentasUsuario: Observable<CuentaDeposito[] | null>;
   $balancesUsuario : Observable<Balance[]>;
   divisas: Observable<Divisa[]>;
 
