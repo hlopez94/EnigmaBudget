@@ -1,28 +1,41 @@
-<section id="listado-balances">
-  <h1>Balances Generales</h1>
-  <ul class="lista-tarjetas" *ngIf="$balancesUsuario | async; let balances">
-    <li *ngFor="let balance of balances">
-      <mat-card>
-        <mat-card-header>
-          <mat-card-title>{{ balance.moneda.name | uppercase }}</mat-card-title>
-          <mat-card-subtitle>{{ balance.moneda.code }}</mat-card-subtitle>
-        </mat-card-header>
+<section id="listado-balances" *ngIf="$balancesUsuario | async as balances">
+  <ng-container *ngIf="balances && balances.length > 0">
+    <h1>Balances Generales</h1>
+    <ul class="lista-tarjetas">
+      <li *ngFor="let balance of balances">
+        <mat-card>
+          <mat-card-header>
+            <mat-card-title>
+              {{ balance.moneda.name | uppercase }}
+            </mat-card-title>
+            <mat-card-subtitle>{{ balance.moneda.code }}</mat-card-subtitle>
+          </mat-card-header>
 
-        <mat-card-content>
-          <div style="display: flex">
-            <h1 class="mat-display-1">
-              {{ balance.totalBalance | moneda : balance.moneda | async }}
-            </h1>
-          </div>
-        </mat-card-content>
-      </mat-card>
-    </li>
-  </ul>
+          <mat-card-content>
+            <div style="display: flex">
+              <h1 class="mat-display-1">
+                {{ balance.totalBalance | moneda : balance.moneda | async }}
+              </h1>
+            </div>
+          </mat-card-content>
+        </mat-card>
+      </li>
+    </ul>
+  </ng-container>
 </section>
 
 <section id="listado-cuentas">
   <h1>Cuentas</h1>
   <ul class="lista-tarjetas">
+    <li *ngIf="$cuentasUsuario | async as cuentas; else cargandoCuentas">
+      <app-cuenta-card
+        [type]="'empty'"
+        *ngIf="cuentas.length == 0"
+      ></app-cuenta-card>
+    </li>
+    <ng-template #cargandoCuentas>
+      <app-cuenta-card [type]="'placeholder'"></app-cuenta-card>
+    </ng-template>
     <li *ngFor="let cuenta of $cuentasUsuario | async">
       <app-cuenta-card [type]="'account'" [account]="cuenta"></app-cuenta-card>
     </li>

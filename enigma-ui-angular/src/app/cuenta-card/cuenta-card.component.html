@@ -41,37 +41,52 @@
   </mat-card-content>
 </mat-card>
 
-<mat-card *ngIf="type === 'placeholder'">
+<mat-card *ngIf="type === 'placeholder'" >
   <mat-card-header >
-    <mat-card-title  style="width: 8ch;">
-    <div class="load-wraper" style="width: 8ch;">
+    <mat-card-title  style="width: 12ch;" >
+    <div class="load-wraper" style="width: 12ch;">
       <span class="activity">&nbsp;</span>
     </div>
     </mat-card-title>
-    <mat-card-subtitle class="load-wraper" style="width: 12ch;"><span class="activity">&nbsp;</span></mat-card-subtitle>
+    <mat-card-subtitle style="width: 12ch;">
+      <div class="load-wraper" style="width: 12ch;">
+        <span class="activity">&nbsp;</span>
+      </div>
+    </mat-card-subtitle>
+  </mat-card-header>
+
+  <mat-card-content>
+    <div style="display: flex; margin-top: 0.5em;">
+      <div class="mat-display-1" style="width: 12ch;">
+        <div class="load-wraper" style="width: 12ch;">
+          <span class="activity">&nbsp;</span>
+        </div>
+      </div>
+    </div>
+    <mat-card-actions>
+      <button mat-raised-button disabled>
+        <mat-icon>up</mat-icon>&nbsp;
+      </button>
+      <button mat-raised-button disabled>
+        <mat-icon>down</mat-icon>&nbsp;
+      </button>
+    </mat-card-actions>
+  </mat-card-content>
+</mat-card>
+
+<mat-card *ngIf="type === 'empty'">
+  <mat-card-header>
+    <mat-card-title>SIN CUENTAS CREADAS</mat-card-title>
+    <mat-card-subtitle>Crea una nueva cuenta</mat-card-subtitle>
   </mat-card-header>
 
   <mat-card-content>
     <div style="display: flex">
-      <h1 class="mat-display-1">
-        {{ 1000 | currency : "ARS" : "symbol-narrow" : "4.2-2" }}
+      <h1 class="mat-display-1 ">
+        💸💸💸
       </h1>
-      <button
-        mat-icon-button
-        title="Ocultar/mostrar balance"
-        aria-label="Ocultar/mostrar balance"
-        type="button"
-      >
-        <mat-icon>visibility_on</mat-icon>
-      </button>
     </div>
     <mat-card-actions style="display: flex">
-      <button mat-button style="color: green">
-        <mat-icon>arrow_circle_up</mat-icon>&nbsp;Crédito
-      </button>
-      <button mat-button color="warn">
-        <mat-icon>arrow_circle_down</mat-icon>&nbsp;Débito
-      </button>
     </mat-card-actions>
   </mat-card-content>
 </mat-card>

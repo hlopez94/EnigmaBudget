@@ -1,17 +1,27 @@
 $URL = "https://dl.filippo.io/mkcert/latest?for=windows/amd64"
-$Path = ".\.tmp\mkcert.exe"
-$Folder= ".\.tmp\"
+$MkCertPath = ".\.tmp\mkcert.exe"
+$Folder = ".\.tmp\"
+$SslAngularFolder = "..\..\..\enigma-ui-angular\.ssl\"
 
 If(-Not (Test-Path $Folder)){
 	New-Item $Folder -ItemType Directory
 }
 
-Invoke-WebRequest -URI $URL -OutFile $Path
+If(-Not (Test-Path $MkCertPath)){
+	Invoke-WebRequest -URI $URL -OutFile $MkCertPath
+}
 
-cd .tmp
+Set-Location .\.tmp
 .\mkcert -install
 .\mkcert -cert-file "cert.pem" -key-file "key.pem" localhost
-Copy-Item -Path ".\*.pem" -Destination "..\..\..\enigma-ui-angular\.ssl\"
-Remove-Item -Path ".\*.pem"
 
-cd ..
+
+If(-Not (Test-Path $SSLAngularFolder)){
+	New-Item $SSLAngularFolder -ItemType Directory
+}
+
+Copy-Item -Path "*.pem" -Destination $SslAngularFolder
+Write-Output $SslAngularFolder
+Remove-Item -Path ".\*.pem"
+Set-Location ..
+exit

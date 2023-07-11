@@ -17,7 +17,7 @@ namespace EnigmaBudget.Persistence.Contexts.EfCore.Enigma.Migrations.Dev.Migrati
 #pragma warning disable 612, 618
             modelBuilder
                 .UseCollation("utf8mb4_general_ci")
-                .HasAnnotation("ProductVersion", "7.0.5")
+                .HasAnnotation("ProductVersion", "7.0.8")
                 .HasAnnotation("Relational:MaxIdentifierLength", 64);
 
             MySqlModelBuilderExtensions.HasCharSet(modelBuilder, "utf8mb4");
@@ -245,8 +245,8 @@ namespace EnigmaBudget.Persistence.Contexts.EfCore.Enigma.Migrations.Dev.Migrati
                             TdaId = 1L,
                             TdaDescription = "Caja de Ahorro",
                             TdaEnumName = "CAJA_AHORRO",
-                            TdaFechaAlta = new DateOnly(2023, 7, 4),
-                            TdaFechaModif = new DateOnly(2023, 7, 4),
+                            TdaFechaAlta = new DateOnly(2023, 7, 10),
+                            TdaFechaModif = new DateOnly(2023, 7, 10),
                             TdaIcon = "savings",
                             TdaName = "Caja de Ahorro"
                         },
@@ -255,8 +255,8 @@ namespace EnigmaBudget.Persistence.Contexts.EfCore.Enigma.Migrations.Dev.Migrati
                             TdaId = 2L,
                             TdaDescription = "Cuenta Corriente",
                             TdaEnumName = "CUENTA_CORRIENTE",
-                            TdaFechaAlta = new DateOnly(2023, 7, 4),
-                            TdaFechaModif = new DateOnly(2023, 7, 4),
+                            TdaFechaAlta = new DateOnly(2023, 7, 10),
+                            TdaFechaModif = new DateOnly(2023, 7, 10),
                             TdaIcon = "account_balance",
                             TdaName = "Cuenta Corriente"
                         },
@@ -265,8 +265,8 @@ namespace EnigmaBudget.Persistence.Contexts.EfCore.Enigma.Migrations.Dev.Migrati
                             TdaId = 3L,
                             TdaDescription = "Billetera Física",
                             TdaEnumName = "BILLETERA_FISICA",
-                            TdaFechaAlta = new DateOnly(2023, 7, 4),
-                            TdaFechaModif = new DateOnly(2023, 7, 4),
+                            TdaFechaAlta = new DateOnly(2023, 7, 10),
+                            TdaFechaModif = new DateOnly(2023, 7, 10),
                             TdaIcon = "wallet",
                             TdaName = "Billetera Física"
                         },
@@ -275,8 +275,8 @@ namespace EnigmaBudget.Persistence.Contexts.EfCore.Enigma.Migrations.Dev.Migrati
                             TdaId = 4L,
                             TdaDescription = "Billetera Virtual",
                             TdaEnumName = "BILLETERA_VIRTUAL",
-                            TdaFechaAlta = new DateOnly(2023, 7, 4),
-                            TdaFechaModif = new DateOnly(2023, 7, 4),
+                            TdaFechaAlta = new DateOnly(2023, 7, 10),
+                            TdaFechaModif = new DateOnly(2023, 7, 10),
                             TdaIcon = "finance_chip",
                             TdaName = "Billetera Virtual"
                         });
@@ -441,7 +441,7 @@ namespace EnigmaBudget.Persistence.Contexts.EfCore.Enigma.Migrations.Dev.Migrati
                     b.HasKey("UveId")
                         .HasName("PRIMARY");
 
-                    b.HasIndex(new[] { "UveUsuId" }, "usuarios_validacion_email_FK");
+                    b.HasIndex(new[] { "UveUsuId" }, "FK_uve_usu");
 
                     b.HasIndex(new[] { "UveId" }, "usuarios_validacion_email_uve_ID_IDX");
 
@@ -476,14 +476,14 @@ namespace EnigmaBudget.Persistence.Contexts.EfCore.Enigma.Migrations.Dev.Migrati
                         .HasForeignKey("DatDeaId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
-                        .HasConstraintName("FK_dea_tda");
+                        .HasConstraintName("FK_dat_dea");
 
                     b.HasOne("EnigmaBudget.Persistence.Contexts.EfCore.Enigma.Entities.UsuarioEntity", "DatUsu")
                         .WithMany("DepositAccountsTransactions")
                         .HasForeignKey("DatUsuId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
-                        .HasConstraintName("FK_dea_usu");
+                        .HasConstraintName("FK_dat_usu");
 
                     b.Navigation("DatDea");
 
@@ -509,7 +509,7 @@ namespace EnigmaBudget.Persistence.Contexts.EfCore.Enigma.Migrations.Dev.Migrati
                         .HasForeignKey("UveUsuId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
-                        .HasConstraintName("FK_usv_usu");
+                        .HasConstraintName("FK_uve_usu");
 
                     b.Navigation("UveUsu");
                 });

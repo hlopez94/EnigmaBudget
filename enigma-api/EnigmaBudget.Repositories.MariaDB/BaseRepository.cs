@@ -64,7 +64,8 @@ namespace EnigmaBudget.Persistence.Repositories.MariaDB
                 {
 
                     var nonQueryResult = await cmd.ExecuteNonQueryAsync();
-                    trx.CommitAsync();
+                    
+                    await trx.CommitAsync();
 
                     await _connection.CloseAsync();
 

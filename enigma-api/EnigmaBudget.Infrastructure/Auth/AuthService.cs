@@ -158,17 +158,10 @@ namespace EnigmaBudget.Infrastructure.Auth
                 }
             }
 
-            if(validacion is null)
+            if(validacion is null || (validacion.valida && validacion.uve_fecha_baja < DateTime.Now))
             {
                 result.AddBusinessError("Token inválido");
             }
-
-            if(!validacion.valida)
-            {
-                if(validacion.uve_fecha_baja < DateTime.Now)
-                    result.AddBusinessError("Token inválido");
-            }
-
 
             return result;
         }
@@ -201,7 +194,7 @@ namespace EnigmaBudget.Infrastructure.Auth
                     cmd.ExecuteNonQuery();
                     trx.Commit();
                 }
-                catch(MySqlException e)
+                catch(MySqlException)
                 {
                     trx.Rollback();
                     throw;

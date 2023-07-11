@@ -12,7 +12,7 @@ namespace EnigmaBudget.Persistence.Contexts.EfCore.Enigma.EntitiesConfiguration
 
             entity.ToTable("usuarios_validacion_email");
 
-            entity.HasIndex(e => e.UveUsuId, "usuarios_validacion_email_FK");
+            entity.HasIndex(e => e.UveUsuId, "FK_uve_usu");
 
             entity.HasIndex(e => e.UveId, "usuarios_validacion_email_uve_ID_IDX");
 
@@ -42,7 +42,7 @@ namespace EnigmaBudget.Persistence.Contexts.EfCore.Enigma.EntitiesConfiguration
             entity.HasOne(d => d.UveUsu).WithMany(p => p.UsuariosValidacionEmails)
                 .HasForeignKey(d => d.UveUsuId)
                 .OnDelete(DeleteBehavior.Restrict)
-                .HasConstraintName("FK_usv_usu");
+                .HasConstraintName("FK_uve_usu");
 
         }
     }

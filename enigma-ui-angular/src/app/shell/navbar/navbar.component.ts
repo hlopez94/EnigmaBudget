@@ -26,13 +26,11 @@ import { AppStateService } from 'src/app/core/services/app-state.service';
 export class NavbarComponent implements OnInit {
   $activeTheme = this._appStateService.activeTheme;
   $mostrarBalances = this._appStateService.mostrarBalances;
+  $rutaMuestraBalances = this._appStateService.rutaMuestraBalances;
+  
   constructor(private _appStateService: AppStateService) {}
 
   ngOnInit(): void {}
-
-  toggleSidebar() {
-    this._appStateService.toggleSidebar();
-  }
 
   async intercambiarTema(){
     await this._appStateService.toggleTheme();
