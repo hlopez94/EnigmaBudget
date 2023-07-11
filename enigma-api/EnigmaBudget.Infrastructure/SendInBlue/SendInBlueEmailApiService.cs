@@ -18,6 +18,9 @@ namespace EnigmaBudget.Infrastructure.SendInBlue
 
         public void EnviarCorreoValidacionCuenta(EmailValidacionInfo infoTemplate)
         {
+            if (!_options.Enabled)
+                return;
+
             Dictionary<string, string> pars = new Dictionary<string, string>
             {
                 { "user_name", infoTemplate.UsuarioNombre },
