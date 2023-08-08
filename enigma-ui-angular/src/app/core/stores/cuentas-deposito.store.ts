@@ -6,7 +6,7 @@ import { StoreStateType, StoreStates } from './StoreState';
 import { TipoCuentaDeposito } from '../model/TipoCuentaDeposito';
 
 @Injectable({
-  providedIn: 'root',
+  providedIn: 'root', 
 })
 export class CuentasDepositoStore {
   private $cuentasUser: BehaviorSubject<CuentaDeposito[] | null>;
@@ -25,38 +25,38 @@ export class CuentasDepositoStore {
     this.$cuentasUser = new BehaviorSubject<CuentaDeposito[] | null>(null);
     this.cuentasUser = this.$cuentasUser.asObservable();
 
-    this.$storeState = new BehaviorSubject<StoreStateType>(StoreStates.SUCCESS);
+    this.$storeState = new BehaviorSubject<StoreStateType>(StoreStates.OK);
     this.storeState = this.$storeState.asObservable();
 
     this.$tiposCuentaDeposito = new BehaviorSubject<TipoCuentaDeposito[]>([]);
     this.tiposCuentaDeposito = this.$tiposCuentaDeposito.asObservable();
 
-    this.$storeTipoState = new BehaviorSubject<StoreStateType>(StoreStates.SUCCESS);
+    this.$storeTipoState = new BehaviorSubject<StoreStateType>(StoreStates.OK);
     this.storeTipoState = this.$storeTipoState.asObservable();
   }
 
   async cargarCuentasUsuario() {
-    this.$storeState.next(StoreStates.LOADING);
+    this.$storeState.next(StoreStates.CARGANDO);
     var res = await this.cuentasDepositoService.cargarCuentasUsuario();
 
     res.subscribe((res) => {
       if(res.isSuccess){
         this.$cuentasUser.next(res.data)
-        this.$storeState.next(StoreStates.SUCCESS);
+        this.$storeState.next(StoreStates.OK);
       }else
-        this.$storeState.next(StoreStates.FAILURE);
+        this.$storeState.next(StoreStates.ERROR);
     })
   }
   async cargarTiposCuentaDeposito() {
-    this.$storeTipoState.next(StoreStates.LOADING);
+    this.$storeTipoState.next(StoreStates.CARGANDO);
     var res = await this.cuentasDepositoService.cargarTiposCuentasDeposito();
 
     res.subscribe((res) => {
       if(res.isSuccess){
         this.$tiposCuentaDeposito.next(res.data)
-        this.$storeTipoState.next(StoreStates.SUCCESS);
+        this.$storeTipoState.next(StoreStates.OK);
       }else
-        this.$storeTipoState.next(StoreStates.FAILURE);
+        this.$storeTipoState.next(StoreStates.ERROR);
     })
   }
 
@@ -67,7 +67,7 @@ export class CuentasDepositoStore {
       if(res.isSuccess){
         await this.cargarCuentasUsuario();
       }else
-      this.$storeState.next(StoreStates.FAILURE);
+      this.$storeState.next(StoreStates.ERROR);
     })
   }
 }

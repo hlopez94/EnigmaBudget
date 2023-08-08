@@ -11,12 +11,12 @@ import { Divisa } from '../model/divisa';
 export class CurrenciesService {
   constructor(private httpClient: HttpClient) {}
 
-  async ObtenerTodas(): Promise<Divisa[]> {
+  async ObtenerTodas(): Promise<TypedApiResponse<Divisa[]>> {
     var res = await firstValueFrom(
       this.httpClient.get<TypedApiResponse<Divisa[]>>(
         `${environment.settings.apiUrl}/currencies`
       )
     );
-    return res.data;
+    return res;
   }
 }

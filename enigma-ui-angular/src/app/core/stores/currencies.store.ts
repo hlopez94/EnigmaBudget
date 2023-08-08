@@ -1,36 +1,29 @@
 import { CurrenciesService } from './../services/currencies.service';
 import { Divisa } from './../model/divisa';
-import { Observable, BehaviorSubject } from 'rxjs';
-import { Injectable } from '@angular/core';
+import { Injectable, Signal, computed, signal } from '@angular/core';
+import { BaseStore } from './BaseStore';
 
 @Injectable({
   providedIn: 'root',
 })
-export class CurrenciesStore {
-  private $divisas: BehaviorSubject<Divisa[]>;
-  divisas: Observable<Divisa[]>;
+export class CurrenciesStore extends BaseStore<Divisa[]> {
+ 
+  private _filterValue = signal<string>('');
+  public filteredDivisas : Signal<Divisa[]> =  computed(()=> this.$store().data ? this.$store().data!.filter((c) =>  c.name.toLowerCase().includes(this._filterValue().toLowerCase())) : [])
 
-  private $filteredDivisas: BehaviorSubject<Divisa[]>;
-  public filteredDivisas: Observable<Divisa[]>;
 
   constructor(private currenciesService: CurrenciesService) {
-    this.$divisas = new BehaviorSubject<Divisa[]>([]);
-    this.divisas = this.$divisas.asObservable();
-
-    this.$filteredDivisas = new BehaviorSubject<Divisa[]>([]);
-    this.filteredDivisas = this.$filteredDivisas.asObservable();
+    super();
   }
 
   async cargarDivisas() {
-    if (this.$divisas.getValue().length == 0) {
-      var divisas = await this.currenciesService.ObtenerTodas();
-      this.$divisas.next(divisas);
+    if (this.$store().data?.length == 0) {
+      var divisas = this.currenciesService.ObtenerTodas();
+      this.handleApiRequest(divisas);
     }
   }
+  
   filterCurrencies(value: string): void {
-    var filtered = this.$divisas.value.filter((c) =>
-      c.name.toLowerCase().includes(value.toLowerCase())
-    );
-    this.$filteredDivisas.next(filtered);
+    this._filterValue.set(value);
   }
 }

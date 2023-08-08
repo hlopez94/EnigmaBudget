@@ -92,10 +92,10 @@
       <cdk-virtual-scroll-viewport
         appendOnly
         itemSize="24"
-        [style.height.px]="currenciesLength * 48"
+        [style.height.px]="currenciesLength() * 48"
       >
         <mat-option
-          *cdkVirtualFor="let currency of $currencies | async"
+          *cdkVirtualFor="let currency of $currencies()"
           [value]="currency"
         >
           {{ currency.name }} ( {{ getCurrency(currency.code) }} )

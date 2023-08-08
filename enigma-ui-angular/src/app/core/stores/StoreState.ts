@@ -1,7 +1,7 @@
-export type StoreStateType = 'loading' | 'failure' | 'success';
+export type StoreStateType = 'cargando' | 'error' | 'ok';
 
 export class StoreStates  {
-  static LOADING : StoreStateType = 'loading'
-  static FAILURE : StoreStateType = 'failure'
-  static SUCCESS : StoreStateType = 'success'
+  static CARGANDO : StoreStateType = 'cargando'
+  static ERROR : StoreStateType = 'error'
+  static OK : StoreStateType = 'ok'
 };

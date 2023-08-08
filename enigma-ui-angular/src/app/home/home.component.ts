@@ -1,5 +1,5 @@
 import { CurrenciesStore } from './../core/stores/currencies.store';
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, Signal } from '@angular/core';
 import { Observable } from 'rxjs';
 import { Divisa } from '../core/model/divisa';
 import { CuentaDeposito } from '../core/model/cuenta-deposito';
@@ -17,6 +17,7 @@ import { CuentaCardComponent } from '../cuenta-card/cuenta-card.component';
 import { Balance } from '../core/model/balance';
 import { BalancesStore } from '../core/stores/balances.store';
 import { MonedaPipe } from '../core/pipes/monedaPipe';
+import { Store } from "../core/stores/Store";
 @Component({
     selector: 'app-home',
     templateUrl: './home.component.html',
@@ -41,8 +42,8 @@ import { MonedaPipe } from '../core/pipes/monedaPipe';
 })
 export class HomeComponent implements OnInit {
   $cuentasUsuario: Observable<CuentaDeposito[] | null>;
-  $balancesUsuario : Observable<Balance[]>;
-  divisas: Observable<Divisa[]>;
+  $balancesUsuario : Signal<Store<Balance[]>>;
+  divisas: Signal<Store<Divisa[]>>;
 
   constructor(
     private divisasStore: CurrenciesStore,
@@ -50,9 +51,9 @@ export class HomeComponent implements OnInit {
     private balancesStore: BalancesStore,
     private dialog: MatDialog
   ) {
-    this.divisas = this.divisasStore.divisas;
+    this.divisas = this.divisasStore._store;
     this.$cuentasUsuario = this.cuentasDepositoStore.cuentasUser;
-    this.$balancesUsuario = this.balancesStore.balances;
+    this.$balancesUsuario = this.balancesStore._store;
   }
 
   $tiposCuentaDeposito = this.cuentasDepositoStore.tiposCuentaDeposito;
@@ -68,12 +69,9 @@ export class HomeComponent implements OnInit {
 
   agregarCuenta() {
     const dialogRef = this.dialog.open(GenerarCuentaDepositoDialog, {
-     // data: {name: this.name, animal: this.animal},
     });
 
     dialogRef.afterClosed().subscribe(result => {
-      console.log('The dialog was closed');
-     // this.animal = result;
     });
   }
 }

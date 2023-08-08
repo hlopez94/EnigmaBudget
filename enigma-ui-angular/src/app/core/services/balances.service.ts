@@ -11,12 +11,12 @@ import { Balance } from '../model/balance';
 export class BalancesService {
   constructor(private httpClient: HttpClient) {}
 
-  async ObtenerBalances(): Promise<Balance[]> {
+  async obtenerBalances(): Promise<TypedApiResponse<Balance[]>> {
     var res = await firstValueFrom(
       this.httpClient.get<TypedApiResponse<Balance[]>>(
         `${environment.settings.apiUrl}/balances`
       )
     );
-    return res.data;
+    return res;
   }
 }

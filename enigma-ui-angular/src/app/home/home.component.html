@@ -1,8 +1,8 @@
-<section id="listado-balances" *ngIf="$balancesUsuario | async as balances">
-  <ng-container *ngIf="balances && balances.length > 0">
+<section id="listado-balances" *ngIf="$balancesUsuario().status == 'ok'">
+  <ng-container *ngIf="$balancesUsuario().status == 'ok' && $balancesUsuario().data!.length>0 ">
     <h1>Balances Generales</h1>
     <ul class="lista-tarjetas">
-      <li *ngFor="let balance of balances">
+      <li *ngFor="let balance of $balancesUsuario().data">
         <mat-card>
           <mat-card-header>
             <mat-card-title>

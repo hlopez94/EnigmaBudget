@@ -8,7 +8,7 @@ import {
   FormBuilder,
   ReactiveFormsModule,
 } from '@angular/forms';
-import { Component, EventEmitter, Output } from '@angular/core';
+import { Component, EventEmitter, Output, Signal, computed } from '@angular/core';
 import { CommonModule, getCurrencySymbol } from '@angular/common';
 import { Pais } from '../../model/pais';
 import { TipoCuentaDeposito } from '../../model/TipoCuentaDeposito';
@@ -50,12 +50,12 @@ export class GenerarCuentaDepositoComponent {
 
   @Output('resultado') resultadoEvent: EventEmitter<'creado' | 'error'> = new EventEmitter();
 
-  readonly $currencies: Observable<Divisa[]> = this.currenciesStore.filteredDivisas;
+  readonly $currencies: Signal<Divisa[]> = this.currenciesStore.filteredDivisas;
   readonly $countries: Observable<Pais[]> = this.countriesStore.filteredCountries;
   readonly $tiposCuenta: Observable<TipoCuentaDeposito[]> = this.cuentasStore.tiposCuentaDeposito;
 
   countriesLength: number = 5;
-  currenciesLength: number = 5;
+  currenciesLength: Signal<number> = computed(()=> {return this.$currencies() ? this.$currencies()!.length < 5 ? this.$currencies()!.length : 5: 5;});
 
   constructor(
     fb: FormBuilder,
@@ -74,9 +74,6 @@ export class GenerarCuentaDepositoComponent {
 
     this.$countries.subscribe(
       (arr) => (this.countriesLength = arr.length > 5 ? 5 : arr.length)
-    );
-    this.$currencies.subscribe(
-      (arr) => (this.currenciesLength = arr.length > 5 ? 5 : arr.length)
     );
   }
 
