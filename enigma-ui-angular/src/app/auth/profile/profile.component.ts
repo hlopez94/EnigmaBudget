@@ -1,10 +1,10 @@
-import { Component, OnInit } from '@angular/core';
+import { Store } from './../../core/stores/Store';
+import { Component, OnInit, Signal } from '@angular/core';
 import { FormControl, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { AuthService } from '../auth.service';
 import { Profile } from '../model/profile';
-import { CountriesStore } from 'src/app/core/stores/countries.store';
-import { Observable } from 'rxjs';
+import { PaisesStore } from 'src/app/core/stores/paises.store';
 import { Pais } from 'src/app/core/model/pais';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
@@ -38,7 +38,7 @@ import { NgIf, NgFor, AsyncPipe, UpperCasePipe } from '@angular/common';
 })
 export class ProfileComponent implements OnInit {
   public perfil: Profile | undefined;
-  readonly $paises: Observable<Pais[]> = this._countiesStore.countries;
+  public $paises: Signal<Store<Pais[]>> = this._countiesStore._store;
 
   perfilForm: FormGroup = new FormGroup({
     usuario: new FormControl('', []),
@@ -53,7 +53,7 @@ export class ProfileComponent implements OnInit {
   constructor(
     private _userService: AuthService,
     private _snackBar: MatSnackBar,
-    private _countiesStore: CountriesStore
+    private _countiesStore: PaisesStore
   ) {}
 
   async ngOnInit() {

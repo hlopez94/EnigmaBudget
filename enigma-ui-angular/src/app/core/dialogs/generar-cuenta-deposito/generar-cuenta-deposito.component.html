@@ -62,10 +62,10 @@
       <cdk-virtual-scroll-viewport
         appendOnly
         itemSize="24"
-        [style.height.px]="countriesLength * 48"
+        [style.height.px]="countriesLength() * 48"
       >
         <mat-option
-          *cdkVirtualFor="let country of $countries | async"
+          *cdkVirtualFor="let country of $countries()"
           [value]="country"
         >
           <span class="fi fi-{{ country.alpha2 | lowercase }}"></span>

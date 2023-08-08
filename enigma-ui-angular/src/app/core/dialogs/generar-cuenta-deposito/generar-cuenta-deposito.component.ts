@@ -1,5 +1,5 @@
-import { CountriesStore } from './../../stores/countries.store';
-import { CurrenciesStore } from './../../stores/currencies.store';
+import { PaisesStore } from '../../stores/paises.store';
+import { DivisasStore } from '../../stores/divisas.store';
 import { Observable } from 'rxjs';
 import { Divisa } from './../../model/divisa';
 import {
@@ -18,16 +18,17 @@ import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatChipsModule } from '@angular/material/chips';
-import { MatDialogModule, MatDialogRef } from '@angular/material/dialog';
+import { MatDialogModule } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
+import { CreateDepositAccountForm } from './CreateDepositAccountForm';
 
 @Component({
   selector: 'app-generar-cuenta-deposito',
   templateUrl: './generar-cuenta-deposito.component.html',
-  styleUrls: ['./generar-cuenta-deposito.component.scss'],
+  styleUrls: ['./generar-cuenta-deposito.component.scss'], 
   standalone: true,
   imports: [
     CommonModule,
@@ -51,16 +52,17 @@ export class GenerarCuentaDepositoComponent {
   @Output('resultado') resultadoEvent: EventEmitter<'creado' | 'error'> = new EventEmitter();
 
   readonly $currencies: Signal<Divisa[]> = this.currenciesStore.filteredDivisas;
-  readonly $countries: Observable<Pais[]> = this.countriesStore.filteredCountries;
+  readonly $countries: Signal<Pais[]> = this.countriesStore.filteredCountries;
   readonly $tiposCuenta: Observable<TipoCuentaDeposito[]> = this.cuentasStore.tiposCuentaDeposito;
 
-  countriesLength: number = 5;
+  //countriesLength: number = 5;
   currenciesLength: Signal<number> = computed(()=> {return this.$currencies() ? this.$currencies()!.length < 5 ? this.$currencies()!.length : 5: 5;});
+  countriesLength: Signal<number> = computed(()=> {return this.$countries() ? this.$countries()!.length < 5 ? this.$countries()!.length : 5: 5;});
 
   constructor(
     fb: FormBuilder,
-    private currenciesStore: CurrenciesStore,
-    private countriesStore: CountriesStore,
+    private currenciesStore: DivisasStore,
+    private countriesStore: PaisesStore,
     private cuentasStore: CuentasDepositoStore
   ) {
     this.newAccountForm = fb.group<CreateDepositAccountForm>({
@@ -71,10 +73,6 @@ export class GenerarCuentaDepositoComponent {
       Currency: new FormControl(),
       Type: new FormControl(),
     });
-
-    this.$countries.subscribe(
-      (arr) => (this.countriesLength = arr.length > 5 ? 5 : arr.length)
-    );
   }
 
   async ngOnInit() {
@@ -82,11 +80,15 @@ export class GenerarCuentaDepositoComponent {
     await this.countriesStore.loadCountries();
     await this.cuentasStore.cargarTiposCuentaDeposito();
 
-    this.newAccountForm.controls['Country'].valueChanges.subscribe((change) =>
-      this.countriesStore.filterCountries(change)
+    this.newAccountForm.controls['Country'].valueChanges.subscribe((change) =>{
+      if(typeof(change) == 'string')
+        this.countriesStore.filterCountries(change)
+    }
     );
-    this.newAccountForm.controls['Currency'].valueChanges.subscribe((change) =>
-      this.currenciesStore.filterCurrencies(change)
+    this.newAccountForm.controls['Currency'].valueChanges.subscribe((change) =>{
+      if(typeof(change) == 'string')
+        this.currenciesStore.filterCurrencies(change)
+      }
     );
   }
 
@@ -107,51 +109,9 @@ export class GenerarCuentaDepositoComponent {
   }
 
   async submit() {
-    var res = await this.cuentasStore.crearCuentaDeposito(this.newAccountForm.value);
+    await this.cuentasStore.crearCuentaDeposito(this.newAccountForm.value);
     this.resultadoEvent.emit('creado');
   }
 }
 
-export interface CreateDepositAccountForm {
-  AccountAlias: FormControl<string>;
-  Description: FormControl<string>;
-  InitialFunds: FormControl<number>;
-  Country: FormControl<Pais>;
-  Currency: FormControl<Divisa>;
-  Type: FormControl<TipoCuentaDeposito>;
-}
 
-@Component({
-  selector: 'generar-cuenta-deposito-dialog',
-  template: `<button
-      mat-icon-button
-      aria-label="Cerrar"
-      class="mat-card-top-right-menu"
-      (click)="onNoClick()">
-      <mat-icon>close</mat-icon>
-    </button>
-    <app-generar-cuenta-deposito (resultado)="resultadoForm($event)">
-    </app-generar-cuenta-deposito>`,
-  standalone: true,
-  imports: [
-    GenerarCuentaDepositoComponent,
-    MatDialogModule,
-    MatButtonModule,
-    MatIconModule,
-  ],
-})
-export class GenerarCuentaDepositoDialog {
-  constructor(
-    public dialogRef: MatDialogRef<GenerarCuentaDepositoComponent>
-  )
-  {}
-
-  onNoClick(): void {
-    this.dialogRef.close();
-  }
-
-  resultadoForm(evento: 'creado' | 'error') {
-    if (evento == 'creado')
-      this.onNoClick();
-  }
-}

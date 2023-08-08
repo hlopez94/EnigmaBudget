@@ -1,11 +1,11 @@
-import { CurrenciesStore } from './../core/stores/currencies.store';
+import { DivisasStore } from '../core/stores/divisas.store';
 import { Component, OnInit, Signal } from '@angular/core';
 import { Observable } from 'rxjs';
 import { Divisa } from '../core/model/divisa';
 import { CuentaDeposito } from '../core/model/cuenta-deposito';
 import { CuentasDepositoStore } from '../core/stores/cuentas-deposito.store';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
-import { GenerarCuentaDepositoDialog } from '../core/dialogs/generar-cuenta-deposito/generar-cuenta-deposito.component';
+import { GenerarCuentaDepositoDialog } from '../core/dialogs/generar-cuenta-deposito/GenerarCuentaDepositoDialog';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatListModule } from '@angular/material/list';
 import { MatMenuModule } from '@angular/material/menu';
@@ -46,7 +46,7 @@ export class HomeComponent implements OnInit {
   divisas: Signal<Store<Divisa[]>>;
 
   constructor(
-    private divisasStore: CurrenciesStore,
+    private divisasStore: DivisasStore,
     private cuentasDepositoStore: CuentasDepositoStore,
     private balancesStore: BalancesStore,
     private dialog: MatDialog

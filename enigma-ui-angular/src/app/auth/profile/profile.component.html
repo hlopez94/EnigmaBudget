@@ -2,7 +2,7 @@
 <form [formGroup]="perfilForm" *ngIf="perfil"  (ngSubmit)="submit()">
   <mat-card class="profile-form-card">
     <mat-card-header>
-      <img matCardAvatar />
+      <img matCardAvatar title="Avatar Usuario"/>
       <mat-card-title class="mat-heading-1">Perfil de Usuario</mat-card-title>
       <mat-card-subtitle>{{perfil.correo}}</mat-card-subtitle>
     </mat-card-header>
@@ -17,7 +17,7 @@
       <p>
         <mat-form-field>
           <mat-label>Fecha de Nacimiento:</mat-label>
-          <input formControlName="fechaNacimiento" type="date" matInput />
+          <input title="Fecha de Nacimiento" formControlName="fechaNacimiento" type="date" matInput />
         </mat-form-field>
       </p>
       <div class="input-telefono-container">
@@ -32,7 +32,7 @@
             formControlName="telefonoCodigoPais"
             [matAutocomplete]="auto">
             <mat-autocomplete #auto="matAutocomplete">
-              <mat-option *ngFor="let pais of $paises | async" [value]="pais.numericCode">
+              <mat-option *ngFor="let pais of $paises()?.data" [value]="pais.numericCode">
                 <span class="fi fi-{{pais.alpha3}}"></span> (+{{pais.numericCode}}) {{pais.name | uppercase}}
               </mat-option>
             </mat-autocomplete>

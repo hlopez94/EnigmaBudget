@@ -12,10 +12,10 @@ export class CountriesService {
 
   constructor(private httpClient: HttpClient) { }
 
-  async getAllCountries() : Promise<Pais[]> {
+  async getAllCountries() : Promise<TypedApiResponse<Pais[]>> {
     var countries = await firstValueFrom(
       this.httpClient.get<TypedApiResponse<Pais[]>>(`${environment.settings.apiUrl}/countries`)
     )
-    return countries.data;
+    return countries;
   }
 }

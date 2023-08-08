@@ -13,6 +13,6 @@ export class BalancesStore extends BaseStore<Balance[]>{
   }
 
   async cargarBalances() {
-    this.handleApiRequest(this.balancesService.obtenerBalances());
+    await this.handleApiRequest(this.balancesService.obtenerBalances());
   }
 }

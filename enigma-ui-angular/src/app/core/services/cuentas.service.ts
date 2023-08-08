@@ -1,4 +1,4 @@
-import { Observable, firstValueFrom } from 'rxjs';
+import { Observable } from 'rxjs';
 import { environment } from 'src/environments/environment';
 import { ApiResponse, TypedApiResponse } from 'src/app/core/model/ApiResponse';
 import { HttpClient } from '@angular/common/http';

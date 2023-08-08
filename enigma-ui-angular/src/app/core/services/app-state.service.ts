@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
-import { NavigationStart,  Router, RouterEvent, Event, NavigationEnd, ActivatedRoute, EventType,  } from '@angular/router';
-import { BehaviorSubject, Observable, Subject, filter, map, take, takeUntil } from 'rxjs';
+import { Router, Event, NavigationEnd, ActivatedRoute, EventType } from '@angular/router';
+import { BehaviorSubject, Observable, Subject, filter, map } from 'rxjs';
 
 export type AppTheme = 'light' | 'dark';
 
