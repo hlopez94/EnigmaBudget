@@ -1,0 +1,27 @@
+.load-wraper{
+  position: relative;
+  height: 100%;
+  background-color: rgb(211,211,211, 0.2);
+  z-index: 44;
+  overflow: hidden;
+  border-radius: 5px;
+}
+.activity{
+  position: relative;
+  display: block;
+  height: 100%;
+  background-image: linear-gradient(to left, rgba(251,251,251, .05), rgba(251,251,251, .3), rgba(251,251,251, .6), rgba(251,251,251, .3), rgba(251,251,251, .05));
+  background-image: -moz-linear-gradient(to left, rgba(251,251,251, .05), rgba(251,251,251, .3), rgba(251,251,251, .6), rgba(251,251,251, .3), rgba(251,251,251, .05));
+  background-image: -webkit-linear-gradient(to left, rgba(251,251,251, .05), rgba(251,251,251, .3), rgba(251,251,251, .6), rgba(251,251,251, .3), rgba(251,251,251, .05));
+  animation: loading 1s infinite;
+  z-index: 45;
+}
+
+@keyframes loading {
+  0%{
+    left: -45%;
+  }
+  100%{
+    left: 100%;
+  }
+}

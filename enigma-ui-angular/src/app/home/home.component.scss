@@ -1,0 +1,41 @@
+.lista-tarjetas {
+  display: flex;
+  padding: 0.5em;
+  flex-direction: row;
+  list-style: none;
+  justify-content: flex-start;
+  align-items: center;
+  overflow: -moz-scrollbars-none;
+  overflow: auto;
+  -ms-overflow-style: none;
+  ::-webkit-scrollbar {
+    width: 0 !important;
+  }
+
+  li {
+    margin-right: 0.5em;
+    margin-left: 0.5em;
+
+    :first {
+      margin-left: 0;
+    }
+
+    :last {
+      margin-right: 0;
+    }
+  }
+}
+
+:host {
+  display: grid;
+}
+
+#listado-cuentas,
+#listado-balances {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  h1 {
+    grid-column: 1 / 3;
+  }
+}

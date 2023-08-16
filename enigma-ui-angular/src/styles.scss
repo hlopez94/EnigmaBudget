@@ -1,0 +1,86 @@
+/* You can add global styles to this file, and also import other style files */
+html,
+body {
+  width: 100vw;
+  height: 100vh;
+  margin: 0;
+  overflow: hidden;
+}
+
+.spacer {
+  flex: 1 1 auto;
+}
+
+button {
+  // padding:0.5em
+}
+
+.rotating-object:focus,
+.rotating-object:checked,
+.rotating-object:active,
+.rotating-object:future {
+  animation: rotation 450ms ease-in-out;
+}
+
+@keyframes rotation {
+  0% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(180deg);
+  }
+  100% {
+    transform: rotate(90deg);
+  }
+}
+
+p mat-form-field {
+  width: 100%;
+}
+
+.mat-typography,
+.mat-display-1 {
+  margin-bottom: 0px !important;
+}
+
+.mat-card-top-right-menu {
+  position: absolute !important;
+  z-index: 1!important;
+  top: 16px;
+  right: 16px;
+}
+
+.mat-menu-item .mat-icon,
+.mat-button .mat-button-wrapper .mat-icon {
+  height: unset;
+  width: unset;
+}
+
+.mat-mdc-floating-label,
+.mat-mdc-form-field-icon-prefix {
+  padding-left: 3ch !important;
+}
+
+.mat-button-toggle-label-content {
+  .mat-icon {
+    height: 48px !important;
+  }
+}
+
+mat-icon.mat-mdc-card-avatar {
+  line-height: 40px;
+  font-size: 40px;
+  border-radius: 0;
+}
+
+
+.content-wrapper{
+  border-radius: 4px;
+  margin: 24px 0;
+  border: 1px solid rgba(0,0,0,.1);
+  padding: 1ch 4ch;
+  .theme-alternate & {
+    border: 1px solid rgba(255,255,255,.1);
+  }
+}
+

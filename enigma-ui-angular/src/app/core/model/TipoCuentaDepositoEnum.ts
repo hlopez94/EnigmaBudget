@@ -1,0 +1,6 @@
+export enum TipoCuentaDepositoEnum {
+  CAJA_AHORRO,
+  CUENTA_CORRIENTE,
+  BILLETERA_FISICA,
+  BILLETERA_VIRTUAL
+}

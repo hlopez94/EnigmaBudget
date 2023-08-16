@@ -1,0 +1,10 @@
+<button type="button" mat-icon-button title="Usuario"  [matMenuTriggerFor]="authMenu"><mat-icon>account_circle</mat-icon></button>
+
+<mat-menu #authMenu>
+    <a mat-menu-item ifLoggedIn routerLink="auth/profile"><mat-icon>person</mat-icon> Perfil</a>
+    <menu mat-menu-item ifLoggedIn (click)="logout()"><mat-icon>logout</mat-icon> Cerrar Sesión</menu>
+
+    <a mat-menu-item ifNotLoggedIn routerLink="auth/login"> <mat-icon>login</mat-icon> Iniciar Sesión</a>
+    <menu mat-menu-item ifNotLoggedIn routerLink="auth/signup"><mat-icon>account_circle</mat-icon> Registrarse</menu>
+
+</mat-menu>

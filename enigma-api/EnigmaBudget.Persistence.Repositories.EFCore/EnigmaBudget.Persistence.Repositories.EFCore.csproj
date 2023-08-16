@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net7.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\EnigmaBudget.Domain\EnigmaBudget.Domain.csproj" />
+    <ProjectReference Include="..\EnigmaBudget.Infrastructure\EnigmaBudget.Infrastructure.csproj" />
+    <ProjectReference Include="..\EnigmaBudget.Persistence.Contexts.EfCore.Enigma\EnigmaBudget.Persistence.Contexts.EfCore.Enigma.csproj" />
+  </ItemGroup>
+
+</Project>

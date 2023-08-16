@@ -1,0 +1,92 @@
+<mat-card *ngIf="type === 'account' && account">
+  <mat-card-header>
+    <mat-icon mat-card-avatar>{{account.type.iconString}}</mat-icon>
+    <span class="cdk-visually-hidden">{{account.type.description}}</span>
+    <mat-card-title>{{account.name}}</mat-card-title>
+    <mat-card-subtitle>{{account.description}}</mat-card-subtitle>
+    <button
+      mat-icon-button
+      [matMenuTriggerFor]="menu"
+      class="mat-card-top-right-menu"
+      aria-label="Botón de Menú para Cuenta"
+    >
+      <mat-icon>more_vert</mat-icon>
+    </button>
+    <mat-menu #menu="matMenu">
+      <button mat-menu-item>
+        <mat-icon>sort</mat-icon>
+        <span>Ver Movimientos</span>
+      </button>
+      <button mat-menu-item disabled>
+        <mat-icon>edit</mat-icon>
+        <span>Editar Detalles</span>
+      </button>
+    </mat-menu>
+  </mat-card-header>
+
+  <mat-card-content>
+    <div style="display: flex">
+      <h1 class="mat-display-1">
+        {{ account.funds | moneda : account.currency | async }}
+      </h1>
+    </div>
+    <mat-card-actions style="display: flex">
+      <button mat-button style="color: green">
+        <mat-icon>arrow_circle_up</mat-icon>&nbsp;Crédito
+      </button>
+      <button mat-button color="warn">
+        <mat-icon>arrow_circle_down</mat-icon>&nbsp;Débito
+      </button>
+    </mat-card-actions>
+  </mat-card-content>
+</mat-card>
+
+<mat-card *ngIf="type === 'placeholder'" >
+  <mat-card-header >
+    <mat-card-title  style="width: 12ch;" >
+    <div class="load-wraper" style="width: 12ch;">
+      <span class="activity">&nbsp;</span>
+    </div>
+    </mat-card-title>
+    <mat-card-subtitle style="width: 12ch;">
+      <div class="load-wraper" style="width: 12ch;">
+        <span class="activity">&nbsp;</span>
+      </div>
+    </mat-card-subtitle>
+  </mat-card-header>
+
+  <mat-card-content>
+    <div style="display: flex; margin-top: 0.5em;">
+      <div class="mat-display-1" style="width: 12ch;">
+        <div class="load-wraper" style="width: 12ch;">
+          <span class="activity">&nbsp;</span>
+        </div>
+      </div>
+    </div>
+    <mat-card-actions>
+      <button mat-raised-button disabled>
+        <mat-icon>up</mat-icon>&nbsp;
+      </button>
+      <button mat-raised-button disabled>
+        <mat-icon>down</mat-icon>&nbsp;
+      </button>
+    </mat-card-actions>
+  </mat-card-content>
+</mat-card>
+
+<mat-card *ngIf="type === 'empty'">
+  <mat-card-header>
+    <mat-card-title>SIN CUENTAS CREADAS</mat-card-title>
+    <mat-card-subtitle>Crea una nueva cuenta</mat-card-subtitle>
+  </mat-card-header>
+
+  <mat-card-content>
+    <div style="display: flex">
+      <h1 class="mat-display-1 ">
+        💸💸💸
+      </h1>
+    </div>
+    <mat-card-actions style="display: flex">
+    </mat-card-actions>
+  </mat-card-content>
+</mat-card>

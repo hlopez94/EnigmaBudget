@@ -1,0 +1,16 @@
+version: "3"
+
+services:
+  db:
+    image: mariadb
+    container_name: enigma_dev_db
+    restart: always
+    environment:
+      MYSQL_RANDOM_ROOT_PASSWORD: yes
+      MYSQL_DATABASE: enigma
+      MYSQL_USER: enigma_user
+      MYSQL_PASSWORD: DbCon355
+    volumes: 
+      - ./db/mysql:/var/lib/mysql
+    ports:
+      - 5906:3306  

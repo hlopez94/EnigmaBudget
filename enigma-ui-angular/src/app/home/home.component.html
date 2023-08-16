@@ -1,0 +1,69 @@
+<section id="listado-balances" *ngIf="$balancesUsuario().status == 'ok'">
+  <ng-container *ngIf="$balancesUsuario().status == 'ok' && $balancesUsuario().data!.length>0 ">
+    <h1>Balances Generales</h1>
+    <ul class="lista-tarjetas">
+      <li *ngFor="let balance of $balancesUsuario().data">
+        <mat-card>
+          <mat-card-header>
+            <mat-card-title>
+              {{ balance.moneda.name | uppercase }}
+            </mat-card-title>
+            <mat-card-subtitle>{{ balance.moneda.code }}</mat-card-subtitle>
+          </mat-card-header>
+
+          <mat-card-content>
+            <div style="display: flex">
+              <h1 class="mat-display-1">
+                {{ balance.totalBalance | moneda : balance.moneda | async }}
+              </h1>
+            </div>
+          </mat-card-content>
+        </mat-card>
+      </li>
+    </ul>
+  </ng-container>
+</section>
+
+<section id="listado-cuentas">
+  <h1>Cuentas</h1>
+  <ul class="lista-tarjetas">
+    <li *ngIf="$cuentasUsuario | async as cuentas; else cargandoCuentas">
+      <app-cuenta-card
+        [type]="'empty'"
+        *ngIf="cuentas.length == 0"
+      ></app-cuenta-card>
+    </li>
+    <ng-template #cargandoCuentas>
+      <app-cuenta-card [type]="'placeholder'"></app-cuenta-card>
+    </ng-template>
+    <li *ngFor="let cuenta of $cuentasUsuario | async">
+      <app-cuenta-card [type]="'account'" [account]="cuenta"></app-cuenta-card>
+    </li>
+  </ul>
+  <div>
+    <button
+      mat-mini-fab
+      color="default"
+      title="Agregar Cuenta"
+      (click)="agregarCuenta()"
+    >
+      <mat-icon>add</mat-icon>
+    </button>
+  </div>
+</section>
+
+<section>
+  <h1>Últimos movimientos</h1>
+  <mat-card>
+    <mat-list>
+      <ng-container *ngFor="let i of counter(10); let last = last">
+        <mat-list-item>
+          <div matListItemTitle>Descripción Movimiento</div>
+          <div matListItemMeta>$0.000,00</div>
+          <div matListItemLine>Nombre Cuenta</div>
+        </mat-list-item>
+        <mat-divider *ngIf="!last"></mat-divider>
+      </ng-container>
+    </mat-list>
+  </mat-card>
+</section>

@@ -1,0 +1,66 @@
+
+<form [formGroup]="perfilForm" *ngIf="perfil"  (ngSubmit)="submit()">
+  <mat-card class="profile-form-card">
+    <mat-card-header>
+      <img matCardAvatar title="Avatar Usuario"/>
+      <mat-card-title class="mat-heading-1">Perfil de Usuario</mat-card-title>
+      <mat-card-subtitle>{{perfil.correo}}</mat-card-subtitle>
+    </mat-card-header>
+    <mat-card-content>
+      <p>
+        <mat-form-field appearance="outline">
+          <mat-label>Nombre:</mat-label>
+          <input formControlName="nombre" type="text" matInput placeholder="NOMBRE"/>
+        </mat-form-field>
+      </p>
+
+      <p>
+        <mat-form-field>
+          <mat-label>Fecha de Nacimiento:</mat-label>
+          <input title="Fecha de Nacimiento" formControlName="fechaNacimiento" type="date" matInput />
+        </mat-form-field>
+      </p>
+      <div class="input-telefono-container">
+          <mat-form-field>
+            <mat-label>Código País</mat-label>
+            <input type="text"
+            placeholder="Pick one"
+            aria-label="Number"
+            matInput
+            #telefonoCodigoPais
+            id="telefonoCodigoPais"
+            formControlName="telefonoCodigoPais"
+            [matAutocomplete]="auto">
+            <mat-autocomplete #auto="matAutocomplete">
+              <mat-option *ngFor="let pais of $paises()?.data" [value]="pais.numericCode">
+                <span class="fi fi-{{pais.alpha3}}"></span> (+{{pais.numericCode}}) {{pais.name | uppercase}}
+              </mat-option>
+            </mat-autocomplete>
+          </mat-form-field>
+
+          <mat-form-field>
+            <mat-label>Código Area</mat-label>
+            <input formControlName="telefonoCodigoArea" type="tel" matInput placeholder="N° de Area sin 0"/>
+          </mat-form-field>
+
+          <mat-form-field class="input-phone-number">
+            <mat-label>Número</mat-label>
+            <input formControlName="telefonoNumero" type="tel" matInput placeholder="N° de celular sin 15"/>
+          </mat-form-field>
+      </div>
+    </mat-card-content>
+    <mat-card-actions style="display: flex">
+      <button mat-button color="accent" (click)="cambiarClave()" type="button" *ngIf="!perfilForm.enabled">
+        <mat-icon>key</mat-icon> Cambiar Contraseña
+      </button>
+      <span class="spacer"></span>
+      <button mat-raised-button color="accent" (click)="editar()" type="button" *ngIf="!perfilForm.enabled">
+        <mat-icon>edit</mat-icon> Editar Perfil
+      </button>
+      <button mat-raised-button color="accent" type="submit" *ngIf="perfilForm.enabled" [disabled]="perfilForm.pristine || perfilForm.invalid">
+        <mat-icon>save</mat-icon> Guardar
+      </button>
+    </mat-card-actions>
+
+  </mat-card>
+</form>
