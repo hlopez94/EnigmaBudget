@@ -1,4 +1,3 @@
-import { firstValueFrom } from 'rxjs';
 import { inject } from '@angular/core';
 import {
   ActivatedRouteSnapshot,

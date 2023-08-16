@@ -82,6 +82,12 @@ devDependencies:
   karma-coverage:
     specifier: ~2.1.1
     version: 2.1.1
+  karma-edge-launcher:
+    specifier: ^0.4.2
+    version: 0.4.2(karma@6.3.20)
+  karma-firefox-launcher:
+    specifier: ^2.1.2
+    version: 2.1.2
   karma-jasmine:
     specifier: ~4.0.2
     version: 4.0.2(karma@6.3.20)
@@ -4153,6 +4159,10 @@ packages:
     resolution: {integrity: sha512-I88TYZWc9XiYHRQ4/3c5rjjfgkjhLyW2luGIheGERbNQ6OY7yTybanSpDXZa8y7VUP9YmDcYa+eyq4ca7iLqWA==}
     dev: true
 
+  /edge-launcher@1.2.2:
+    resolution: {integrity: sha512-JcD5WBi3BHZXXVSSeEhl6sYO8g5cuynk/hifBzds2Bp4JdzCGLNMHgMCKu5DvrO1yatMgF0goFsxXRGus0yh1g==}
+    dev: true
+
   /ee-first@1.1.1:
     resolution: {integrity: sha512-WMwm9LhRUo+WUaRN+vRuETqG89IgZphVSNkdFgeb6sS/E4OrDIN7t48CAewSHXc6C8lefD8KKfr5vY61brQlow==}
     dev: true
@@ -5344,6 +5354,23 @@ packages:
       minimatch: 3.1.2
     transitivePeerDependencies:
       - supports-color
+    dev: true
+
+  /karma-edge-launcher@0.4.2(karma@6.3.20):
+    resolution: {integrity: sha512-YAJZb1fmRcxNhMIWYsjLuxwODBjh2cSHgTW/jkVmdpGguJjLbs9ZgIK/tEJsMQcBLUkO+yO4LBbqYxqgGW2HIw==}
+    engines: {node: '>=4'}
+    peerDependencies:
+      karma: '>=0.9'
+    dependencies:
+      edge-launcher: 1.2.2
+      karma: 6.3.20
+    dev: true
+
+  /karma-firefox-launcher@2.1.2:
+    resolution: {integrity: sha512-VV9xDQU1QIboTrjtGVD4NCfzIH7n01ZXqy/qpBhnOeGVOkG5JYPEm8kuSd7psHE6WouZaQ9Ool92g8LFweSNMA==}
+    dependencies:
+      is-wsl: 2.2.0
+      which: 2.0.2
     dev: true
 
   /karma-jasmine-html-reporter@1.7.0(jasmine-core@4.0.1)(karma-jasmine@4.0.2)(karma@6.3.20):

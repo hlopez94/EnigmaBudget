@@ -63,7 +63,7 @@ export class GenerarCuentaDepositoComponent {
     fb: FormBuilder,
     private currenciesStore: DivisasStore,
     private countriesStore: PaisesStore,
-    private cuentasStore: CuentasDepositoStore
+    public cuentasStore: CuentasDepositoStore
   ) {
     this.newAccountForm = fb.group<CreateDepositAccountForm>({
       AccountAlias: new FormControl(),

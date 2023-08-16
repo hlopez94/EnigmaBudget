@@ -18,7 +18,7 @@ export const AUTH_ROUTES: Routes = [
     path: 'profile',
     loadComponent: () =>
       import('./profile/profile.component').then((c) => c.ProfileComponent),
-    canActivate: [canActivateAuth],
+      canActivate: [canActivateAuth],
   },
   {
     path: 'signup',
