@@ -5,7 +5,7 @@ Proyecto de front end para aplicación EnigmaBudget realizado en Angular
 ## Code Coverage
 | Statements                  | Branches                | Functions                 | Lines             |
 | --------------------------- | ----------------------- | ------------------------- | ----------------- |
-| ![Statements](#statements#) | ![Branches](#branches#) | ![Functions](#functions#) | ![Lines](#lines#) |
+| ![Statements](https://img.shields.io/badge/statements-56.87%25-red.svg?style=flat) | ![Branches](https://img.shields.io/badge/branches-28.57%25-red.svg?style=flat) | ![Functions](https://img.shields.io/badge/functions-50%25-red.svg?style=flat) | ![Lines](https://img.shields.io/badge/lines-57.65%25-red.svg?style=flat) |
 ## Build
 
 Run `ng build` to build the project. The build artifacts will be stored in the `dist/` directory.
