@@ -62,10 +62,7 @@ jobs:
         git config --local user.name "GitHub Action"
         git add -A
         git commit -m "Actualiza README.md con badges de cobertura de código [skip ci]"
-        git push origin HEAD:${{ github.ref }}
-      
-    - name: Pushear badges de Coverage a la rama
-      run: 
+        git push origin HEAD:${{ github.ref }}      
   
   build-and-test-api:
     runs-on: ubuntu-latest
