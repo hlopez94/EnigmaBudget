@@ -58,35 +58,35 @@ jobs:
     - name: Generar badges de Coverage
       run: pnpm run badges:ci
   
-  # build-and-test-api:
-  #   runs-on: ubuntu-latest
-  #   defaults:
-  #     run:
-  #       working-directory: enigma-api
+  build-and-test-api:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: enigma-api
       
-  #   steps:
-  #   - name: Checkout code
-  #     uses: actions/checkout@v2
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
 
-  #   - name: Cache NuGet modules
-  #     uses: actions/cache@v2
-  #     env:
-  #       cache-name: cache-nuget-modules
-  #     with:
-  #       path: ~/.nuget/packages
-  #       key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/*.csproj') }}
-  #       restore-keys: |
-  #         ${{ runner.os }}-build-${{ env.cache-name }}-
-  #         ${{ runner.os }}-build-
-  #         ${{ runner.os }}-
+    - name: Cache NuGet modules
+      uses: actions/cache@v2
+      env:
+        cache-name: cache-nuget-modules
+      with:
+        path: ~/.nuget/packages
+        key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/*.csproj') }}
+        restore-keys: |
+          ${{ runner.os }}-build-${{ env.cache-name }}-
+          ${{ runner.os }}-build-
+          ${{ runner.os }}-
 
-  #   - name: Instalar .NET
-  #     uses: actions/setup-dotnet@v2
-  #     with:
-  #       dotnet-version: '7.0.x'
+    - name: Instalar .NET
+      uses: actions/setup-dotnet@v2
+      with:
+        dotnet-version: '7.0.x'
 
-  #   - name: Restaurar paquetes NuGet
-  #     run: dotnet restore EnigmaBudget.WebApi/EnigmaBudget.WebApi.csproj
+    - name: Restaurar paquetes NuGet
+      run: dotnet restore EnigmaBudget.WebApi/EnigmaBudget.WebApi.csproj
 
-  #   - name: Compilar y probar WebAPI
-  #     run: dotnet build EnigmaBudget.WebApi/EnigmaBudget.WebApi.csproj && dotnet test EnigmaBudget.WebApi/EnigmaBudget.WebApi.csproj
+    - name: Compilar y probar WebAPI
+      run: dotnet build EnigmaBudget.WebApi/EnigmaBudget.WebApi.csproj && dotnet test EnigmaBudget.WebApi/EnigmaBudget.WebApi.csproj
