@@ -25,10 +25,11 @@ jobs:
       uses: actions/checkout@v2
 
     - name: Instalar dependencias de sistema
-      run: |
-            apt-get -qq update
-            apt-get -qq install -y libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 libasound2
-
+      uses: awalsh128/cache-apt-pkgs-action@latest
+      with:
+        packages: libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 libasound2
+        version: 1.0
+        
     - name: Cache node modules
       uses: actions/cache@v2
       env:
