@@ -1,0 +1,96 @@
+name: Workflow Quality checks
+
+on:
+  push:
+    branches:
+      - feature/*
+  pull_request:
+    branches:
+      - testing
+      - main
+      - release/*
+
+jobs:
+  build-and-test-angular:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: enigma-ui-angular
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Instalar dependencias de sistema
+        run: |
+          sudo apt-get -qq update
+          sudo apt-get -qq install -y libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 libasound2
+
+      - name: Cache node modules
+        uses: actions/cache@v2
+        env:
+          cache-name: cache-node-modules
+        with:
+          path: node_modules/.pnpm
+          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-build-${{ env.cache-name }}-
+            ${{ runner.os }}-build-
+            ${{ runner.os }}-
+
+      - name: Instalar Node
+        uses: actions/setup-node@v2
+        with:
+          node-version: "16.14"
+
+      - name: Instalar pnpm
+        run: npm install -g pnpm@8
+
+      - name: Instalar dependencias de Proyecto
+        run: pnpm install
+
+      - name: Ejecutar Pruebas FrontEnd
+        run: pnpm run test:ci
+
+      - name: Generar badges de Coverage
+        if: github.event_name == 'push'
+        run: |
+          pnpm run badges:ci      
+          git config --local user.email "actions@github.com"
+          git config --local user.name "GitHub Action"
+          git add -A
+          git commit -m "Actualiza README.md con badges de cobertura de código [skip ci]"
+          git push origin HEAD:${{ github.ref }}
+
+  build-and-test-api:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: enigma-api
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Cache NuGet modules
+        uses: actions/cache@v2
+        env:
+          cache-name: cache-nuget-modules
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-build-${{ env.cache-name }}-
+            ${{ runner.os }}-build-
+            ${{ runner.os }}-
+
+      - name: Instalar .NET
+        uses: actions/setup-dotnet@v2
+        with:
+          dotnet-version: "7.0.x"
+
+      - name: Restaurar paquetes NuGet
+        run: dotnet restore EnigmaBudget.WebApi/EnigmaBudget.WebApi.csproj
+
+      - name: Compilar y probar WebAPI
+        run: dotnet build EnigmaBudget.WebApi/EnigmaBudget.WebApi.csproj && dotnet test EnigmaBudget.WebApi/EnigmaBudget.WebApi.csproj

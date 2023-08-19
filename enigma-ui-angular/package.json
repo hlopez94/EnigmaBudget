@@ -10,7 +10,7 @@
     "test:ci": "ng test --watch=false --no-progress --code-coverage=true --browsers=ChromeHeadlessCI",
     "test": "ng test --code-coverage=true --watch=true",
     "sme": "ng build -c production --source-map=true --named-chunks==true && source-map-explorer dist/**/*.js",
-    "badges:ci": "istanbul-badges-readme --coverageDir=.\\coverage\\enigma-ui\\"
+    "badges:ci": "istanbul-badges-readme --coverageDir=./coverage/enigma-ui/"
   },
   "private": true,
   "dependencies": {
