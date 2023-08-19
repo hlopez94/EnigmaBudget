@@ -57,6 +57,14 @@ jobs:
 
     - name: Generar badges de Coverage
       run: pnpm run badges:ci
+      
+    - name: Pushear badges de Coverage a la rama
+      run: |
+        git config --local user.email "actions@github.com"
+        git config --local user.name "GitHub Action"
+        git add ./README.md
+        git commit -m "Actualiza README.md con badges de cobertura de código [skip ci]"
+        git push origin HEAD:${{ github.ref }}
   
   build-and-test-api:
     runs-on: ubuntu-latest
