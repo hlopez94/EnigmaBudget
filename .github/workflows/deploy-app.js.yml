@@ -249,3 +249,10 @@ jobs:
           COMMAND: |
             cd ${{secrets.DEPLOY_PATH}}
             docker-compose up -d
+            
+      - name: Limpiar artifacts
+        uses: geekyeggo/delete-artifact@v1
+        with: 
+          name: |
+            dist-env-docker
+            dist-env-angular
