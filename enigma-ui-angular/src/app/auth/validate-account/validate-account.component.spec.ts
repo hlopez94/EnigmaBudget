@@ -1,11 +1,10 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-
 import { ValidateAccountComponent } from './validate-account.component';
-import { RouterModule } from '@angular/router';
 import { HttpClientTestingModule } from '@angular/common/http/testing';
 import { AuthService } from '../auth.service';
 import { MatSnackBarModule } from '@angular/material/snack-bar';
 import { provideHttpClient, withInterceptorsFromDi } from '@angular/common/http';
+import { RouterTestingModule } from '@angular/router/testing';
 
 describe('ValidateAccountComponent', () => {
   let component: ValidateAccountComponent;
@@ -17,10 +16,10 @@ describe('ValidateAccountComponent', () => {
       declarations:[     
         ],
       imports: [
-        RouterModule,
         MatSnackBarModule,
         HttpClientTestingModule,
-        ValidateAccountComponent        
+        ValidateAccountComponent,
+        RouterTestingModule        
       ],
       providers: [
         provideHttpClient(withInterceptorsFromDi()),
