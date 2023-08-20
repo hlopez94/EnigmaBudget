@@ -25,7 +25,7 @@ public partial class EnigmaContext : DbContext
                 .AddUserSecrets(Assembly.Load("EnigmaBudget.Persistence.Contexts.EfCore.Enigma"), true)
                 .Build();
 
-            optionsBuilder.UseMySql(configuration.GetConnectionString("EnigmaDb"), ServerVersion.AutoDetect(configuration.GetConnectionString("EnigmaDb")));
+            optionsBuilder.UseMySql(configuration.GetConnectionString("MariaDB"), ServerVersion.AutoDetect(configuration.GetConnectionString("MariaDB")));
         }
 
     }

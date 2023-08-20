@@ -1,6 +1,5 @@
 ﻿using EnigmaBudget.Persistence.Contexts.EfCore.Enigma;
 using EnigmaBudget.WebApi.Filters;
-using EnigmaBudget.WebApi.Model;
 using Microsoft.EntityFrameworkCore;
 using MySqlConnector;
 
@@ -8,38 +7,35 @@ namespace EnigmaBudget.WebApi.Configuration
 {
     public static class WebAppConfigurationExtensions
     {
-
-        public static void ConfigLogs(this WebApplicationBuilder builder)
+        public static void ConfigureLogs(this WebApplicationBuilder builder)
         {
-            var logFile = builder.Configuration.GetValue<string>("Logs:FileRoute");
         }
+
         public static void ConfigureCORS(this WebApplicationBuilder builder)
         {
-            var corsOrigins = builder.Configuration.GetSection("Cors:Origins").Get<string[]>();
+            var corsOrigins = builder.Configuration.GetSection("Cors:Origins").Get<string>().Split(',');
             builder.Services.AddCors(options =>
-                options.AddPolicy(name: "enigmaapp",
-                    policy =>
-                    {
-                        policy.WithOrigins(corsOrigins);
-                    }
-                ));
+                options.AddPolicy("enigmaapp", policy => policy.WithOrigins(corsOrigins)));
         }
-        public static void ConfigDataBases(this WebApplicationBuilder builder)
+
+        public static void ConfigureDataBases(this WebApplicationBuilder builder)
         {
-            MariaDBConfig MariaDbConfig = builder.Configuration.GetRequiredSection("MariaDB").Get<MariaDBConfig>()!;
+            var connectionString = builder.Configuration.GetConnectionString("MariaDb");
+            var env = builder.Configuration.GetValue<string>("Environment");
 
-            builder.Services.AddScoped(_ => new MySqlConnection(MariaDbConfig.ConnectionString));
-
+            builder.Services.AddScoped(_ => new MySqlConnection(connectionString));
             builder.Services.AddDbContext<EnigmaContext>(
                 options => options.UseMySql(
-                                    MariaDbConfig.ConnectionString,
-                                    ServerVersion.AutoDetect(MariaDbConfig.ConnectionString),
-                                    x => x.MigrationsAssembly($"EnigmaBudget.Persistence.Contexts.EfCore.Enigma.Migrations.{MariaDbConfig.Environment}")
-                            )
-                );
+                    connectionString,
+                    ServerVersion.AutoDetect(connectionString),
+                    x => x.MigrationsAssembly($"EnigmaBudget.Persistence.Contexts.EfCore.Enigma.Migrations.{env}")
+                )
+                .LogTo(Console.WriteLine, LogLevel.Information)
+                .EnableSensitiveDataLogging()
+                .EnableDetailedErrors()
+            );
 
             builder.Services.AddTransient<IStartupFilter, MigrationStartupFilter<EnigmaContext>>();
-
         }
     }
 }
