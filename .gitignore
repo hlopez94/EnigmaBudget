@@ -1,3 +1,5 @@
 .vs/
 obj/
 .tmp/
+.config/
+.docker/
