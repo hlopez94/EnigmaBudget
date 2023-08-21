@@ -34,8 +34,7 @@ namespace EnigmaBudget.WebApi.Configuration
                     ServerVersion.AutoDetect(connectionString),
                     x => x.MigrationsAssembly($"EnigmaBudget.Persistence.Contexts.EfCore.Enigma.Migrations.{env}")
                 )
-                .LogTo(Console.WriteLine, LogLevel.Information)
-                .EnableSensitiveDataLogging()
+                .LogTo(Console.WriteLine, LogLevel.Warning)
                 .EnableDetailedErrors()
             );
 

@@ -81,9 +81,7 @@ export class LoginComponent implements OnInit {
   }
 
   navigateAfterLogin() {
-    //if (this.originUrl == null || this.originUrl.length == 0)
     this._router.navigate(['/'], { relativeTo: null });
-    //else this._router.navigate(this.originUrl, {queryParams: this.originParams} )
   }
 
   async login() {
@@ -96,7 +94,6 @@ export class LoginComponent implements OnInit {
         panelClass: ['mat-primary'],
       });
     } catch (err: any) {
-      console.log(err);
       switch (err.status) {
         case 0:
           this._snackBar.open('El servidor no responde.', undefined, {
@@ -105,7 +102,7 @@ export class LoginComponent implements OnInit {
           });
           break;
         default:
-          this._snackBar.open('error', undefined, { duration: 3000 });
+          this._snackBar.open(err.error.errorsText,'', { duration: 3000 });
       }
     }
   }

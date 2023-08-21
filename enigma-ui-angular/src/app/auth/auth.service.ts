@@ -58,9 +58,10 @@ export class AuthService {
   async loginUserWithCredentials(
     request: LoginRequest
   ): Promise<LoginResponse> {
+    const uri : string = `${environment.settings.apiUrl}/user/login`;
     var res = await firstValueFrom(
       this._httpClient.post<TypedApiResponse<LoginResponse>>(
-        `${environment.settings.apiUrl}/user/login`,
+        uri,
         request
       )
     );
