@@ -11,7 +11,7 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=${APP_ENV}
       - ASPNETCORE_URLS=http://+
-      - Cors:Origins=${APP_UI_BASE_URL}
+      - Cors:Origins=${API_CORS_ORIGINS}
       - ConnectionStrings:MariaDB=Server=enigmadb; Port=3306; Database=enigma; User=${SQL_USER}; Password=${SQL_USER_PASS};
       - Jwt:Issuer=${JWT_ISSUER}
       - Jwt:Audience=${JWT_AUDIENCE}

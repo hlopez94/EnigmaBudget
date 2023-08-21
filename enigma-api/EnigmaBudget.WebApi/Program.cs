@@ -85,6 +85,8 @@ builder.Services.RegisterRepositories();
 builder.Services.RegisterApplicationServices();
 
 var app = builder.Build();
+
+app.UseRouting();
 app.UseCors("enigmaapp");
 
 // Configure the HTTP request pipeline.
