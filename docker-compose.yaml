@@ -44,14 +44,13 @@ services:
       start_period: 10s
       interval: 5s
       timeout: 10s
-      retries: 120    
-
+      retries: 120
   enigmaui:
     container_name: enigma_angular_ui_${APP_ENV:?error}
     restart: always
     build:
       context: ./enigma-ui-angular
-      args:
-        - ENIGMA_API_URL:${APP_API_BASE_URL} 
     ports:
       - ${UI_PORT}:80
+    environment:
+      - APP_API_BASE_URL=${APP_API_BASE_URL} 

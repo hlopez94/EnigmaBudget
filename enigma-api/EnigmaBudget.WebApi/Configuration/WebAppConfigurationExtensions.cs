@@ -14,6 +14,10 @@ namespace EnigmaBudget.WebApi.Configuration
         public static void ConfigureCORS(this WebApplicationBuilder builder)
         {
             var corsOrigins = builder.Configuration.GetSection("Cors:Origins").Get<string>().Split(',');
+            if(corsOrigins.Length == 0)
+                throw new ArgumentNullException("Undefined CORS Origins");
+
+            Console.Write(corsOrigins[0]);
             builder.Services.AddCors(options =>
                 options.AddPolicy("enigmaapp", policy => policy.WithOrigins(corsOrigins)));
         }
