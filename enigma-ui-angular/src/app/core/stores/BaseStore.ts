@@ -16,7 +16,7 @@ export class BaseStore<T> {
     if (apiResponse.isSuccess) {
       this.$store.mutate(store => { store.status = 'ok', store.data = apiResponse.data; });
     } else {
-      this.$store.mutate(store => { store.status = 'error', store.errorText = apiResponse.errorText; });
+      this.$store.mutate(store => { store.status = 'error', store.errorText = apiResponse.errorsText; });
       console.error(apiResponse.errors);
     }
   }

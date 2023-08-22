@@ -70,7 +70,7 @@ export class AuthService {
       this.setearToken(res.data.jwt);
     } else {
       this.limpiarToken();
-      throw Error(res.errorText);
+      throw Error(res.errorsText);
     }
 
     return res.data;
