@@ -13,7 +13,8 @@ var builder = WebApplication.CreateBuilder(args);
 
 var configuration = builder.Configuration;
 
-builder.ConfigureCORS();
+builder.ConfigureCORS();   
+
 builder.ConfigureDataBases();
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
@@ -85,7 +86,6 @@ builder.Services.RegisterRepositories();
 builder.Services.RegisterApplicationServices();
 
 var app = builder.Build();
-
 app.UseRouting();
 app.UseCors("enigmaapp");
 
@@ -96,10 +96,11 @@ if(app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseMiddleware<ResponseResultMiddleware>();
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+app.UseMiddleware<ResponseResultMiddleware>();
 
 app.MapControllers();
 

@@ -7,10 +7,9 @@ services:
     build:
       context: ./enigma-api
     ports:
-      - ${API_PORT}:81
+      - ${API_PORT}:80
     environment:
       - ASPNETCORE_ENVIRONMENT=${APP_ENV}
-      - ASPNETCORE_URLS=http://+
       - Cors:Origins=${API_CORS_ORIGINS}
       - ConnectionStrings:MariaDB=Server=enigmadb; Port=3306; Database=enigma; User=${SQL_USER}; Password=${SQL_USER_PASS};
       - Jwt:Issuer=${JWT_ISSUER}
