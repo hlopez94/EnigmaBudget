@@ -32,7 +32,7 @@ describe('AuthService', () => {
 
   it('should verify account mail', async () => {
     const verifyEmailToken = 'ogfjrewgfj8493q-vajifg043=vjirojq8430';
-    const response: TypedApiResponse<boolean> = { isSuccess: true, data: true, errors:[], errorText:'' };
+    const response: TypedApiResponse<boolean> = { isSuccess: true, data: true, errors:[], errorsText:'' };
     
     authService.verifyAccountMail(verifyEmailToken).then(result => {
       expect(result).toEqual(response);
@@ -46,7 +46,7 @@ describe('AuthService', () => {
 
   it('should get profile', async () => {
     const dummyProfile: Profile = { correo: 'test@test.com', fechaNacimiento:new Date(1994,4,29), nombre:'Test', telefonoCodigoArea: 342, telefonoCodigoNumero: 4069403, telefonoCodigoPais:54 ,usuario: 'userTest'};
-    const response: TypedApiResponse<Profile> = { isSuccess: true, data: dummyProfile, errors:[], errorText: ''};
+    const response: TypedApiResponse<Profile> = { isSuccess: true, data: dummyProfile, errors:[], errorsText: ''};
 
     authService.getProfile().then(result => {
       expect(result).toEqual(dummyProfile);
@@ -58,7 +58,7 @@ describe('AuthService', () => {
 
   it('should update profile', async () => {
     const dummyProfile: Profile = { correo: 'test@test.com', fechaNacimiento:new Date(1994,4,29), nombre:'Test', telefonoCodigoArea: 342, telefonoCodigoNumero: 4069403, telefonoCodigoPais:54 ,usuario: 'userTest'};
-    const response: TypedApiResponse<boolean> = { isSuccess: true, data: true, errors:[], errorText: ''};
+    const response: TypedApiResponse<boolean> = { isSuccess: true, data: true, errors:[], errorsText: ''};
 
     authService.updateProfile(dummyProfile).then(result => {
       expect(result).toEqual(true);
