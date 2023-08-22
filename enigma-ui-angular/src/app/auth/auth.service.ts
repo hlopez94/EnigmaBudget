@@ -24,9 +24,10 @@ export class AuthService {
     }
   }
 
-  async verifyAccountMail(token: string): Promise<TypedApiResponse<boolean>>  {
-    return await firstValueFrom(this._httpClient.post<TypedApiResponse<boolean>>(`${environment.settings.apiUrl}/user/verify-email-account`, token))
-
+  async verifyAccountMail(verifyEmailToken: string): Promise<TypedApiResponse<boolean>>  {
+    var uri = `${environment.settings.apiUrl}/user/verify-email-account`
+    console.log(uri);
+    return await firstValueFrom(this._httpClient.post<TypedApiResponse<boolean>>(uri, verifyEmailToken));
   }
 
   async getProfile(): Promise<Profile> {
@@ -45,7 +46,7 @@ export class AuthService {
 
   async updateProfile(perfil: Profile): Promise<boolean> {
     var res = await firstValueFrom(
-      this._httpClient.post<TypedApiResponse<boolean>>(
+      this._httpClient.put<TypedApiResponse<boolean>>(
         `${environment.settings.apiUrl}/user/profile`,
         perfil
       )
@@ -57,9 +58,10 @@ export class AuthService {
   async loginUserWithCredentials(
     request: LoginRequest
   ): Promise<LoginResponse> {
+    const uri : string = `${environment.settings.apiUrl}/user/login`;
     var res = await firstValueFrom(
       this._httpClient.post<TypedApiResponse<LoginResponse>>(
-        `${environment.settings.apiUrl}/user/login`,
+        uri,
         request
       )
     );
@@ -68,7 +70,7 @@ export class AuthService {
       this.setearToken(res.data.jwt);
     } else {
       this.limpiarToken();
-      throw Error(res.errorText);
+      throw Error(res.errorsText);
     }
 
     return res.data;
@@ -99,15 +101,18 @@ export class AuthService {
   private programarVencimientoToken(token: string) {}
 
   private tokenExpired(token: string): boolean {
-    const expiryInSeconds = JSON.parse(atob(token.split('.')[1])).exp;
-    return Math.floor(new Date().getTime() / 1000) >= expiryInSeconds;
+    if(token && token.split('.')[1] ){
+      const expiryInSeconds = JSON.parse(atob(token.split('.')[1])).exp;
+      return Math.floor(new Date().getTime() / 1000) >= expiryInSeconds;
+    }
+    return false;
   }
 
 
   public cuentaVerificada() : Boolean{
     var token = localStorage.getItem('token');
 
-    if(token){
+    if(token && token.split('.')[1]){
       var parse = JSON.parse(atob(token.split('.')[1]));
       var verificado : Boolean = parse['verified-account'] as Boolean;
       return verificado;

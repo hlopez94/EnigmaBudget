@@ -4,27 +4,26 @@ import { HttpClientTestingModule, HttpTestingController } from '@angular/common/
 import { TypedApiResponse } from '../../core/model/ApiResponse';
 import { Profile } from '../model/profile';
 import { environment } from 'src/environments/environment';
-import { provideHttpClient, withInterceptorsFromDi } from '@angular/common/http';
+import { HttpClient, provideHttpClient, withInterceptorsFromDi } from '@angular/common/http';
 
 describe('AuthService', () => {
   let authService: AuthService;
-  let httpMock: HttpTestingController;
+  let httpClient: HttpClient;
+  let httpTestingController: HttpTestingController;
 
   beforeEach(() => {
     TestBed.configureTestingModule({
       imports: [
         HttpClientTestingModule         
-      ],
-      providers: [
-        provideHttpClient(withInterceptorsFromDi()),
       ]
     });
-    httpMock = TestBed.inject(HttpTestingController);
+    httpClient = TestBed.inject(HttpClient);
+    httpTestingController  = TestBed.inject(HttpTestingController);
     authService = TestBed.inject(AuthService);
   });
 
   afterEach(() => {
-    httpMock.verify();
+    httpTestingController.verify();
   });
 
   it('should be created', () => {
@@ -32,29 +31,40 @@ describe('AuthService', () => {
   });
 
   it('should verify account mail', async () => {
-    const token = 'dummyToken';
-    const response: TypedApiResponse<boolean> = { isSuccess: true, data: true, errors:[], errorText:'' };
+    const verifyEmailToken = 'ogfjrewgfj8493q-vajifg043=vjirojq8430';
+    const response: TypedApiResponse<boolean> = { isSuccess: true, data: true, errors:[], errorsText:'' };
     
-    authService.verifyAccountMail(token).then(result => {
+    authService.verifyAccountMail(verifyEmailToken).then(result => {
       expect(result).toEqual(response);
     });
 
-    const req = httpMock.expectOne(`${environment.settings.apiUrl}/user/verify-email-account`);
+    const req = httpTestingController.expectOne(`${environment.settings.apiUrl}/user/verify-email-account`);
     expect(req.request.method).toBe('POST');
-    expect(req.request.body).toBe(token);
+    expect(req.request.body).toBe(verifyEmailToken);
     req.flush(response);
   });
 
   it('should get profile', async () => {
-    const dummyProfile: Profile = { correo: 'testtest.com', fechaNacimiento:new Date(1994,4,29), nombre:'Test', telefonoCodigoArea: 342, telefonoCodigoNumero: 4069403, telefonoCodigoPais:54 ,usuario: 'userTest'};
-    const response: TypedApiResponse<Profile> = { isSuccess: true, data: dummyProfile, errors:[], errorText: ''};
+    const dummyProfile: Profile = { correo: 'test@test.com', fechaNacimiento:new Date(1994,4,29), nombre:'Test', telefonoCodigoArea: 342, telefonoCodigoNumero: 4069403, telefonoCodigoPais:54 ,usuario: 'userTest'};
+    const response: TypedApiResponse<Profile> = { isSuccess: true, data: dummyProfile, errors:[], errorsText: ''};
 
     authService.getProfile().then(result => {
       expect(result).toEqual(dummyProfile);
     });
-
-    const req = httpMock.expectOne(`${environment.settings.apiUrl}/user/profile`);
+    const req = httpTestingController.expectOne(`${environment.settings.apiUrl}/user/profile`);
     expect(req.request.method).toBe('GET');
+    req.flush(response);
+  });
+
+  it('should update profile', async () => {
+    const dummyProfile: Profile = { correo: 'test@test.com', fechaNacimiento:new Date(1994,4,29), nombre:'Test', telefonoCodigoArea: 342, telefonoCodigoNumero: 4069403, telefonoCodigoPais:54 ,usuario: 'userTest'};
+    const response: TypedApiResponse<boolean> = { isSuccess: true, data: true, errors:[], errorsText: ''};
+
+    authService.updateProfile(dummyProfile).then(result => {
+      expect(result).toEqual(true);
+    });
+    const req = httpTestingController.expectOne(`${environment.settings.apiUrl}/user/profile`);
+    expect(req.request.method).toBe('PUT');
     req.flush(response);
   });
 });

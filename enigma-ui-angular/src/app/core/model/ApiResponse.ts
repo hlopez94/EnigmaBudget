@@ -2,7 +2,7 @@ import { ApiError } from "./ApiError";
 
 export interface ApiResponse {
   isSuccess: boolean;
-  errorText: string;
+  errorsText: string;
   errors: ApiError[];
 }
 

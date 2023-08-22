@@ -4,7 +4,6 @@ import {
 } from '@angular/platform-browser/animations';
 import { enableProdMode } from '@angular/core';
 import { environment } from './environments/environment';
-import { environmentLoader as environmentLoaderPromise } from './environments/environmentLoader';
 import { BrowserModule, bootstrapApplication } from '@angular/platform-browser';
 import { AppComponent } from './app/app.component';
 import { AuthInterceptor } from './app/auth/auth-interceptor';
@@ -23,12 +22,9 @@ import {
 import { APP_ROUTES } from './app/app-routing.module';
 import { CommonModule } from '@angular/common';
 
-environmentLoaderPromise.then((env) => {
-  if (env.production) {
-    enableProdMode();
-  }
-  environment.settings = env.settings;
-});
+if (environment.production) {
+  enableProdMode();
+}
 
 bootstrapApplication(AppComponent, {
   providers: [

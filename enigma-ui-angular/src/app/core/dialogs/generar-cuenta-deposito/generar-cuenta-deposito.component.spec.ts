@@ -73,9 +73,9 @@ describe('GenerarCuentaDepositoComponent', () => {
       AccountAlias: 'TestAlias',
       Description: 'Test Description',
       InitialFunds: 100,
-      Country: 'TestCountry',
-      Currency: 'USD',
-      Type: 'TestType',
+      Country: testCountry,
+      Currency: testCurr,
+      Type: testType,
     });
   
     await component.submit();

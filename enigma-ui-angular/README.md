@@ -1,7 +1,11 @@
 # EnigmaUi
 
-This project was generated with [Angular CLI](https://github.com/angular/angular-cli) version 13.3.7.
+Proyecto de front end para aplicación EnigmaBudget realizado en Angular
 
+## Code Coverage
+| Statements                  | Branches                | Functions                 | Lines             |
+| --------------------------- | ----------------------- | ------------------------- | ----------------- |
+| ![Statements](https://img.shields.io/badge/statements-56.6%25-red.svg?style=flat) | ![Branches](https://img.shields.io/badge/branches-28.57%25-red.svg?style=flat) | ![Functions](https://img.shields.io/badge/functions-50%25-red.svg?style=flat) | ![Lines](https://img.shields.io/badge/lines-57.36%25-red.svg?style=flat) |
 ## Build
 
 Run `ng build` to build the project. The build artifacts will be stored in the `dist/` directory.
@@ -35,3 +39,5 @@ To be able to test PWA features, you'll need to serve your app through a SSL con
     Material Design UI components for Angular applications.
 - [Flag-Icons](https://github.com/lipis/flag-icons): 
     A curated collection of all country flags in SVG — plus the CSS for easier integration.
+- [Istanbul Badges Readme](https://github.com/the-bugging/istanbul-badges-readme):
+    Creates and updates README testing coverage badges with your json-summary.

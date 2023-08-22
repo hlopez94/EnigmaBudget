@@ -11,10 +11,9 @@ using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
-var configuration = builder.Configuration;
+builder.ConfigureCORS();   
 
-builder.ConfigureCORS();
-builder.ConfigDataBases();
+builder.ConfigureDataBases();
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
 {
@@ -85,6 +84,7 @@ builder.Services.RegisterRepositories();
 builder.Services.RegisterApplicationServices();
 
 var app = builder.Build();
+app.UseRouting();
 app.UseCors("enigmaapp");
 
 // Configure the HTTP request pipeline.
@@ -94,10 +94,11 @@ if(app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseMiddleware<ResponseResultMiddleware>();
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+app.UseMiddleware<ResponseResultMiddleware>();
 
 app.MapControllers();
 
