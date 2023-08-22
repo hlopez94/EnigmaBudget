@@ -59,8 +59,10 @@ jobs:
           git config --local user.email "actions@github.com"
           git config --local user.name "GitHub Action"
           git add -A
-          git commit -m "Actualiza README.md con badges de cobertura de código [skip ci]"
-          git push origin HEAD:${{ github.ref }}
+          if ! git diff-index --quiet HEAD; then
+            git commit -m "Actualiza README.md con badges de cobertura de código [skip ci]"
+            git push origin HEAD:${{ github.ref }}
+          fi
 
   build-and-test-api:
     runs-on: ubuntu-latest
