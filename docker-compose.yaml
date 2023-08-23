@@ -1,6 +1,17 @@
 version: "3.1"
 
 services:
+
+  enigma_ui:
+    container_name: enigma_angular_ui_${APP_ENV:?error}
+    restart: always
+    build:
+      context: ./enigma-ui-angular
+    ports:
+      - ${UI_PORT}:80
+    environment:
+      - APP_API_BASE_URL=${APP_API_BASE_URL}   
+
   enigma-api:
     container_name: enigma_api_${APP_ENV:?error}
     restart: always
@@ -25,10 +36,10 @@ services:
       - SendInBlue:ValidationTemplate:AppUrl = ${APP_UI_BASE_URL}
       - SendInBlue:ValidationTemplate:Id = ${API_SIB_TEMPLATE_ID}
     depends_on:
-      enigmadb:
-        condition: service_healthy        
+      enigma_db:
+        condition: service_healthy
 
-  enigmadb:
+  enigma_db:
     image: mariadb:latest
     container_name: enigma_db_${APP_ENV:?error}
     restart: always
@@ -45,12 +56,48 @@ services:
       interval: 5s
       timeout: 10s
       retries: 120
-  enigmaui:
-    container_name: enigma_angular_ui_${APP_ENV:?error}
+
+  enigma_db_backup:
+    image: mariadb:latest
+    container_name: enigma_db_${APP_ENV:?error}_backup
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${SQL_ROOT_PASS}
+      MYSQL_DATABASE: enigma_backup
+      MYSQL_USER: ${SQL_USER}
+      MYSQL_PASSWORD: ${SQL_USER_PASS}
+    volumes:
+      - ./.docker/db/mysql_backup:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mariadb -u $$MYSQL_USER -p$$MYSQL_PASSWORD -e 'SELECT 1;'  || exit 1"]
+      start_period: 10s
+      interval: 5s
+      timeout: 10s
+      retries: 120
+
+  backup_scheduler:
+    image: appropriate/curl
+    container_name: enigma_db_${APP_ENV:?error}_backup_scheduler
     restart: always
     build:
-      context: ./enigma-ui-angular
-    ports:
-      - ${UI_PORT}:80
+      context: ./enigma-db-backer
+      args:
+        CRON_SCHEDULE: ${DB_BCK_CRON_SCHEDULE}
     environment:
-      - APP_API_BASE_URL=${APP_API_BASE_URL} 
+      PRIMARY_DB_HOST: enigma_db
+      PRIMARY_DB_USER: ${SQL_USER}
+      PRIMARY_DB_PASSWORD: ${SQL_USER_PASS}
+      PRIMARY_DB_NAME: enigma
+      BACKUP_DB_HOST: enigma_db_backup
+      BACKUP_DB_USER: ${SQL_USER}
+      BACKUP_DB_PASSWORD: ${SQL_USER_PASS}
+      BACKUP_DB_NAME: enigma_backup
+      MAX_DB_BACKUPS: ${DB_BCK_MAX_BACKUPS}
+    volumes:
+      - ./.docker/db_backups:/root/backups
+      - ./.docker/db_backups/logs:/var/cron_logs
+    depends_on:
+      enigma_db:
+        condition: service_healthy
+      enigma_db_backup:
+        condition: service_healthy
