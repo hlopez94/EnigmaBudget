@@ -17,7 +17,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="AutoMapper" Version="12.0.1" />
     <PackageReference Include="AutoMapper.Extensions.Microsoft.DependencyInjection" Version="12.0.1" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="7.0.10" />
@@ -37,6 +36,7 @@
     <ProjectReference Include="..\EnigmaBudget.Application\EnigmaBudget.Application.csproj" />
     <ProjectReference Include="..\EnigmaBudget.Infrastructure\EnigmaBudget.Infrastructure.csproj" />
     <ProjectReference Include="..\EnigmaBudget.Persistence.Contexts.EfCore.Enigma.Migrations.Dev\EnigmaBudget.Persistence.Contexts.EfCore.Enigma.Migrations.Dev.csproj" />
+    <ProjectReference Include="..\EnigmaBudget.Persistence.Contexts.EfCore.Enigma.Migrations.Test\EnigmaBudget.Persistence.Contexts.EfCore.Enigma.Migrations.Test.csproj" />
     <ProjectReference Include="..\EnigmaBudget.Persistence.Contexts.EfCore.Enigma\EnigmaBudget.Persistence.Contexts.EfCore.Enigma.csproj" />
     <ProjectReference Include="..\EnigmaBudget.Persistence.Repositories.EFCore\EnigmaBudget.Persistence.Repositories.EFCore.csproj" />
     <ProjectReference Include="..\EnigmaBudget.Repositories.MariaDB\EnigmaBudget.Persistence.Repositories.MariaDB.csproj" />

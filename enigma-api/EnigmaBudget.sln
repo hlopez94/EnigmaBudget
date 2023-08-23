@@ -40,6 +40,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "EnigmaBudget.Persistence.Re
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "EnigmaBudget.Persistence.Contexts.EfCore.Enigma.Migrations.Dev", "EnigmaBudget.Persistence.Contexts.EfCore.Enigma.Migrations.Dev\EnigmaBudget.Persistence.Contexts.EfCore.Enigma.Migrations.Dev.csproj", "{95D23EDB-610D-4B82-BAD1-FB4DEC0DF79F}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EnigmaBudget.Persistence.Contexts.EfCore.Enigma.Migrations.Test", "EnigmaBudget.Persistence.Contexts.EfCore.Enigma.Migrations.Test\EnigmaBudget.Persistence.Contexts.EfCore.Enigma.Migrations.Test.csproj", "{3EEF9B66-AEFA-4526-91B5-60C2A9F1D2E3}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -82,6 +84,10 @@ Global
 		{95D23EDB-610D-4B82-BAD1-FB4DEC0DF79F}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{95D23EDB-610D-4B82-BAD1-FB4DEC0DF79F}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{95D23EDB-610D-4B82-BAD1-FB4DEC0DF79F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3EEF9B66-AEFA-4526-91B5-60C2A9F1D2E3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3EEF9B66-AEFA-4526-91B5-60C2A9F1D2E3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3EEF9B66-AEFA-4526-91B5-60C2A9F1D2E3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3EEF9B66-AEFA-4526-91B5-60C2A9F1D2E3}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -98,6 +104,8 @@ Global
 		{BFD042D9-E784-46A0-9AB7-37BB7CA22EC0} = {6D00237A-E4EE-456F-8680-63DCE17064BD}
 		{326C1042-AD33-4F49-8F58-2DEFBAF6C6AF} = {33BE885F-33FD-4E66-8600-C0A00F041CD1}
 		{95D23EDB-610D-4B82-BAD1-FB4DEC0DF79F} = {BFD042D9-E784-46A0-9AB7-37BB7CA22EC0}
+		{675AFCB7-4E7C-4306-9865-BA1AA064F2FE} = {6D00237A-E4EE-456F-8680-63DCE17064BD}
+		{3EEF9B66-AEFA-4526-91B5-60C2A9F1D2E3} = {BFD042D9-E784-46A0-9AB7-37BB7CA22EC0}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {759F1391-BBCD-41BC-A901-93098D676DE2}
