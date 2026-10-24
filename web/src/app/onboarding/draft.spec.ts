@@ -32,6 +32,73 @@ describe('onboarding draft rules', () => {
     expect(controller.version).toBe(3);
     expect(controller.accounts).toEqual(saved.accounts);
   });
+  it('keeps edits entered while a save snapshot is pending', async () => {
+    let resolveSave!: (value: OnboardingState) => void;
+    const saveResponse = new Promise<OnboardingState>(resolve => { resolveSave = resolve; });
+    const api = { loadOnboarding: vi.fn(), saveDraft: vi.fn().mockReturnValue(saveResponse), completeDraft: vi.fn() };
+    const controller = new OnboardingDraftController(api);
+    controller.accounts = [account('Antes de guardar','ARS','80.00')];
+
+    const pendingSave = controller.save();
+    expect(api.saveDraft.mock.calls[0][0].accounts[0].name).toBe('Antes de guardar');
+    controller.accounts[0].name = 'Edición posterior';
+    resolveSave(state(3, [account('Antes de guardar','ARS','80.00')]));
+    await pendingSave;
+
+    expect(controller.accounts[0].name).toBe('Edición posterior');
+    expect(controller.version).toBe(3);
+  });
+  it('refreshes a stale version and can explicitly save local edits over the latest draft', async () => {
+    const latest = state(4, [account('Versión de otro dispositivo','ARS','90.00')]);
+    const localSaved = state(5, [account('Mi edición local','ARS','80.00')]);
+    const api = { loadOnboarding: vi.fn().mockResolvedValue(latest), saveDraft: vi.fn()
+      .mockRejectedValueOnce(new ApiProblem(409, 'El borrador cambió.'))
+      .mockResolvedValueOnce(localSaved), completeDraft: vi.fn() };
+    const controller = new OnboardingDraftController(api);
+    controller.accounts = [account('Mi edición local','ARS','80.00')];
+
+    await controller.save();
+    expect(controller.accounts[0].name).toBe('Mi edición local');
+    await controller.refreshLatest();
+    expect(controller.latestState?.version).toBe(4);
+    expect(controller.accounts[0].name).toBe('Mi edición local');
+    await controller.saveLocalOverLatest();
+
+    expect(api.saveDraft.mock.calls[1][0].version).toBe(4);
+    expect(api.saveDraft.mock.calls[1][0].accounts[0].name).toBe('Mi edición local');
+    expect(controller.version).toBe(5);
+    expect(controller.accounts[0].name).toBe('Mi edición local');
+    expect(controller.conflict).toBe(false);
+  });
+  it('replaces local values only after choosing the refreshed server draft', async () => {
+    const latest = state(7, [account('Guardada en el servidor','USD','32.10')]);
+    const api = { loadOnboarding: vi.fn().mockResolvedValue(latest), saveDraft: vi.fn(), completeDraft: vi.fn() };
+    const controller = new OnboardingDraftController(api);
+    controller.accounts = [account('Edición local','ARS','80.00')];
+    controller.conflict = true;
+
+    await controller.refreshLatest();
+    expect(controller.accounts[0].name).toBe('Edición local');
+    const applied = controller.useLatestVersion();
+
+    expect(applied?.version).toBe(7);
+    expect(controller.version).toBe(7);
+    expect(controller.accounts).toEqual(latest.accounts);
+  });
+  it('uses a newly completed draft instead of retrying a local overwrite', async () => {
+    const finished = state(6, [account('Guardada','ARS','2.00')], [], true);
+    const api = { loadOnboarding: vi.fn().mockResolvedValue(finished), saveDraft: vi.fn(), completeDraft: vi.fn() };
+    const controller = new OnboardingDraftController(api);
+    controller.conflict = true;
+    await controller.refreshLatest();
+
+    expect(controller.latestState?.completed).toBe(true);
+    expect(await controller.saveLocalOverLatest()).toBe(false);
+    const applied = controller.useLatestVersion();
+    expect(applied?.completed).toBe(true);
+    expect(controller.accounts).toEqual(finished.accounts);
+    expect(api.saveDraft).not.toHaveBeenCalled();
+  });
   it('shows a stale-save conflict and preserves local edits', async () => {
     const api = { loadOnboarding: vi.fn(), saveDraft: vi.fn().mockRejectedValue(new ApiProblem(409, 'El borrador cambió. Actualizá la pantalla antes de guardar.')), completeDraft: vi.fn() };
     const controller = new OnboardingDraftController(api);

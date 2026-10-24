@@ -23,6 +23,9 @@ export class OnboardingComponent implements OnInit {
   async skipAccounts():Promise<void>{this.controller.accounts=[];if(await this.controller.save())this.stage=2;this.changeDetector.markForCheck()}
   async skipCards():Promise<void>{this.controller.cards=[];if(await this.controller.save())this.stage=3;this.changeDetector.markForCheck()}
   async saveAndStay():Promise<void>{await this.controller.save();this.changeDetector.markForCheck()}
+  async refreshLatest():Promise<void>{await this.controller.refreshLatest();this.changeDetector.markForCheck()}
+  async saveLocalOverLatest():Promise<void>{await this.controller.saveLocalOverLatest();this.changeDetector.markForCheck()}
+  useLatestVersion():void{const state=this.controller.useLatestVersion();if(state?.completed)this.completed.emit(state);this.changeDetector.markForCheck()}
   async confirm():Promise<void>{this.confirming=true;try{if(await this.controller.confirm())this.completed.emit({version:this.controller.version,completed:true,accounts:this.controller.accounts,cards:this.controller.cards})}finally{this.confirming=false;this.changeDetector.markForCheck()}}
   addAccount():void{this.controller.accounts=[...this.controller.accounts,createAccountDraft()]}
   addCard():void{this.controller.cards=[...this.controller.cards,createCardDraft()]}
