@@ -29,6 +29,8 @@ public sealed class BankAccount
     public string Currency { get; set; } = "";
     public decimal OpeningBalance { get; set; }
     public DateOnly OpeningDate { get; set; }
+    public bool IsArchived { get; set; }
+    public int Version { get; set; } = 1;
 }
 public sealed class PaymentCard
 {
@@ -42,6 +44,8 @@ public sealed class PaymentCard
     public decimal StatementDebtArs { get; set; }
     public decimal StatementDebtUsd { get; set; }
     public DateOnly AsOfDate { get; set; }
+    public bool IsArchived { get; set; }
+    public int Version { get; set; } = 1;
 }
 public sealed class OpeningBalanceRecord
 {
@@ -53,6 +57,52 @@ public sealed class OpeningBalanceRecord
     public DateOnly EffectiveDate { get; set; }
 }
 
+public sealed class FinanceOperation
+{
+    public Guid Id { get; set; }
+    public Guid WorkspaceId { get; set; }
+    public string Kind { get; set; } = "";
+    public Guid AccountId { get; set; }
+    public DateOnly Date { get; set; }
+    public string Description { get; set; } = "";
+    public string Category { get; set; } = "";
+    public string Currency { get; set; } = "";
+    public decimal Amount { get; set; }
+    public bool IsVoided { get; set; }
+    public int Version { get; set; } = 1;
+    public List<FinancePayment> Payments { get; set; } = [];
+}
+public sealed class FinancePayment
+{
+    public Guid Id { get; set; }
+    public Guid WorkspaceId { get; set; }
+    public Guid OperationId { get; set; }
+    public Guid AccountId { get; set; }
+    public DateOnly Date { get; set; }
+    public decimal Amount { get; set; }
+    public string Currency { get; set; } = "";
+}
+public sealed class LedgerEntry
+{
+    public Guid Id { get; set; }
+    public Guid WorkspaceId { get; set; }
+    public Guid AccountId { get; set; }
+    public DateOnly Date { get; set; }
+    public string Currency { get; set; } = "";
+    public decimal Amount { get; set; }
+    public string Source { get; set; } = "";
+    public Guid SourceId { get; set; }
+}
+public sealed class TransferRecord
+{
+    public Guid Id { get; set; }
+    public Guid WorkspaceId { get; set; }
+    public Guid FromAccountId { get; set; }
+    public Guid ToAccountId { get; set; }
+    public DateOnly Date { get; set; }
+    public decimal Amount { get; set; }
+    public decimal DestinationAmount { get; set; }
+}
 public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
 {
     public DbSet<Workspace> Workspaces => Set<Workspace>();
@@ -60,6 +110,12 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<BankAccount> Accounts => Set<BankAccount>();
     public DbSet<PaymentCard> Cards => Set<PaymentCard>();
     public DbSet<OpeningBalanceRecord> OpeningBalances => Set<OpeningBalanceRecord>();
+    public DbSet<FinanceOperation> FinanceOperations => Set<FinanceOperation>();
+    public DbSet<FinancePayment> FinancePayments => Set<FinancePayment>();
+    public DbSet<LedgerEntry> LedgerEntries => Set<LedgerEntry>();
+    public DbSet<TransferRecord> Transfers => Set<TransferRecord>();
+    public DbSet<SharedGroup> Groups => Set<SharedGroup>(); public DbSet<GroupParticipant> Participants => Set<GroupParticipant>(); public DbSet<MonthlyRule> MonthlyRules => Set<MonthlyRule>(); public DbSet<RuleWeight> RuleWeights => Set<RuleWeight>(); public DbSet<CardPurchase> Purchases => Set<CardPurchase>(); public DbSet<CardInstallment> Installments => Set<CardInstallment>(); public DbSet<SharedCollection> Collections => Set<SharedCollection>();
+    public DbSet<CardStatement> CardStatements=>Set<CardStatement>();public DbSet<StatementAdjustment> StatementAdjustments=>Set<StatementAdjustment>();public DbSet<CardPaymentRecord> CardPayments=>Set<CardPaymentRecord>();
     protected override void OnModelCreating(ModelBuilder model)
     {
         model.Entity<Workspace>().HasIndex(x => x.OwnerSubject).IsUnique();
@@ -69,14 +125,28 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         model.Entity<BankAccount>().Property(x => x.Name).HasMaxLength(120);
         model.Entity<BankAccount>().Property(x => x.BankName).HasMaxLength(120);
         model.Entity<BankAccount>().Property(x => x.Currency).HasMaxLength(3);
+        model.Entity<BankAccount>().Property(x=>x.Version).IsConcurrencyToken();
         model.Entity<PaymentCard>().Property(x => x.Name).HasMaxLength(120);
         model.Entity<PaymentCard>().Property(x => x.BankName).HasMaxLength(120);
         model.Entity<PaymentCard>().Property(x => x.StatementDebtArs).HasPrecision(18, 2);
         model.Entity<PaymentCard>().Property(x => x.StatementDebtUsd).HasPrecision(18, 2);
+        model.Entity<PaymentCard>().Property(x=>x.Version).IsConcurrencyToken();
         model.Entity<OpeningBalanceRecord>().Property(x => x.Amount).HasPrecision(18, 2);
         model.Entity<OpeningBalanceRecord>().HasIndex(x => new { x.WorkspaceId, x.AccountId }).IsUnique();
         model.Entity<OpeningBalanceRecord>().HasOne<Workspace>().WithMany().HasForeignKey(x => x.WorkspaceId).OnDelete(DeleteBehavior.Cascade);
         model.Entity<OpeningBalanceRecord>().HasOne<BankAccount>().WithMany().HasForeignKey(x => x.AccountId).OnDelete(DeleteBehavior.Cascade);
+        model.Entity<FinanceOperation>().Property(x => x.Amount).HasPrecision(18, 2);
+        model.Entity<FinanceOperation>().Property(x => x.Version).IsConcurrencyToken();
+        model.Entity<FinanceOperation>().HasIndex(x => new { x.WorkspaceId, x.Id }).IsUnique();
+        model.Entity<FinancePayment>().Property(x => x.Amount).HasPrecision(18, 2);
+        model.Entity<FinancePayment>().HasIndex(x => new { x.WorkspaceId, x.Id }).IsUnique();
+        model.Entity<LedgerEntry>().Property(x => x.Amount).HasPrecision(18, 2);
+        model.Entity<LedgerEntry>().HasIndex(x => new { x.WorkspaceId, x.Source, x.SourceId }).IsUnique();
+        model.Entity<TransferRecord>().Property(x => x.Amount).HasPrecision(18, 2);
+        model.Entity<TransferRecord>().Property(x => x.DestinationAmount).HasPrecision(18, 2);
+        model.Entity<TransferRecord>().HasIndex(x => new { x.WorkspaceId, x.Id }).IsUnique();
+        model.Entity<SharedGroup>().HasIndex(x=>new{x.WorkspaceId,x.Id}).IsUnique(); model.Entity<MonthlyRule>().HasIndex(x=>new{x.WorkspaceId,x.GroupId,x.Period}).IsUnique(); model.Entity<MonthlyRule>().Property(x=>x.Version).IsConcurrencyToken(); model.Entity<RuleWeight>().Property(x=>x.Value).HasPrecision(18,2); model.Entity<CardPurchase>().Property(x=>x.TotalAmount).HasPrecision(18,2); model.Entity<CardInstallment>().Property(x=>x.Amount).HasPrecision(18,2); model.Entity<SharedCollection>().Property(x=>x.Amount).HasPrecision(18,2); model.Entity<SharedCollection>().Property(x=>x.AppliedAmount).HasPrecision(18,2); model.Entity<SharedCollection>().HasIndex(x=>new{x.WorkspaceId,x.Id}).IsUnique();
+        model.Entity<CardStatement>().HasIndex(x=>new{x.WorkspaceId,x.CardId,x.Period,x.Currency}).IsUnique();model.Entity<CardStatement>().Property(x=>x.Version).IsConcurrencyToken();model.Entity<StatementAdjustment>().Property(x=>x.Amount).HasPrecision(18,2);model.Entity<CardPaymentRecord>().Property(x=>x.Amount).HasPrecision(18,2);model.Entity<CardPaymentRecord>().Property(x=>x.AppliedAmount).HasPrecision(18,2);model.Entity<CardPaymentRecord>().HasIndex(x=>new{x.WorkspaceId,x.Id}).IsUnique();
         model.Entity<Workspace>().HasMany(x => x.Accounts).WithOne(x => x.Workspace).HasForeignKey(x => x.WorkspaceId);
         model.Entity<Workspace>().HasMany(x => x.Cards).WithOne(x => x.Workspace).HasForeignKey(x => x.WorkspaceId);
         model.Entity<Workspace>().HasOne(x => x.Draft).WithOne(x => x.Workspace).HasForeignKey<OnboardingDraft>(x => x.WorkspaceId);

@@ -5,6 +5,7 @@ using EnigmaBudget.Api.Data;
 using EnigmaBudget.Api.Identity;
 using EnigmaBudget.Api.Onboarding;
 using EnigmaBudget.Api.Storage;
+using EnigmaBudget.Api.Finance;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.Google;
@@ -121,8 +122,7 @@ api.MapPost("/onboarding/complete", async (HttpContext http, AppDbContext db, IA
     try { await db.SaveChangesAsync(); await tx.CommitAsync(); } catch (DbUpdateException) { await tx.RollbackAsync(); db.ChangeTracker.Clear(); var latest = await db.Drafts.AsNoTracking().FirstOrDefaultAsync(x => x.WorkspaceId == workspace.Id); if (latest is { Completed: true }) return Results.Ok(State(latest)); return Problem(409, "La configuración ya fue confirmada o cambió."); }
     return Results.Ok(State(draft));
 });
-api.MapGet("/accounts", async (HttpContext http, AppDbContext db) => Results.Ok(await db.Accounts.Where(x => x.Workspace.OwnerSubject == (http.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "")).Select(x => new { x.Id, x.Name, x.BankName, x.Currency, openingBalance = x.OpeningBalance.ToString("0.00", CultureInfo.InvariantCulture), openingDate = x.OpeningDate.ToString("yyyy-MM-dd") }).ToArrayAsync()));
-api.MapGet("/cards", async (HttpContext http, AppDbContext db) => Results.Ok(await db.Cards.Where(x => x.Workspace.OwnerSubject == (http.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "")).Select(x => new { x.Id, x.Name, x.BankName, x.ClosingDay, x.DueDay, statementDebtArs = x.StatementDebtArs.ToString("0.00", CultureInfo.InvariantCulture), statementDebtUsd = x.StatementDebtUsd.ToString("0.00", CultureInfo.InvariantCulture), asOfDate = x.AsOfDate.ToString("yyyy-MM-dd") }).ToArrayAsync()));
+api.MapFinanceEndpoints();
 app.Run();
 
 static async Task<Workspace> EnsureWorkspace(AppDbContext db, string subject)
