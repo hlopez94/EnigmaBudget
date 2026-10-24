@@ -1,0 +1,14 @@
+<div class="shell">
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="EnigmaBudget, inicio"><span class="brand-mark" aria-hidden="true">e</span><span>enigma<span class="brand-light">budget</span></span></a>
+    @if (session?.authenticated) { <div class="user-tools"><span class="user-greeting">{{ session?.displayName }}</span><p-button label="Cerrar sesión" severity="secondary" [text]="true" (onClick)="logout()" /></div> }
+  </header>
+  <main>
+    @if (busy) { <section class="loading" aria-live="polite"><span class="loader-dot"></span><p>Preparando tu espacio…</p></section> }
+    @else if (error) { <section class="load-error panel" aria-live="assertive"><p class="eyebrow">No se pudo conectar</p><h1>Tu espacio sigue acá.</h1><p>{{ error }}</p><p-button label="Intentar de nuevo" (onClick)="load()" /></section> }
+    @else if (session && !session.authenticated) { <app-sign-in [session]="session" (signedIn)="signedIn()" /> }
+    @else if (state?.completed) { <app-dashboard [name]="session?.displayName || 'tu espacio'" [accounts]="accounts" [cards]="cards" /> }
+    @else if (session?.authenticated) { <app-onboarding [initialState]="state!" (completed)="completed($event)" /> }
+  </main>
+  <footer class="footer"><span>EnigmaBudget</span><span>Tu dinero, ordenado a tu manera.</span></footer>
+</div>

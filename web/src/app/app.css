@@ -1,0 +1,10 @@
+:host { display:block; min-height:100vh; }
+.shell { min-height:100vh; display:flex; flex-direction:column; }
+.topbar { width:min(1160px,calc(100% - 48px)); min-height:76px; margin:0 auto; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--line); }
+.brand { display:inline-flex; align-items:center; gap:10px; color:var(--ink); text-decoration:none; font-weight:750; letter-spacing:-.04em; font-size:19px; }
+.brand-mark { display:grid; place-items:center; width:31px; height:31px; border-radius:10px; background:var(--green); color:white; font:italic 21px Georgia,serif; }
+.brand-light { color:var(--muted); font-weight:500; }.user-tools { display:flex; align-items:center; gap:18px; }.user-greeting { color:var(--muted); font-size:14px; }
+main { flex:1; width:100%; }.loading { min-height:60vh; display:grid; place-content:center; justify-items:center; color:var(--muted); }
+.loader-dot { width:12px; height:12px; border-radius:50%; background:var(--green); box-shadow:20px 0 var(--green-soft),-20px 0 var(--green-soft); animation:pulse 1s infinite ease-in-out; }@keyframes pulse {50%{opacity:.3;transform:scale(.8)}}
+.load-error { max-width:520px; margin:10vh auto; padding:40px; }.footer { width:min(1160px,calc(100% - 48px)); margin:30px auto 0; min-height:58px; display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--line); color:var(--muted); font-size:12px; }
+@media(max-width:540px){.topbar,.footer{width:calc(100% - 32px)}.user-greeting{display:none}.footer{gap:12px;font-size:11px}.load-error{margin:10vh 16px;padding:25px}}
