@@ -255,9 +255,11 @@ Un gasto admite uno o varios pagadores y solo los beneficiarios que participaron
 
 El titular conserva toda la obligación frente al emisor. La participación de cada persona se vincula a la misma compra y a su calendario.
 
-**Propuesta de regla predeterminada:** reconocer la parte total comprometida al confirmar la compra y programar el cobro por cuota. Mostrar tanto “total que me debe” como “corresponde cobrar este mes”. Se puede acordar un cobro anticipado o distinto calendario de forma explícita. Cobrar no equivale a pagar la tarjeta.
+**Regla confirmada por el usuario:** programar el cobro mes a mes, calculando cada cuota con la regla de reparto de costos de su propio mes. No congelar un porcentaje de la compra para todos los meses. Un cambio de reparto futuro modifica las previsiones de esos meses; los repartos mensuales ya confirmados o con cobros se conservan. Mostrar separado lo adeudado confirmado y lo estimado para meses todavía sin confirmar. Cobrar no equivale a pagar la tarjeta.
 
-**Ejemplo sintético:** A compra ARS 120.000 en tres cuotas de ARS 40.000; acuerdo A 60%, B 40%. El banco tiene un compromiso total de ARS 120.000 a cargo de A. B debe ARS 48.000 en total y, con cobro por cuota, ARS 16.000 por mes. El presupuesto personal mensual es ARS 24.000 para A y ARS 16.000 para B; el gasto consolidado del grupo es ARS 40.000. No sumar esas tres representaciones como ARS 80.000 de consumo.
+Si falta una regla futura, la última regla conocida puede mostrarse solo como estimación identificada; para cobrar se debe definir o confirmar el reparto de ese mes. Confirmar el primer cobro confirma también su regla mensual. Para corregir un mes ya confirmado se requiere un ajuste explícito; no recalcular silenciosamente cobros anteriores.
+
+**Ejemplo sintético:** A compra ARS 120.000 en tres cuotas de ARS 40.000. En octubre, A 60% y B 40%: a B le corresponde ARS 16.000. En noviembre, A 50% y B 50%: a B le corresponde ARS 20.000. Diciembre se calcula con su regla propia; no se presenta una deuda total fija de B como si el reparto no pudiera cambiar. El banco conserva el compromiso total de ARS 120.000 a cargo de A. El gasto consolidado de cada cuota es ARS 40.000; las vistas personales son su distribución, no consumo adicional.
 
 Si B paga ARS 16.000 a A, baja la cuenta por cobrar y sube la cuenta de A. La deuda bancaria no cambia hasta pagar al emisor. Si B todavía no pagó, A debe prever el importe completo de la tarjeta, sin considerar ese cobro como dinero disponible hoy.
 
@@ -366,7 +368,7 @@ La separación de conceptos y los circuitos anteriores son la propuesta funciona
 Las decisiones que todavía afectan el comportamiento son:
 
 1. Qué ingresos se consideran para el reparto proporcional: neto esperado, neto cobrado, extras incluidos/excluidos o base declarada. Propuesta: base declarada por período, con fuentes seleccionadas y carácter provisional hasta confirmar.
-2. Compras compartidas en cuotas: propuesta de deuda total comprometida y cobro por cuota; calendario diferente por acuerdo explícito.
+2. Compras compartidas en cuotas: confirmado el cobro mensual según el reparto de costos de cada mes, conservando meses confirmados y distinguiendo previsiones futuras.
 3. Adelantos a caja común: propuesta de elegir descontar del aporte o devolver, sin aplicar ambas compensaciones.
 4. Cierre mensual: propuesta de arrastrar caja real y obligaciones pendientes separadamente; ajustes históricos trazables.
 5. Comercialización: acceso de invitados sin plan propio, pertenencia a hogares, límites, precios y reglas de cambios/cancelación.
