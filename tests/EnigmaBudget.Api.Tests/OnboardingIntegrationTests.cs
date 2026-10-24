@@ -14,6 +14,9 @@ using System.Net;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
+using EnigmaBudget.Api.Data;
 
 namespace EnigmaBudget.Api.Tests;
 
@@ -156,6 +159,76 @@ public sealed class OnboardingIntegrationTests : IDisposable
     }
 
     [Fact]
+    public async Task Concurrent_first_workspace_requests_recover_the_owner_collision()
+    {
+        using var factory = new ApiFactory();
+        var barrier = factory.SaveBarrier;
+        barrier.ArmWorkspaceCreate("same-owner", arrivals: 2);
+        using var first = factory.IdentityClient("same-owner");
+        using var second = factory.IdentityClient("same-owner");
+        var firstRequest = first.GetAsync("/api/onboarding");
+        var secondRequest = second.GetAsync("/api/onboarding");
+
+        var responses = await Task.WhenAll(firstRequest, secondRequest);
+
+        Assert.All(responses, response => Assert.Equal(HttpStatusCode.OK, response.StatusCode));
+        var states = await Task.WhenAll(responses.Select(response => response.Content.ReadFromJsonAsync<State>()));
+        Assert.All(states, state => Assert.NotNull(state));
+        Assert.All(states, state => Assert.Equal(0, state!.Version));
+        Assert.Equal(1, await factory.CountWorkspacesAsync("same-owner"));
+
+        using var other = factory.IdentityClient("other-owner");
+        var otherState = await other.GetFromJsonAsync<State>("/api/onboarding");
+        Assert.NotNull(otherState);
+        Assert.Empty(otherState.Accounts);
+        Assert.Equal(1, await factory.CountWorkspacesAsync("same-owner"));
+        Assert.Equal(1, await factory.CountWorkspacesAsync("other-owner"));
+    }
+
+    [Fact]
+    public async Task Save_loaded_before_confirmation_conflicts_after_confirmation_wins()
+    {
+        using var factory = new ApiFactory();
+        using var client = await factory.AuthenticatedClientAsync();
+        var account = new AccountInput(Guid.NewGuid(), "Caja", "Banco", "ARS", "123.45", "2026-10-01");
+        var card = new CardInput(Guid.NewGuid(), "Visa", "Banco", 10, 20, "12.34", "0.00", "2026-10-15");
+        var initial = await client.PutAsJsonAsync("/api/onboarding", new SaveRequest(0, [account], [card]));
+        Assert.Equal(HttpStatusCode.OK, initial.StatusCode);
+        var version = (await initial.Content.ReadFromJsonAsync<State>())!.Version;
+
+        factory.SaveBarrier.ArmDraftSave("stale-save-marker");
+        var staleSave = client.PutAsJsonAsync("/api/onboarding", new SaveRequest(version,
+            [account with { Name = "stale-save-marker" }], [card with { StatementDebtArs = "98.76" }]));
+        await factory.SaveBarrier.WaitUntilBlockedAsync();
+
+        var confirmed = await client.PostAsJsonAsync("/api/onboarding/complete", new { version });
+        Assert.Equal(HttpStatusCode.OK, confirmed.StatusCode);
+        var confirmedState = await confirmed.Content.ReadFromJsonAsync<State>();
+        Assert.NotNull(confirmedState);
+        Assert.True(confirmedState.Completed);
+        Assert.Equal(version + 1, confirmedState.Version);
+        factory.SaveBarrier.Release();
+
+        var staleResponse = await staleSave;
+        Assert.Equal(HttpStatusCode.Conflict, staleResponse.StatusCode);
+        var finalState = await client.GetFromJsonAsync<State>("/api/onboarding");
+        Assert.NotNull(finalState);
+        Assert.True(finalState.Completed);
+        Assert.Equal(version + 1, finalState.Version);
+        Assert.Equal("Caja", Assert.Single(finalState.Accounts).Name);
+        Assert.Equal("12.34", Assert.Single(finalState.Cards).StatementDebtArs);
+        var confirmedAccounts = await client.GetFromJsonAsync<AccountSummary[]>("/api/accounts");
+        var confirmedCards = await client.GetFromJsonAsync<CardSummary[]>("/api/cards");
+        Assert.Equal("123.45", Assert.Single(confirmedAccounts!).OpeningBalance);
+        Assert.Equal("12.34", Assert.Single(confirmedCards!).StatementDebtArs);
+
+        var repeatedConfirmation = await client.PostAsJsonAsync("/api/onboarding/complete", new { version });
+        Assert.Equal(HttpStatusCode.OK, repeatedConfirmation.StatusCode);
+        Assert.Equal(version + 1, (await repeatedConfirmation.Content.ReadFromJsonAsync<State>())!.Version);
+        Assert.Single((await client.GetFromJsonAsync<AccountSummary[]>("/api/accounts"))!);
+    }
+
+    [Fact]
     public async Task Two_identities_have_isolated_drafts()
     {
         using var a = await _factory.AuthenticatedClientAsync("test-user-a");
@@ -208,6 +281,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
     private ApiFactory? _productionFactory;
     private readonly bool _relaxSecureCookiesForTests;
     private readonly string _environment;
+    public SaveChangesBarrierInterceptor SaveBarrier { get; } = new();
     public ApiFactory(bool relaxSecureCookiesForTests = true, string environment = "Development")
     {
         _relaxSecureCookiesForTests = relaxSecureCookiesForTests;
@@ -223,6 +297,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
         builder.UseEnvironment(_environment);
         builder.ConfigureTestServices(services =>
         {
+            services.AddSingleton(SaveBarrier);
+            services.AddDbContext<AppDbContext>((serviceProvider, options) => options.AddInterceptors(serviceProvider.GetRequiredService<SaveChangesBarrierInterceptor>()));
             services.AddAuthentication(o => { o.DefaultAuthenticateScheme = "TestOrCookie"; o.DefaultChallengeScheme = "TestOrCookie"; }).AddPolicyScheme("TestOrCookie", "Test identity or cookie", o => o.ForwardDefaultSelector = context => context.Request.Headers.ContainsKey("X-Test-Identity") ? "TestIdentity" : CookieAuthenticationDefaults.AuthenticationScheme).AddScheme<AuthenticationSchemeOptions, TestIdentityHandler>("TestIdentity", _ => { });
             if (_relaxSecureCookiesForTests)
             {
@@ -260,8 +336,72 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
         client.DefaultRequestHeaders.Add("X-CSRF-TOKEN", refreshed!.CsrfToken);
         return client;
     }
+    public HttpClient IdentityClient(string identity)
+    {
+        var client = CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false, BaseAddress = new Uri("https://localhost") });
+        client.DefaultRequestHeaders.Add("X-Test-Identity", identity);
+        return client;
+    }
+    public async Task<int> CountWorkspacesAsync(string owner)
+    {
+        await using var db = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>().UseNpgsql(_connection).Options);
+        return await db.Workspaces.CountAsync(x => x.OwnerSubject == owner);
+    }
     private sealed record SessionDto(string CsrfToken);
     protected override void Dispose(bool disposing) { base.Dispose(disposing); if (disposing) { _productionFactory?.Dispose(); using var c = new NpgsqlConnection(Environment.GetEnvironmentVariable("ENIGMABUDGET_TEST_CONNECTION")!); c.Open(); using var cmd = c.CreateCommand(); cmd.CommandText = $"DROP SCHEMA IF EXISTS \"{_schema}\" CASCADE"; cmd.ExecuteNonQuery(); } }
+}
+
+public sealed class SaveChangesBarrierInterceptor : SaveChangesInterceptor
+{
+    private string? _workspaceOwner;
+    private int _workspaceArrivals;
+    private TaskCompletionSource _workspaceGate = NewSignal();
+    private string? _draftMarker;
+    private TaskCompletionSource _draftBlocked = NewSignal();
+    private TaskCompletionSource _draftRelease = NewSignal();
+
+    public void ArmWorkspaceCreate(string owner, int arrivals)
+    {
+        _workspaceOwner = owner;
+        _workspaceArrivals = arrivals;
+        _workspaceGate = NewSignal();
+    }
+
+    public void ArmDraftSave(string marker)
+    {
+        _draftMarker = marker;
+        _draftBlocked = NewSignal();
+        _draftRelease = NewSignal();
+    }
+
+    public Task WaitUntilBlockedAsync() => _draftBlocked.Task;
+    public void Release() => _draftRelease.TrySetResult();
+
+    public override async ValueTask<InterceptionResult<int>> SavingChangesAsync(DbContextEventData eventData, InterceptionResult<int> result, CancellationToken cancellationToken = default)
+    {
+        var context = eventData.Context;
+        if (context is null) return result;
+        var addedOwner = context.ChangeTracker.Entries<Workspace>().FirstOrDefault(entry => entry.State == EntityState.Added)?.Entity.OwnerSubject;
+        if (_workspaceOwner is not null && addedOwner == _workspaceOwner)
+        {
+            if (Interlocked.Decrement(ref _workspaceArrivals) == 0)
+            {
+                _workspaceOwner = null;
+                _workspaceGate.TrySetResult();
+            }
+            await _workspaceGate.Task.WaitAsync(cancellationToken);
+        }
+
+        if (_draftMarker is not null && context.ChangeTracker.Entries<OnboardingDraft>().Any(entry => entry.State == EntityState.Modified && entry.Entity.AccountsJson.Contains(_draftMarker, StringComparison.Ordinal)))
+        {
+            _draftMarker = null;
+            _draftBlocked.TrySetResult();
+            await _draftRelease.Task.WaitAsync(cancellationToken);
+        }
+        return result;
+    }
+
+    private static TaskCompletionSource NewSignal() => new(TaskCreationOptions.RunContinuationsAsynchronously);
 }
 
 public sealed class TestIdentityHandler(IOptionsMonitor<AuthenticationSchemeOptions> options, ILoggerFactory logger, UrlEncoder encoder) : AuthenticationHandler<AuthenticationSchemeOptions>(options, logger, encoder)

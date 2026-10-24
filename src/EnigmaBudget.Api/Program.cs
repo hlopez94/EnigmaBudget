@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
 var googleId = builder.Configuration["Authentication:Google:ClientId"];
@@ -116,6 +117,7 @@ api.MapPost("/onboarding/complete", async (HttpContext http, AppDbContext db, IA
     foreach (var a in accounts) { var amount = decimal.Parse(a.OpeningBalance, NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture); var date = DateOnly.ParseExact(a.OpeningDate, "yyyy-MM-dd", CultureInfo.InvariantCulture); db.Accounts.Add(new BankAccount { Id=a.Id, WorkspaceId=workspace.Id, Name=a.Name.Trim(), BankName=a.BankName.Trim(), Currency=a.Currency, OpeningBalance=amount, OpeningDate=date }); db.OpeningBalances.Add(new OpeningBalanceRecord { WorkspaceId=workspace.Id, AccountId=a.Id, Currency=a.Currency, Amount=amount, EffectiveDate=date }); }
     foreach (var c in cards) db.Cards.Add(new PaymentCard { Id=c.Id, WorkspaceId=workspace.Id, Name=c.Name.Trim(), BankName=c.BankName.Trim(), ClosingDay=c.ClosingDay, DueDay=c.DueDay, StatementDebtArs=decimal.Parse(c.StatementDebtArs, CultureInfo.InvariantCulture), StatementDebtUsd=decimal.Parse(c.StatementDebtUsd, CultureInfo.InvariantCulture), AsOfDate=DateOnly.ParseExact(c.AsOfDate,"yyyy-MM-dd",CultureInfo.InvariantCulture) });
     draft.Completed = true;
+    draft.Version++;
     try { await db.SaveChangesAsync(); await tx.CommitAsync(); } catch (DbUpdateException) { await tx.RollbackAsync(); db.ChangeTracker.Clear(); var latest = await db.Drafts.AsNoTracking().FirstOrDefaultAsync(x => x.WorkspaceId == workspace.Id); if (latest is { Completed: true }) return Results.Ok(State(latest)); return Problem(409, "La configuración ya fue confirmada o cambió."); }
     return Results.Ok(State(draft));
 });
@@ -127,8 +129,20 @@ static async Task<Workspace> EnsureWorkspace(AppDbContext db, string subject)
 {
     var workspace = await db.Workspaces.Include(x => x.Draft).FirstOrDefaultAsync(x => x.OwnerSubject == subject);
     if (workspace is not null) return workspace;
-    workspace = new Workspace { OwnerSubject = subject, Draft = new OnboardingDraft() }; db.Workspaces.Add(workspace); await db.SaveChangesAsync(); return workspace;
+    workspace = new Workspace { OwnerSubject = subject, Draft = new OnboardingDraft() }; db.Workspaces.Add(workspace);
+    try { await db.SaveChangesAsync(); return workspace; }
+    catch (DbUpdateException ex) when (IsWorkspaceOwnerUniqueViolation(ex))
+    {
+        db.ChangeTracker.Clear();
+        var winner = await db.Workspaces.Include(x => x.Draft).FirstOrDefaultAsync(x => x.OwnerSubject == subject);
+        if (winner is not null) return winner;
+        throw;
+    }
 }
+static bool IsWorkspaceOwnerUniqueViolation(DbUpdateException exception) =>
+    exception.GetBaseException() is PostgresException postgres
+    && postgres.SqlState == PostgresErrorCodes.UniqueViolation
+    && postgres.ConstraintName == "IX_Workspaces_OwnerSubject";
 static async Task<OnboardingState> GetState(AppDbContext db, string subject)
 {
     var workspace = await EnsureWorkspace(db, subject); var draft = workspace.Draft!; return State(draft);

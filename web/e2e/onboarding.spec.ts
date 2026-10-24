@@ -34,7 +34,9 @@ test('saves a bilingual account and card draft, confirms once, then keeps separa
   await card.getByLabel('Deuda actual en USD').fill('12,34');
   await card.getByLabel('Fecha del resumen').fill('2026-10-22');
 
+  const savedCardDraft = page.waitForResponse(response => response.url().endsWith('/api/onboarding') && response.request().method() === 'PUT');
   await page.getByRole('button', { name: 'Guardar avance' }).click();
+  expect((await savedCardDraft).status()).toBe(200);
   await expect(page.getByText('Visa personal')).toBeVisible();
   await page.reload();
 

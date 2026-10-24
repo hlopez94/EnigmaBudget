@@ -24,7 +24,7 @@ jobs:
     env:
       DOTNET_COMMAND: dotnet
       ENIGMABUDGET_TEST_CONNECTION: Host=127.0.0.1;Port=5432;Database=enigmabudget;Username=enigmabudget;Password=ci-test-only
-      ENIGMABUDGET_E2E_CONNECTION: Host=127.0.0.1;Port=5432;Database=enigmabudget;Username=enigmabudget;Password=ci-test-only
+      ENIGMABUDGET_E2E_CONNECTION: Host=127.0.0.1;Port=5432;Database=enigmabudget_e2e;Username=enigmabudget;Password=ci-test-only
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-dotnet@v6
@@ -37,6 +37,10 @@ jobs:
           cache-dependency-path: web/package-lock.json
       - name: Install frontend dependencies
         run: npm --prefix web ci
+      - name: Create isolated browser acceptance database
+        env:
+          PGPASSWORD: ci-test-only
+        run: createdb --host=127.0.0.1 --username=enigmabudget enigmabudget_e2e
       - name: Test and build frontend
         run: |
           npm --prefix web test -- --run
