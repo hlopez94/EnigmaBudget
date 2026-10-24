@@ -1,5 +1,5 @@
-using System.Globalization;
 using System.Data;
+using System.Globalization;
 using System.Security.Claims;
 using EnigmaBudget.Api.Data;
 using Microsoft.AspNetCore.Antiforgery;
@@ -11,6 +11,7 @@ namespace EnigmaBudget.Api.Finance;
 public static partial class FinanceEndpoints
 {
     private static readonly CultureInfo Invariant = CultureInfo.InvariantCulture;
+
     public static void MapFinanceEndpoints(this RouteGroupBuilder api)
     {
         api.MapGet("/accounts", Accounts);
@@ -41,10 +42,58 @@ public static partial class FinanceEndpoints
         api.MapPost("/cards/{cardId:guid}/payments", PayCard);
     }
 
-    private static string Subject(HttpContext h)=>h.User.FindFirstValue(ClaimTypes.NameIdentifier)??"";
-    private static async Task<Workspace> Workspace(AppDbContext db,string subject){var ws=await db.Workspaces.FirstOrDefaultAsync(x=>x.OwnerSubject==subject);if(ws is not null)return ws;ws=new Workspace{OwnerSubject=subject,Draft=new OnboardingDraft()};db.Workspaces.Add(ws);try{await db.SaveChangesAsync();return ws;}catch(DbUpdateException ex)when(ex.GetBaseException() is PostgresException {SqlState:PostgresErrorCodes.UniqueViolation}){db.ChangeTracker.Clear();return await db.Workspaces.SingleAsync(x=>x.OwnerSubject==subject);}}
-    private static async Task<bool> Csrf(HttpContext h,IAntiforgery csrf){try{await csrf.ValidateRequestAsync(h);return true;}catch(AntiforgeryValidationException){return false;}}
-    private static IResult Problem(int status,string detail)=>Results.Problem(statusCode:status,title:"No se pudo completar la solicitud",detail:detail);
-    private static bool ValidName(string? x)=>!string.IsNullOrWhiteSpace(x)&&x.Trim().Length<=120;
-    private static string F(decimal x)=>x.ToString("0.00",Invariant);
+    private static string Subject(HttpContext h) =>
+        h.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
+
+    private static async Task<Workspace> Workspace(AppDbContext db, string subject)
+    {
+        var ws = await db.Workspaces.FirstOrDefaultAsync(x => x.OwnerSubject == subject);
+        if (ws is not null)
+            return ws;
+        ws = new Workspace { OwnerSubject = subject, Draft = new OnboardingDraft() };
+        db.Workspaces.Add(ws);
+        try
+        {
+            await db.SaveChangesAsync();
+            return ws;
+        }
+        catch (DbUpdateException ex)
+            when (ex.GetBaseException()
+                    is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation }
+            )
+        {
+            db.ChangeTracker.Clear();
+            return await db.Workspaces.SingleAsync(x => x.OwnerSubject == subject);
+        }
+    }
+
+    private static async Task<bool> Csrf(HttpContext h, IAntiforgery csrf)
+    {
+        try
+        {
+            await csrf.ValidateRequestAsync(h);
+            return true;
+        }
+        catch (AntiforgeryValidationException)
+        {
+            return false;
+        }
+    }
+
+    private static IResult Problem(int status, string detail) =>
+        Results.Problem(
+            statusCode: status,
+            title: "No se pudo completar la solicitud",
+            detail: detail
+        );
+
+    private static bool IsPersistenceConflict(Exception exception) =>
+        exception is DbUpdateConcurrencyException
+        || exception.GetBaseException() is PostgresException postgres
+            && postgres.SqlState is "40001" or "23505";
+
+    private static bool ValidName(string? x) =>
+        !string.IsNullOrWhiteSpace(x) && x.Trim().Length <= 120;
+
+    private static string F(decimal x) => x.ToString("0.00", Invariant);
 }

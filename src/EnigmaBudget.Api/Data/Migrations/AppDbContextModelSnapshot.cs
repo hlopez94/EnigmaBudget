@@ -273,6 +273,9 @@ namespace EnigmaBudget.Api.Data.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<bool>("InitiallyPaid")
+                        .HasColumnType("boolean");
+
                     b.Property<bool>("IsVoided")
                         .HasColumnType("boolean");
 
@@ -283,6 +286,12 @@ namespace EnigmaBudget.Api.Data.Migrations
                     b.Property<int>("Version")
                         .IsConcurrencyToken()
                         .HasColumnType("integer");
+
+                    b.Property<string>("VoidReason")
+                        .HasColumnType("text");
+
+                    b.Property<Guid?>("VoidRequestId")
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("WorkspaceId")
                         .HasColumnType("uuid");
@@ -378,6 +387,13 @@ namespace EnigmaBudget.Api.Data.Migrations
                     b.Property<DateOnly>("Date")
                         .HasColumnType("date");
 
+                    b.Property<decimal?>("ObservedBalance")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("Reason")
+                        .HasColumnType("text");
+
                     b.Property<string>("Source")
                         .IsRequired()
                         .HasColumnType("text");
@@ -415,6 +431,10 @@ namespace EnigmaBudget.Api.Data.Migrations
                     b.Property<string>("Mode")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<int>("MutationVersion")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer");
 
                     b.Property<string>("Period")
                         .IsRequired()
