@@ -4,6 +4,8 @@ Diseño para revisión · 24 de octubre de 2026
 
 Este documento reúne requisitos confirmados y propuestas para construir una primera versión. Las propuestas están identificadas y quedan sujetas a aprobación. Implementación autorizada por el usuario el 24 de octubre de 2026. Las planillas y ramas previas se conservan; la nueva implementación vive en una rama separada.
 
+La [definición funcional completa de funcionalidades y circuitos](../../producto/funcionalidades-y-circuitos.md) amplía este diseño y es la referencia para los próximos planes de producto. El asistente implementado es solo una base y no cumple por sí mismo el alcance funcional solicitado. Las políticas todavía propuestas no deben tratarse como requisitos aprobados.
+
 ## 1. Objetivo
 
 Reemplazar las planillas por una aplicación que permita continuar registrando ingresos y gastos, entender el dinero disponible, anticipar compromisos y organizar gastos compartidos y objetivos de ahorro. Debe responder cuánto tengo hoy, cuánto ya comprometí, cuánto me deben y cuándo puedo alcanzar una meta, separando pesos y dólares.
@@ -73,7 +75,7 @@ Los permisos dicen qué puede hacer una persona; los beneficios del plan dicen q
 
 Las invitaciones pendientes reservan un lugar con vencimiento para evitar sobrecupo; la aceptación también comprueba el límite de forma atómica. Un grupo no hereda datos ni permisos de los hogares de sus miembros.
 
-Precios, prueba gratuita, cantidad de grupos, límites de almacenamiento y pertenencia simultánea a hogares quedan como políticas comerciales configurables. Propuesta inicial: un hogar activo por persona; grupos múltiples. Un miembro de grupo necesita cobertura Personal o Hogar para operar autenticado; el organizador puede registrar participantes sin cuenta. No se presupone un plan gratuito.
+Precios, prueba gratuita, cantidad de grupos, límites de almacenamiento y pertenencia simultánea a hogares quedan como políticas comerciales configurables. Un hogar activo por persona sigue siendo una propuesta, no un requisito confirmado. El acceso de invitados sin suscripción propia se define en la propuesta funcional: no se exige un plan individual por participar de un grupo sin una decisión comercial explícita. Esto no implica un plan Personal gratuito.
 
 ## 7. Núcleo de movimientos y cuentas
 
