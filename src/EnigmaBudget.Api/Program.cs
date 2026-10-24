@@ -107,7 +107,7 @@ static string? ValidateForCompletion(AccountInput[] accounts, CardInput[] cards)
     foreach (var c in cards) if (string.IsNullOrWhiteSpace(c.Name) || string.IsNullOrWhiteSpace(c.BankName) || !Day(c.ClosingDay) || !Day(c.DueDay) || !Amount(c.StatementDebtArs, true) || !Amount(c.StatementDebtUsd, true) || !Date(c.AsOfDate)) return "Revisá nombre, banco, deuda, fechas y días de cierre y vencimiento de cada tarjeta.";
     return null;
 }
-static bool Amount(string s, bool nonnegative) => decimal.TryParse(s, NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var v) && (!nonnegative || v>=0) && decimal.Round(v,2)==v && Math.Abs(v)<=9999999999999999.99m;
+static bool Amount(string s, bool nonnegative) => decimal.TryParse(s, NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var v) && (!nonnegative || v>=0) && decimal.Round(v,2)==v && v>=-9999999999999999.99m && v<=9999999999999999.99m;
 static bool Date(string s) => DateOnly.TryParseExact(s,"yyyy-MM-dd",CultureInfo.InvariantCulture,DateTimeStyles.None,out _);
 static bool Day(int? n) => n is null or (>=1 and <=31);
 public partial class Program { }

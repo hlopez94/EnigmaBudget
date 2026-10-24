@@ -122,6 +122,8 @@ public sealed class OnboardingIntegrationTests : IDisposable
     [Theory]
     [InlineData("date")]
     [InlineData("amount")]
+    [InlineData("amount-min")]
+    [InlineData("amount-high")]
     [InlineData("currency")]
     [InlineData("duplicate-id")]
     public async Task Invalid_completion_inputs_are_rejected(string invalidKind)
@@ -129,7 +131,7 @@ public sealed class OnboardingIntegrationTests : IDisposable
         using var client = await _factory.AuthenticatedClientAsync();
         var id = Guid.NewGuid();
         var currency = invalidKind == "currency" ? "EUR" : "ARS";
-        var amount = invalidKind == "amount" ? "1.001" : "1.00";
+        var amount = invalidKind switch { "amount" => "1.001", "amount-min" => decimal.MinValue.ToString(System.Globalization.CultureInfo.InvariantCulture), "amount-high" => "10000000000000000", _ => "1.00" };
         var date = invalidKind == "date" ? "2026-02-30" : "2026-02-28";
         var account = new AccountInput(id, "Cuenta", "Banco", currency, amount, date);
          CardInput[] cards = invalidKind == "duplicate-id" ? [new CardInput(id, "Tarjeta", "Banco", null, null, "0", "0", "2026-02-28")] : [];
@@ -138,6 +140,7 @@ public sealed class OnboardingIntegrationTests : IDisposable
         Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
         var version = (await saved.Content.ReadFromJsonAsync<State>())!.Version;
         var response = await client.PostAsJsonAsync("/api/onboarding/complete", new { version });
+        if (invalidKind == "amount-min") Console.WriteLine(await response.Content.ReadAsStringAsync());
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
