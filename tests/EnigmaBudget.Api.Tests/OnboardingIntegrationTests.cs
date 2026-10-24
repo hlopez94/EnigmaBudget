@@ -6,9 +6,9 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.Extensions.Options;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
-using Microsoft.Extensions.Options;
 using Npgsql;
 using System.Net;
 using System.Net.Http.Json;
@@ -64,6 +64,53 @@ public sealed class OnboardingIntegrationTests : IDisposable
         Assert.NotNull(session);
         var response = await client.PostAsJsonAsync("/api/auth/development", new { });
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Session_and_authenticated_api_responses_are_not_cached()
+    {
+        using var anonymous = _factory.CreateClient();
+        var session = await anonymous.GetAsync("/api/auth/session");
+        Assert.Equal(HttpStatusCode.OK, session.StatusCode);
+        Assert.Contains("no-store", session.Headers.CacheControl?.ToString() ?? "", StringComparison.OrdinalIgnoreCase);
+
+        using var authenticated = await _factory.AuthenticatedClientAsync();
+        var onboarding = await authenticated.GetAsync("/api/onboarding");
+        Assert.Equal(HttpStatusCode.OK, onboarding.StatusCode);
+        Assert.Contains("no-store", onboarding.Headers.CacheControl?.ToString() ?? "", StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Development_http_session_works_without_secure_cookie_test_overrides()
+    {
+        using var factory = new ApiFactory(relaxSecureCookiesForTests: false);
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false, BaseAddress = new Uri("http://localhost") });
+
+        var sessionResponse = await client.GetAsync("/api/auth/session");
+
+        Assert.Equal(HttpStatusCode.OK, sessionResponse.StatusCode);
+        Assert.Contains(sessionResponse.Headers.GetValues("Set-Cookie"), value => value.StartsWith("EnigmaBudget.Csrf=", StringComparison.Ordinal) && !value.Contains("; secure", StringComparison.OrdinalIgnoreCase));
+        var session = await sessionResponse.Content.ReadFromJsonAsync<Session>();
+        var login = new HttpRequestMessage(HttpMethod.Post, "/api/auth/development") { Content = JsonContent.Create(new { }) };
+        login.Headers.Add("X-CSRF-TOKEN", session!.CsrfToken);
+        var loginResponse = await client.SendAsync(login);
+        Assert.Equal(HttpStatusCode.NoContent, loginResponse.StatusCode);
+        Assert.Contains(loginResponse.Headers.GetValues("Set-Cookie"), value => value.StartsWith("EnigmaBudget.Auth=", StringComparison.Ordinal) && !value.Contains("; secure", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task Production_https_session_keeps_secure_antiforgery_and_auth_cookie_policies()
+    {
+        using var production = _factory.CreateProductionFactory();
+        using var client = production.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false, BaseAddress = new Uri("https://localhost") });
+
+        var response = await client.GetAsync("/api/auth/session");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var cookies = response.Headers.GetValues("Set-Cookie").ToArray();
+        Assert.Contains(cookies, value => value.StartsWith("EnigmaBudget.Csrf=", StringComparison.Ordinal) && value.Contains("; secure", StringComparison.OrdinalIgnoreCase));
+        Assert.Equal(CookieSecurePolicy.Always, production.Services.GetRequiredService<IOptionsMonitor<CookieAuthenticationOptions>>().Get(CookieAuthenticationDefaults.AuthenticationScheme).Cookie.SecurePolicy);
+        Assert.Equal(CookieSecurePolicy.Always, production.Services.GetRequiredService<IOptionsMonitor<AntiforgeryOptions>>().CurrentValue.Cookie.SecurePolicy);
     }
 
     [Fact]
@@ -124,6 +171,7 @@ public sealed class OnboardingIntegrationTests : IDisposable
     [InlineData("amount")]
     [InlineData("amount-min")]
     [InlineData("amount-high")]
+    [InlineData("amount-subcent-long")]
     [InlineData("currency")]
     [InlineData("duplicate-id")]
     public async Task Invalid_completion_inputs_are_rejected(string invalidKind)
@@ -131,7 +179,7 @@ public sealed class OnboardingIntegrationTests : IDisposable
         using var client = await _factory.AuthenticatedClientAsync();
         var id = Guid.NewGuid();
         var currency = invalidKind == "currency" ? "EUR" : "ARS";
-        var amount = invalidKind switch { "amount" => "1.001", "amount-min" => decimal.MinValue.ToString(System.Globalization.CultureInfo.InvariantCulture), "amount-high" => "10000000000000000", _ => "1.00" };
+        var amount = invalidKind switch { "amount" => "1.001", "amount-min" => decimal.MinValue.ToString(System.Globalization.CultureInfo.InvariantCulture), "amount-high" => "10000000000000000", "amount-subcent-long" => "0.00000000000000000000000000001", _ => "1.00" };
         var date = invalidKind == "date" ? "2026-02-30" : "2026-02-28";
         var account = new AccountInput(id, "Cuenta", "Banco", currency, amount, date);
          CardInput[] cards = invalidKind == "duplicate-id" ? [new CardInput(id, "Tarjeta", "Banco", null, null, "0", "0", "2026-02-28")] : [];
@@ -158,16 +206,30 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
     private readonly string _schema = "test_" + Guid.NewGuid().ToString("N");
     private string _connection = "";
     private ApiFactory? _productionFactory;
-    public ApiFactory()
+    private readonly bool _relaxSecureCookiesForTests;
+    private readonly string _environment;
+    public ApiFactory(bool relaxSecureCookiesForTests = true, string environment = "Development")
     {
-        var b = new NpgsqlConnectionStringBuilder("Host=127.0.0.1;Port=55432;Database=enigmabudget;Username=enigma;Password=local-development-only");
+        _relaxSecureCookiesForTests = relaxSecureCookiesForTests;
+        _environment = environment;
+        var testConnection = Environment.GetEnvironmentVariable("ENIGMABUDGET_TEST_CONNECTION");
+        if (string.IsNullOrWhiteSpace(testConnection)) throw new InvalidOperationException("Set ENIGMABUDGET_TEST_CONNECTION to an isolated PostgreSQL test database.");
+        var b = new NpgsqlConnectionStringBuilder(testConnection);
         using var c = new NpgsqlConnection(b.ConnectionString); c.Open(); using var cmd = c.CreateCommand(); cmd.CommandText = $"CREATE SCHEMA \"{_schema}\""; cmd.ExecuteNonQuery();
         b.SearchPath = _schema; _connection = b.ConnectionString;
     }
     protected override void ConfigureWebHost(Microsoft.AspNetCore.Hosting.IWebHostBuilder builder)
     {
-        builder.UseEnvironment("Development");
-        builder.ConfigureTestServices(services => { services.AddAuthentication(o => { o.DefaultAuthenticateScheme = "TestOrCookie"; o.DefaultChallengeScheme = "TestOrCookie"; }).AddPolicyScheme("TestOrCookie", "Test identity or cookie", o => o.ForwardDefaultSelector = context => context.Request.Headers.ContainsKey("X-Test-Identity") ? "TestIdentity" : CookieAuthenticationDefaults.AuthenticationScheme).AddScheme<AuthenticationSchemeOptions, TestIdentityHandler>("TestIdentity", _ => { }); services.Configure<AntiforgeryOptions>(o => o.Cookie.SecurePolicy = CookieSecurePolicy.None); services.Configure<CookieAuthenticationOptions>(CookieAuthenticationDefaults.AuthenticationScheme, o => o.Cookie.SecurePolicy = CookieSecurePolicy.None); });
+        builder.UseEnvironment(_environment);
+        builder.ConfigureTestServices(services =>
+        {
+            services.AddAuthentication(o => { o.DefaultAuthenticateScheme = "TestOrCookie"; o.DefaultChallengeScheme = "TestOrCookie"; }).AddPolicyScheme("TestOrCookie", "Test identity or cookie", o => o.ForwardDefaultSelector = context => context.Request.Headers.ContainsKey("X-Test-Identity") ? "TestIdentity" : CookieAuthenticationDefaults.AuthenticationScheme).AddScheme<AuthenticationSchemeOptions, TestIdentityHandler>("TestIdentity", _ => { });
+            if (_relaxSecureCookiesForTests)
+            {
+                services.Configure<AntiforgeryOptions>(o => o.Cookie.SecurePolicy = CookieSecurePolicy.None);
+                services.Configure<CookieAuthenticationOptions>(CookieAuthenticationDefaults.AuthenticationScheme, o => o.Cookie.SecurePolicy = CookieSecurePolicy.None);
+            }
+        });
         builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["ConnectionStrings:Default"] = _connection,
@@ -179,18 +241,11 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
 
     public HttpClient CreateProductionClient()
     {
-        _productionFactory = new ApiFactory();
-        return _productionFactory.WithWebHostBuilder(builder =>
-        {
-            builder.UseEnvironment("Production");
-            builder.ConfigureTestServices(services => { services.Configure<AntiforgeryOptions>(o => o.Cookie.SecurePolicy = CookieSecurePolicy.None); services.Configure<CookieAuthenticationOptions>(CookieAuthenticationDefaults.AuthenticationScheme, o => o.Cookie.SecurePolicy = CookieSecurePolicy.None); });
-            builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["ConnectionStrings:Default"] = _connection,
-                ["Authentication:DevelopmentLoginEnabled"] = "true"
-            }));
-        }).CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false, BaseAddress = new Uri("https://localhost") });
+        _productionFactory = CreateProductionFactory();
+        return _productionFactory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false, BaseAddress = new Uri("https://localhost") });
     }
+
+    public ApiFactory CreateProductionFactory() => new(relaxSecureCookiesForTests: false, environment: "Production");
 
     public async Task<HttpClient> AuthenticatedClientAsync(string? identity = null)
     {
@@ -206,7 +261,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
         return client;
     }
     private sealed record SessionDto(string CsrfToken);
-    protected override void Dispose(bool disposing) { base.Dispose(disposing); if (disposing) { _productionFactory?.Dispose(); using var c = new NpgsqlConnection("Host=127.0.0.1;Port=55432;Database=enigmabudget;Username=enigma;Password=local-development-only"); c.Open(); using var cmd = c.CreateCommand(); cmd.CommandText = $"DROP SCHEMA IF EXISTS \"{_schema}\" CASCADE"; cmd.ExecuteNonQuery(); } }
+    protected override void Dispose(bool disposing) { base.Dispose(disposing); if (disposing) { _productionFactory?.Dispose(); using var c = new NpgsqlConnection(Environment.GetEnvironmentVariable("ENIGMABUDGET_TEST_CONNECTION")!); c.Open(); using var cmd = c.CreateCommand(); cmd.CommandText = $"DROP SCHEMA IF EXISTS \"{_schema}\" CASCADE"; cmd.ExecuteNonQuery(); } }
 }
 
 public sealed class TestIdentityHandler(IOptionsMonitor<AuthenticationSchemeOptions> options, ILoggerFactory logger, UrlEncoder encoder) : AuthenticationHandler<AuthenticationSchemeOptions>(options, logger, encoder)

@@ -8,6 +8,8 @@ work/
 **/coverage/
 **/playwright-report/
 **/test-results/
+artifacts/
+src/EnigmaBudget.Api/wwwroot/
 .env
 .env.*
 !.env.example

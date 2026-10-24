@@ -4,10 +4,12 @@ using System.Text.Json;
 using EnigmaBudget.Api.Data;
 using EnigmaBudget.Api.Identity;
 using EnigmaBudget.Api.Onboarding;
+using EnigmaBudget.Api.Storage;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.AspNetCore.Antiforgery;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -15,10 +17,11 @@ var googleId = builder.Configuration["Authentication:Google:ClientId"];
 var googleSecret = builder.Configuration["Authentication:Google:ClientSecret"];
 var googleConfigured = !string.IsNullOrWhiteSpace(googleId) && !string.IsNullOrWhiteSpace(googleSecret);
 builder.Services.AddDbContext<AppDbContext>(o => o.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
-builder.Services.AddAntiforgery(o => { o.HeaderName = "X-CSRF-TOKEN"; o.Cookie.Name = "EnigmaBudget.Csrf"; o.Cookie.HttpOnly = true; o.Cookie.SecurePolicy = CookieSecurePolicy.Always; o.Cookie.SameSite = SameSiteMode.Strict; });
+builder.Services.AddOptions<StorageOptions>().Bind(builder.Configuration.GetSection(StorageOptions.SectionName)).Validate(StorageOptions.IsValid, "S3 storage configuration must include a bucket and region, and use a valid HTTP(S) endpoint when configured.").ValidateOnStart();
+builder.Services.AddAntiforgery(o => { o.HeaderName = "X-CSRF-TOKEN"; o.Cookie.Name = "EnigmaBudget.Csrf"; o.Cookie.HttpOnly = true; o.Cookie.SecurePolicy = appDevelopmentLoginEnabled(builder) ? CookieSecurePolicy.SameAsRequest : CookieSecurePolicy.Always; o.Cookie.SameSite = SameSiteMode.Strict; });
 var auth = builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme).AddCookie(o =>
 {
-    o.Cookie.Name = "EnigmaBudget.Auth"; o.Cookie.HttpOnly = true; o.Cookie.SecurePolicy = CookieSecurePolicy.Always; o.Cookie.SameSite = SameSiteMode.Lax;
+    o.Cookie.Name = "EnigmaBudget.Auth"; o.Cookie.HttpOnly = true; o.Cookie.SecurePolicy = appDevelopmentLoginEnabled(builder) ? CookieSecurePolicy.SameAsRequest : CookieSecurePolicy.Always; o.Cookie.SameSite = SameSiteMode.Lax;
     o.Events.OnRedirectToLogin = context => { context.Response.StatusCode = StatusCodes.Status401Unauthorized; return Task.CompletedTask; };
     o.Events.OnRedirectToAccessDenied = context => { context.Response.StatusCode = StatusCodes.Status403Forbidden; return Task.CompletedTask; };
 });
@@ -28,8 +31,43 @@ builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.PropertyNamin
 
 var app = builder.Build();
 if (!app.Environment.IsEnvironment("Testing")) { using var scope = app.Services.CreateScope(); await scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.MigrateAsync(); }
+var forwardedHeaders = new ForwardedHeadersOptions { ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto };
+foreach (var proxy in builder.Configuration.GetSection("ReverseProxy:KnownProxies").Get<string[]>() ?? [])
+{
+    if (!System.Net.IPAddress.TryParse(proxy, out var address)) throw new InvalidOperationException($"Invalid ReverseProxy:KnownProxies address: {proxy}");
+    forwardedHeaders.KnownProxies.Add(address);
+}
+app.UseForwardedHeaders(forwardedHeaders);
+app.UseDefaultFiles();
+app.UseStaticFiles();
+app.Use(async (context, next) =>
+{
+    if (context.Request.Path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase))
+    {
+        context.Response.Headers.CacheControl = "no-store";
+        context.Response.Headers.Pragma = "no-cache";
+    }
+    await next();
+});
 app.UseAuthentication(); app.UseAuthorization();
 app.MapGet("/api/health", () => Results.Ok(new { status = "ok" }));
+app.MapFallback(async context =>
+{
+    if (context.Request.Path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase))
+    {
+        context.Response.StatusCode = StatusCodes.Status404NotFound;
+        return;
+    }
+
+    var indexPath = Path.Combine(app.Environment.WebRootPath ?? Path.Combine(app.Environment.ContentRootPath, "wwwroot"), "index.html");
+    if (!File.Exists(indexPath))
+    {
+        context.Response.StatusCode = StatusCodes.Status404NotFound;
+        return;
+    }
+    context.Response.ContentType = "text/html; charset=utf-8";
+    await context.Response.SendFileAsync(indexPath);
+});
 app.MapGet("/api/auth/session", async (HttpContext http, IAntiforgery antiforgery, AppDbContext db) =>
 {
     var tokens = antiforgery.GetAndStoreTokens(http);
@@ -107,7 +145,17 @@ static string? ValidateForCompletion(AccountInput[] accounts, CardInput[] cards)
     foreach (var c in cards) if (string.IsNullOrWhiteSpace(c.Name) || string.IsNullOrWhiteSpace(c.BankName) || !Day(c.ClosingDay) || !Day(c.DueDay) || !Amount(c.StatementDebtArs, true) || !Amount(c.StatementDebtUsd, true) || !Date(c.AsOfDate)) return "Revisá nombre, banco, deuda, fechas y días de cierre y vencimiento de cada tarjeta.";
     return null;
 }
-static bool Amount(string s, bool nonnegative) => decimal.TryParse(s, NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var v) && (!nonnegative || v>=0) && decimal.Round(v,2)==v && v>=-9999999999999999.99m && v<=9999999999999999.99m;
+static bool Amount(string s, bool nonnegative)
+{
+    if (string.IsNullOrEmpty(s)) return false;
+    var decimalPoint = s.IndexOf('.');
+    if (decimalPoint >= 0 && s.Length - decimalPoint - 1 > 2) return false;
+    return decimal.TryParse(s, NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var value)
+        && (!nonnegative || value >= 0)
+        && value >= -9999999999999999.99m
+        && value <= 9999999999999999.99m;
+}
+static bool appDevelopmentLoginEnabled(WebApplicationBuilder builder) => builder.Environment.IsDevelopment() && builder.Configuration.GetValue<bool>("Authentication:DevelopmentLoginEnabled");
 static bool Date(string s) => DateOnly.TryParseExact(s,"yyyy-MM-dd",CultureInfo.InvariantCulture,DateTimeStyles.None,out _);
 static bool Day(int? n) => n is null or (>=1 and <=31);
 public partial class Program { }

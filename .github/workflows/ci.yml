@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: enigmabudget
+          POSTGRES_USER: enigmabudget
+          POSTGRES_PASSWORD: ci-test-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U enigmabudget -d enigmabudget"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      DOTNET_COMMAND: dotnet
+      ENIGMABUDGET_TEST_CONNECTION: Host=127.0.0.1;Port=5432;Database=enigmabudget;Username=enigmabudget;Password=ci-test-only
+      ENIGMABUDGET_E2E_CONNECTION: Host=127.0.0.1;Port=5432;Database=enigmabudget;Username=enigmabudget;Password=ci-test-only
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install frontend dependencies
+        run: npm --prefix web ci
+      - name: Test and build frontend
+        run: |
+          npm --prefix web test -- --run
+          npm --prefix web run build
+          mkdir -p src/EnigmaBudget.Api/wwwroot
+          cp -R web/dist/web/browser/. src/EnigmaBudget.Api/wwwroot/
+      - name: Build and test backend
+        run: dotnet test EnigmaBudget.sln --configuration Release
+      - name: Install Chromium
+        working-directory: web
+        run: npx playwright install --with-deps chromium
+      - name: Verify single-host browser flow
+        run: npm --prefix web run test:e2e
+        env:
+          CI: "true"
