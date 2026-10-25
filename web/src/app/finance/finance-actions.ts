@@ -55,7 +55,11 @@ export abstract class FinanceActions {
     return value.trim() ? Number(value) : null;
   }
 
-  protected async runMutation(mutation: () => Promise<unknown>, success: string): Promise<boolean> {
+  protected async runMutation(
+    mutation: () => Promise<unknown>,
+    success: string,
+    afterSuccess?: () => Promise<void>,
+  ): Promise<boolean> {
     if (this.saving) return false;
     this.saving = true;
     this.error = '';
@@ -64,6 +68,13 @@ export abstract class FinanceActions {
     try {
       await mutation();
       this.notice = success;
+      if (afterSuccess) {
+        try {
+          await afterSuccess();
+        } catch (error) {
+          this.showLoadError(error);
+        }
+      }
       return true;
     } catch (error) {
       this.error = error instanceof Error ? error.message : 'No pudimos guardar los cambios.';

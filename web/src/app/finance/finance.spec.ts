@@ -251,6 +251,82 @@ describe('finance workspace regressions', () => {
     });
   });
 
+  it('keeps monthly-rule controls locked until the saved rule finishes hydrating', async () => {
+    let finishSave!: () => void;
+    const savePending = new Promise<void>((resolve) => (finishSave = resolve));
+    let finishRefresh!: () => void;
+    const refreshPending = new Promise<void>((resolve) => (finishRefresh = resolve));
+    let announceRefresh!: () => void;
+    const refreshStarted = new Promise<void>((resolve) => (announceRefresh = resolve));
+    const participants = [
+      { id: 'person-a', name: 'Ana', isSelf: true },
+      { id: 'person-b', name: 'Beto', isSelf: false },
+    ];
+    const api = {
+      saveRule: vi.fn().mockReturnValue(savePending),
+      receivables: vi.fn().mockResolvedValue([]),
+    };
+    const sharing = new FinanceSharing(
+      api as unknown as ApiService,
+      { markForCheck: vi.fn() } as unknown as import('@angular/core').ChangeDetectorRef,
+    );
+    sharing.period = '2026-11';
+    sharing.selectedGroupId = 'group-1';
+    sharing.ruleMode = 'Percentage';
+    sharing.ruleWeights = { 'person-a': '50', 'person-b': '50' };
+    sharing.overview = {
+      groups: [
+        {
+          id: 'group-1',
+          name: 'Viaje',
+          version: 1,
+          participants,
+          rule: null,
+        },
+      ],
+    } as never;
+    sharing.refreshOverview = vi.fn(async () => {
+      sharing.overview = {
+        groups: [
+          {
+            id: 'group-1',
+            name: 'Viaje',
+            version: 2,
+            participants,
+            rule: {
+              period: '2026-11',
+              version: 1,
+              mode: 'Percentage',
+              basisCurrency: 'ARS',
+              weights: [
+                { id: 'person-a', value: '50.00' },
+                { id: 'person-b', value: '50.00' },
+              ],
+              confirmed: false,
+            },
+          },
+        ],
+      } as never;
+      sharing.ngOnChanges();
+      announceRefresh();
+      await refreshPending;
+    });
+
+    const saving = sharing.saveRule();
+    expect(sharing.saving).toBe(true);
+    finishSave();
+    await refreshStarted;
+
+    expect(sharing.saving).toBe(true);
+    expect(sharing.ruleWeights).toEqual({ 'person-a': '50.00', 'person-b': '50.00' });
+    expect(api.receivables).toHaveBeenCalledWith('group-1', '2026-11');
+
+    finishRefresh();
+    await saving;
+    expect(sharing.saving).toBe(false);
+    expect(sharing.notice).toBe('Reparto mensual guardado.');
+  });
+
   it('requires real FX transfer amounts and uses equality only for matching account currencies', async () => {
     const api = { transfer: vi.fn().mockResolvedValue(undefined) };
     const operations = new FinanceOperations(

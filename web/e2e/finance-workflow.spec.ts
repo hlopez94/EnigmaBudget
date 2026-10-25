@@ -325,6 +325,9 @@ test('runs real finance, sharing, and card acceptance from empty completed onboa
   await futureRule.getByLabel('Luz').fill('70');
   await futureRule.getByRole('button', { name: 'Guardar regla mensual' }).click();
   expect((await saveFutureRule).status()).toBe(200);
+  await expect(page.getByText('Regla guardada · versión 1')).toBeVisible();
+  await expect(futureRule.getByLabel('Yo (vos)')).toHaveValue('30.00');
+  await expect(futureRule.getByLabel('Luz')).toHaveValue('70.00');
   let future = await (
     await page.request.get(`/api/groups/${groupId}/receivables?period=${nextMonth}`)
   ).json();
@@ -335,6 +338,8 @@ test('runs real finance, sharing, and card acceptance from empty completed onboa
   const updateFutureRule = waitForApi(page, 'PUT', `/api/groups/${groupId}/rules/${nextMonth}`);
   await futureRule.getByLabel('Yo (vos)').fill('50');
   await futureRule.getByLabel('Luz').fill('50');
+  await expect(futureRule.getByLabel('Yo (vos)')).toHaveValue('50');
+  await expect(futureRule.getByLabel('Luz')).toHaveValue('50');
   await futureRule.getByRole('button', { name: 'Guardar regla mensual' }).click();
   expect((await updateFutureRule).status()).toBe(200);
   future = await (
@@ -372,9 +377,13 @@ test('runs real finance, sharing, and card acceptance from empty completed onboa
   await page.getByRole('button', { name: 'Inicio', exact: true }).click();
   await page.reload();
   await expect(page.locator('.balance-card.ars strong')).toContainText('76.900');
-  await expect(page.locator('.dashboard-columns .dash-panel').nth(0)).toContainText(
-    'Cuenta secundaria',
-  );
+  const accountsPanel = page.locator('.dashboard-columns .dash-panel').first();
+  await expect(
+    accountsPanel.locator('.list-row').filter({ hasText: 'Cuenta principal' }).locator('strong'),
+  ).toHaveText(/\$\s*76\.800,00/);
+  await expect(
+    accountsPanel.locator('.list-row').filter({ hasText: 'Cuenta secundaria' }).locator('strong'),
+  ).toHaveText(/\$\s*100,00/);
   await expect(page.locator('.summary-card.debt').first()).toContainText('80.000');
   const output = resolve(process.cwd(), '../work');
   await mkdir(output, { recursive: true });

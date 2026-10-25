@@ -135,11 +135,13 @@ export class FinanceSharing extends FinanceActions implements OnChanges {
       !(await this.runMutation(
         () => this.api.saveRule(group.id, this.period, request),
         'Reparto mensual guardado.',
+        async () => {
+          await this.refreshOverview();
+          await this.loadReceivables();
+        },
       ))
     )
       return;
-    await this.refreshOverview();
-    await this.loadReceivables();
   }
 
   async confirmRule(): Promise<void> {
@@ -149,11 +151,13 @@ export class FinanceSharing extends FinanceActions implements OnChanges {
       !(await this.runMutation(
         () => this.api.confirmRule(group.id, this.period, { version: group.rule!.version }),
         'Reparto del mes confirmado.',
+        async () => {
+          await this.refreshOverview();
+          await this.loadReceivables();
+        },
       ))
     )
       return;
-    await this.refreshOverview();
-    await this.loadReceivables();
   }
 
   chooseReceivable(row: Receivable): void {
