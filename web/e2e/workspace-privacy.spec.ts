@@ -374,6 +374,7 @@ test('mobile workspace header stays readable and in bounds at 360 and 390 px', a
         return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom, width: rect.width, height: rect.height };
       };
       const titleBlock = header.querySelector<HTMLElement>(':scope > div:first-child')!;
+      const eyebrow = titleBlock.querySelector<HTMLElement>('.eyebrow')!;
       const workspace = header.querySelector<HTMLSelectElement>('.workspace-picker select')!;
       const period = header.querySelector<HTMLInputElement>('.period-picker input')!;
       return {
@@ -381,6 +382,8 @@ test('mobile workspace header stays readable and in bounds at 360 and 390 px', a
         documentWidth: document.documentElement.scrollWidth,
         titleBlock: box(titleBlock),
         title: box(titleBlock.querySelector('h1')!),
+        titleFont: Number.parseFloat(getComputedStyle(titleBlock.querySelector('h1')!).fontSize),
+        eyebrow: box(eyebrow),
         workspace: box(workspace),
         workspaceFont: Number.parseFloat(getComputedStyle(workspace).fontSize),
         period: box(period),
@@ -388,7 +391,9 @@ test('mobile workspace header stays readable and in bounds at 360 and 390 px', a
     });
     expect(geometry.documentWidth, JSON.stringify(geometry)).toBeLessThanOrEqual(width);
     expect(geometry.titleBlock.width, JSON.stringify(geometry)).toBeGreaterThanOrEqual(width - 48);
-    expect(geometry.title.width, JSON.stringify(geometry)).toBeGreaterThan(0);
+    expect(geometry.title.width, JSON.stringify(geometry)).toBeGreaterThanOrEqual(width - 48);
+    expect(geometry.titleFont, JSON.stringify(geometry)).toBeGreaterThanOrEqual(20);
+    expect(geometry.eyebrow.width, JSON.stringify(geometry)).toBeGreaterThanOrEqual(width - 48);
     expect(geometry.titleBlock.bottom, JSON.stringify(geometry)).toBeLessThanOrEqual(geometry.workspace.top);
     expect(geometry.workspace.bottom, JSON.stringify(geometry)).toBeLessThanOrEqual(geometry.period.top);
     expect(geometry.workspace.height, JSON.stringify(geometry)).toBeGreaterThanOrEqual(44);
