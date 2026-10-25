@@ -272,6 +272,13 @@ public sealed class ProjectionService(AppDbContext db, BusinessClock clock, Savi
         return (original with { Currencies = currencies, Rows = sorted, Alerts = alerts.ToArray() }, 200, null);
     }
 
+    public async Task<IReadOnlyList<ProjectionRowDto>> GetScenarioSourceRowsAsync(WorkspaceRequestContext context, CancellationToken ct)
+    {
+        var through = clock.Today.AddMonths(36);
+        var (result, _, _) = await CalculateAsync(context, through, [], null, ct);
+        return result?.Rows ?? [];
+    }
+
     private static string? ValidateAssumption(ProjectionAssumptionInput input, DateOnly today, DateOnly through)
     {
         if (input.Id == Guid.Empty || input.Description is null || input.Description.Trim().Length > 500) return "El supuesto no es válido.";

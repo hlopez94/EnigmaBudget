@@ -11,7 +11,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace EnigmaBudget.Api.Projection;
 
-public sealed class ProjectionScenarioService(AppDbContext db, WorkspaceMutationGate gate, WorkspaceAccessService access, TimeProvider timeProvider)
+public sealed class ProjectionScenarioService(AppDbContext db, WorkspaceMutationGate gate, WorkspaceAccessService access, TimeProvider timeProvider, ProjectionService projectionService)
 {
     private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
@@ -21,8 +21,10 @@ public sealed class ProjectionScenarioService(AppDbContext db, WorkspaceMutation
         var scenarios = await db.ProjectionScenarios.AsNoTracking().Where(x => x.WorkspaceId == context.Workspace.Id && x.ActorUserId == actorId && !x.IsDeleted)
             .OrderBy(x => x.Name).ThenBy(x => x.Id).ToArrayAsync(ct);
         var ids = scenarios.Select(x => x.Id).ToArray();
+        if (scenarios.Length == 0) return [];
         var assumptions = await db.ProjectionAssumptions.AsNoTracking().Where(x => x.WorkspaceId == context.Workspace.Id && ids.Contains(x.ScenarioId)).OrderBy(x => x.Id).ToArrayAsync(ct);
-        return scenarios.Select(x => ToDto(x, assumptions.Where(a => a.ScenarioId == x.Id))).ToArray();
+        var visible = await ResolveVisibleAssumptionsAsync(context, assumptions, ct);
+        return scenarios.Select(x => ToDto(x, visible.Where(a => a.ScenarioId == x.Id).Select(a => ToInput(a)))).ToArray();
     }
 
     public async Task<IReadOnlyList<ProjectionAssumptionInput>?> GetAssumptionsAsync(WorkspaceRequestContext context, Guid id, CancellationToken ct)
@@ -30,7 +32,7 @@ public sealed class ProjectionScenarioService(AppDbContext db, WorkspaceMutation
         var scenario = await db.ProjectionScenarios.AsNoTracking().SingleOrDefaultAsync(x => x.WorkspaceId == context.Workspace.Id && x.Id == id && x.ActorUserId == context.User.Id && !x.IsDeleted, ct);
         if (scenario is null) return null;
         var assumptions = await db.ProjectionAssumptions.AsNoTracking().Where(x => x.WorkspaceId == context.Workspace.Id && x.ScenarioId == id).OrderBy(x => x.Id).ToArrayAsync(ct);
-        return assumptions.Select(ToInput).ToArray();
+        return (await ResolveVisibleAssumptionsAsync(context, assumptions, ct)).Select(ToInput).ToArray();
     }
 
     public async Task<(ProjectionScenarioDto? Result, int Status, string? Error)> CreateAsync(WorkspaceRequestContext context,
@@ -49,7 +51,7 @@ public sealed class ProjectionScenarioService(AppDbContext db, WorkspaceMutation
             {
                 if (command.CommandKind != "ProjectionScenarioCreate" || command.PayloadHash != hash) return (null, 409, "El identificador del escenario ya se usó con otros datos.");
                 var replay = await FindOwned(context.Workspace.Id, fresh.User.Id, request.Id, ct);
-                return replay is null ? (null, 409, "El escenario ya no está disponible.") : (await ToDtoAsync(replay, ct), 200, null);
+                return replay is null ? (null, 409, "El escenario ya no está disponible.") : (await ToDtoAsync(replay, fresh, ct), 200, null);
             }
             var collision = await db.ProjectionScenarios.AnyAsync(x => x.WorkspaceId == context.Workspace.Id && x.Id == request.Id, ct);
             if (collision) return (null, 404, "El escenario no está disponible.");
@@ -60,7 +62,7 @@ public sealed class ProjectionScenarioService(AppDbContext db, WorkspaceMutation
             lease.MarkChanged();
             try { await db.SaveChangesAsync(ct); await lease.CommitAsync(ct); }
             catch (DbUpdateException) { db.ChangeTracker.Clear(); return (null, 409, "El escenario ya existe o hubo un cambio concurrente."); }
-            return (await ToDtoAsync(scenario, ct), 200, null);
+            return (await ToDtoAsync(scenario, fresh, ct), 200, null);
         }
     }
 
@@ -80,7 +82,7 @@ public sealed class ProjectionScenarioService(AppDbContext db, WorkspaceMutation
             {
                 if (command.CommandKind != "ProjectionScenarioUpdate" || command.PayloadHash != hash) return (null, 409, "El identificador de solicitud ya se usó con otros datos.");
                 var replay = await FindOwned(context.Workspace.Id, fresh.User.Id, command.ResultResourceId, ct);
-                return replay is null ? (null, 409, "El escenario ya no está disponible.") : (await ToDtoAsync(replay, ct), 200, null);
+                return replay is null ? (null, 409, "El escenario ya no está disponible.") : (await ToDtoAsync(replay, fresh, ct), 200, null);
             }
             var scenario = await FindOwned(context.Workspace.Id, fresh.User.Id, id, ct);
             if (scenario is null) return (null, 404, "El escenario no existe en este espacio.");
@@ -109,7 +111,7 @@ public sealed class ProjectionScenarioService(AppDbContext db, WorkspaceMutation
             lease.MarkChanged();
             try { await db.SaveChangesAsync(ct); await lease.CommitAsync(ct); }
             catch (DbUpdateException) { return (null, 409, "El escenario cambió. Actualizá la pantalla antes de guardar."); }
-            return (await ToDtoAsync(scenario, ct), 200, null);
+            return (await ToDtoAsync(scenario, fresh, ct), 200, null);
         }
     }
 
@@ -175,13 +177,49 @@ public sealed class ProjectionScenarioService(AppDbContext db, WorkspaceMutation
         new() { WorkspaceId = workspaceId, RequestId = requestId, CommandKind = kind, PayloadHash = hash, ResultResourceId = result, OccurredAt = timeProvider.GetUtcNow() };
     private Task<SavingsCommand?> FindCommand(Guid ws, Guid requestId, CancellationToken ct) => db.SavingsCommands.AsNoTracking().SingleOrDefaultAsync(x => x.WorkspaceId == ws && x.RequestId == requestId, ct);
     private Task<ProjectionScenario?> FindOwned(Guid ws, Guid actor, Guid id, CancellationToken ct) => db.ProjectionScenarios.SingleOrDefaultAsync(x => x.WorkspaceId == ws && x.ActorUserId == actor && x.Id == id && !x.IsDeleted, ct);
-    private async Task<ProjectionScenarioDto> ToDtoAsync(ProjectionScenario scenario, CancellationToken ct)
+    private async Task<ProjectionScenarioDto> ToDtoAsync(ProjectionScenario scenario, WorkspaceRequestContext context, CancellationToken ct)
     {
         var assumptions = await db.ProjectionAssumptions.AsNoTracking().Where(x => x.WorkspaceId == scenario.WorkspaceId && x.ScenarioId == scenario.Id).OrderBy(x => x.Id).ToArrayAsync(ct);
-        return ToDto(scenario, assumptions);
+        var visible = await ResolveVisibleAssumptionsAsync(context, assumptions, ct);
+        return ToDto(scenario, visible.Select(ToInput));
     }
-    private static ProjectionScenarioDto ToDto(ProjectionScenario scenario, IEnumerable<ProjectionAssumption> assumptions) =>
-        new(scenario.Id, scenario.Name, scenario.Version, assumptions.Select(ToInput).ToArray());
+
+    private async Task<ProjectionAssumption[]> ResolveVisibleAssumptionsAsync(WorkspaceRequestContext context,
+        IReadOnlyList<ProjectionAssumption> assumptions, CancellationToken ct)
+    {
+        var selectors = assumptions.Where(x => x.SourceId is not null || x.SourceKind is not null || x.ComponentId is not null).ToArray();
+        if (selectors.Length == 0) return assumptions.ToArray();
+        HashSet<Guid> groupInstallmentIds = [];
+        if (!context.Permissions.Contains(WorkspacePermissions.ReadGroups))
+        {
+            groupInstallmentIds = (await db.Installments.AsNoTracking().Where(x => x.WorkspaceId == context.Workspace.Id && x.GroupId != null)
+                .Select(x => x.Id).ToArrayAsync(ct)).ToHashSet();
+        }
+        var visibleRows = await projectionService.GetScenarioSourceRowsAsync(context, ct);
+        var visible = new List<ProjectionAssumption>(assumptions.Count);
+        foreach (var assumption in assumptions)
+        {
+            if (assumption.SourceId is null && assumption.SourceKind is null && assumption.ComponentId is null
+                && (assumption.Kind is "Income" or "Expense"))
+            {
+                visible.Add(assumption);
+                continue;
+            }
+            if (assumption.SourceId is not { } sourceId || assumption.Kind is not ("AmountChange" or "DateChange")) continue;
+            if (!context.Permissions.Contains(WorkspacePermissions.ReadGroups)
+                && (assumption.SourceKind == "GroupReceivable"
+                    || assumption.SourceKind is null && groupInstallmentIds.Contains(sourceId))) continue;
+            var matches = visibleRows.Where(x => x.SourceId == sourceId
+                && (assumption.SourceKind is null || x.SourceKind == assumption.SourceKind)
+                && (assumption.ComponentId is null || x.ComponentId == assumption.ComponentId)
+                && (assumption.Kind != "AmountChange" || x.Currency == assumption.Currency)).Take(2).ToArray();
+            if (matches.Length == 1) visible.Add(assumption);
+        }
+        return visible.ToArray();
+    }
+
+    private static ProjectionScenarioDto ToDto(ProjectionScenario scenario, IEnumerable<ProjectionAssumptionInput> assumptions) =>
+        new(scenario.Id, scenario.Name, scenario.Version, assumptions.ToArray());
     private static ProjectionAssumptionInput ToInput(ProjectionAssumption x) => new(x.Id, x.Kind, x.Date?.ToString("yyyy-MM-dd", Inv), x.Currency,
         x.Amount?.ToString("0.00", Inv), x.Description, x.SourceId, x.SourceKind, x.ComponentId);
 }

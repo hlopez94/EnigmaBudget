@@ -5,6 +5,7 @@ using EnigmaBudget.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using EnigmaBudget.Api.Workspaces;
+using EnigmaBudget.Api.Savings;
 
 namespace EnigmaBudget.Api.Tests;
 
@@ -244,6 +245,151 @@ public sealed class ProjectionScenarioIntegrationTests : IDisposable
         Assert.Equal(HttpStatusCode.NoContent, (await client.SendAsync(delete)).StatusCode);
         Assert.Empty(await client.GetFromJsonAsync<JsonElement[]>("/api/projection/scenarios") ?? []);
     }
+
+    [Fact]
+    public async Task shared_personal_reader_scenario_list_hides_historical_group_selectors_but_keeps_manual_assumptions()
+    {
+        using var factory = new ApiFactory(timeProvider: new FixedTimeProvider(TestInstant));
+        using var owner = VerifiedClient(factory, "scenario-privacy-owner", "owner@example.test");
+        using var reader = VerifiedClient(factory, "scenario-privacy-reader", "reader@example.test");
+        await AddCsrfAsync(owner);
+        await AddCsrfAsync(reader);
+        var personal = Assert.Single(await owner.GetFromJsonAsync<JsonElement[]>("/api/workspaces") ?? []);
+        var personalId = personal.GetProperty("id").GetGuid();
+        owner.DefaultRequestHeaders.Add("X-Workspace-Id", personalId.ToString());
+        var personalAccountId = Guid.NewGuid(); var personalOperationId = Guid.NewGuid();
+        Assert.Equal(HttpStatusCode.OK, (await owner.PostAsJsonAsync("/api/accounts", new { id = personalAccountId, name = "Cuenta privada", bankName = "Banco", currency = "ARS", openingBalance = "100.00", openingDate = "2026-10-25" })).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await owner.PostAsJsonAsync("/api/operations", new { id = personalOperationId, kind = "Expense", accountId = personalAccountId, date = "2026-10-26", description = "Compra personal visible", category = "Hogar", amount = "25.00", paid = false })).StatusCode);
+
+        var groupId = Guid.NewGuid(); var selfId = Guid.NewGuid(); var participantId = Guid.NewGuid();
+        Assert.Equal(HttpStatusCode.OK, (await owner.PostAsJsonAsync("/api/groups", new { id = groupId, name = "Grupo privado histórico", participants = new[] {
+            new { id = selfId, name = "Titular", isSelf = true }, new { id = participantId, name = "Persona no visible", isSelf = false } } })).StatusCode);
+        var cardId = Guid.NewGuid();
+        Assert.Equal(HttpStatusCode.OK, (await owner.PostAsJsonAsync("/api/cards", new { id = cardId, name = "Visa", bankName = "Banco", closingDay = 10, dueDay = 20,
+            statementDebtArs = "0.00", statementDebtUsd = "0.00", asOfDate = "2026-10-01" })).StatusCode);
+        var purchase = await owner.PostAsJsonAsync("/api/purchases", new { id = Guid.NewGuid(), cardId, date = "2026-10-02", description = "Compra", category = "Viaje",
+            currency = "ARS", totalAmount = "200.00", installmentCount = 1, firstPeriod = "2026-11", groupId });
+        Assert.Equal(HttpStatusCode.OK, purchase.StatusCode);
+        using var purchaseDoc = JsonDocument.Parse(await purchase.Content.ReadAsStringAsync());
+        var installmentId = purchaseDoc.RootElement.GetProperty("installments")[0].GetProperty("id").GetGuid();
+
+        var household = await CreateHouseholdAsync(owner);
+        var invitation = await CreateInvitationAsync(owner, household.Id, "reader@example.test");
+        Assert.Equal(HttpStatusCode.OK, (await PostTokenAsync(reader, TokenFrom(invitation.ShareUrl))).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await owner.PutAsJsonAsync($"/api/personal-sharing/{household.Id}", new { version = 1, enabled = true })).StatusCode);
+        var sharedPersonal = Assert.Single(await reader.GetFromJsonAsync<JsonElement[]>("/api/workspaces") ?? [], x => x.GetProperty("id").GetGuid() == personalId);
+        Assert.True(sharedPersonal.GetProperty("isSharedPersonalRead").GetBoolean());
+        reader.DefaultRequestHeaders.Add("X-Workspace-Id", personalId.ToString());
+
+        var readerId = await UserIdAsync(factory, "scenario-privacy-reader");
+        var scenarioId = Guid.NewGuid();
+        var hiddenAssumptionId = Guid.NewGuid();
+        var hiddenNullKindAssumptionId = Guid.NewGuid();
+        var manualAssumptionId = Guid.NewGuid();
+        await using (var db = Db(factory))
+        {
+            db.ProjectionScenarios.Add(new ProjectionScenario { Id = scenarioId, WorkspaceId = personalId, ActorUserId = readerId, Name = "Notas propias", Version = 3 });
+            db.ProjectionAssumptions.Add(new ProjectionAssumption { Id = hiddenAssumptionId, WorkspaceId = personalId, ScenarioId = scenarioId,
+                Kind = "AmountChange", Currency = "ARS", Amount = 17.50m, Description = "Importe para Persona no visible", SourceId = installmentId,
+                SourceKind = "GroupReceivable", ComponentId = $"Participant:{participantId}", Version = 2 });
+            db.ProjectionAssumptions.Add(new ProjectionAssumption { Id = hiddenNullKindAssumptionId, WorkspaceId = personalId, ScenarioId = scenarioId,
+                Kind = "AmountChange", Currency = "ARS", Amount = 11.00m, Description = "Importe oculto sin tipo", SourceId = installmentId,
+                ComponentId = $"Participant:{participantId}", Version = 1 });
+            db.ProjectionAssumptions.Add(new ProjectionAssumption { Id = Guid.NewGuid(), WorkspaceId = personalId, ScenarioId = scenarioId,
+                Kind = "AmountChange", Currency = "ARS", Amount = 1.25m, Description = "Ajuste de compra personal", SourceId = personalOperationId,
+                SourceKind = "FinanceOperation", Version = 1 });
+            db.ProjectionAssumptions.Add(new ProjectionAssumption { Id = manualAssumptionId, WorkspaceId = personalId, ScenarioId = scenarioId,
+                Kind = "Income", Date = DateOnly.FromDateTime(TestInstant.UtcDateTime).AddDays(1), Currency = "ARS", Amount = 15.00m,
+                Description = "Ingreso manual", Version = 1 });
+            await db.SaveChangesAsync();
+        }
+
+        using var response = await reader.GetAsync("/api/projection/scenarios");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.DoesNotContain(groupId.ToString(), body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(installmentId.ToString(), body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(participantId.ToString(), body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(hiddenAssumptionId.ToString(), body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(hiddenNullKindAssumptionId.ToString(), body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Persona no visible", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("Importe para", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("17.50", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("Importe oculto sin tipo", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("11.00", body, StringComparison.Ordinal);
+        using var list = JsonDocument.Parse(body);
+        var saved = Assert.Single(list.RootElement.EnumerateArray(), x => x.GetProperty("id").GetGuid() == scenarioId);
+        Assert.Equal("Notas propias", saved.GetProperty("name").GetString());
+        var retained = saved.GetProperty("assumptions").EnumerateArray().ToArray();
+        Assert.Equal(2, retained.Length);
+        var manual = Assert.Single(retained, x => x.GetProperty("id").GetGuid() == manualAssumptionId);
+        Assert.Equal("Ingreso manual", manual.GetProperty("description").GetString());
+        var personalChange = Assert.Single(retained, x => x.GetProperty("sourceId").ValueKind == JsonValueKind.String && x.GetProperty("sourceId").GetGuid() == personalOperationId);
+        Assert.Equal("Ajuste de compra personal", personalChange.GetProperty("description").GetString());
+
+        using var calculate = await reader.PostAsJsonAsync("/api/projection/calculate", new { through = "2026-10-28", scenario = "Estimated", savedScenarioId = scenarioId, assumptions = Array.Empty<object>() });
+        Assert.Equal(HttpStatusCode.OK, calculate.StatusCode);
+        using var projection = JsonDocument.Parse(await calculate.Content.ReadAsStringAsync());
+        Assert.Contains(projection.RootElement.GetProperty("rows").EnumerateArray(), x => x.GetProperty("description").GetString() == "Ingreso manual");
+        Assert.Equal("26.25", Assert.Single(projection.RootElement.GetProperty("rows").EnumerateArray(), x => x.GetProperty("sourceId").GetGuid() == personalOperationId).GetProperty("amount").GetString());
+        Assert.DoesNotContain(projection.RootElement.GetProperty("rows").EnumerateArray(), x => x.GetProperty("sourceKind").GetString() == "GroupReceivable");
+        await using var verify = Db(factory);
+        Assert.Equal(4, await verify.ProjectionAssumptions.CountAsync(x => x.WorkspaceId == personalId && x.ScenarioId == scenarioId));
+    }
+
+    private static HttpClient VerifiedClient(ApiFactory factory, string subject, string email)
+    {
+        var client = factory.IdentityClient(subject);
+        client.DefaultRequestHeaders.Add("X-Test-Email", email);
+        client.DefaultRequestHeaders.Add("X-Test-Email-Verified", "true");
+        return client;
+    }
+
+    private static async Task AddCsrfAsync(HttpClient client)
+    {
+        if (client.DefaultRequestHeaders.Contains("X-CSRF-TOKEN")) return;
+        using var response = await client.GetAsync("/api/auth/session");
+        response.EnsureSuccessStatusCode();
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        client.DefaultRequestHeaders.Add("X-CSRF-TOKEN", document.RootElement.GetProperty("csrfToken").GetString());
+    }
+
+    private static async Task<HttpResponseMessage> PostTokenAsync(HttpClient client, string token)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/invitations/accept") { Content = JsonContent.Create(new { token }) };
+        request.Headers.Add("X-CSRF-TOKEN", client.DefaultRequestHeaders.GetValues("X-CSRF-TOKEN").Single());
+        return await client.SendAsync(request);
+    }
+
+    private static async Task<(Guid Id, string ShareUrl)> CreateHouseholdAsync(HttpClient client)
+    {
+        using var response = await client.PostAsJsonAsync("/api/workspaces", new { id = Guid.NewGuid(), kind = "Household", name = "Hogar de prueba" });
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        return (document.RootElement.GetProperty("id").GetGuid(), "");
+    }
+
+    private static async Task<(Guid Id, string ShareUrl)> CreateInvitationAsync(HttpClient owner, Guid householdId, string email)
+    {
+        using var response = await owner.PostAsJsonAsync($"/api/workspaces/{householdId}/invitations", new { id = Guid.NewGuid(), email, role = "Reader" });
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        return (document.RootElement.GetProperty("id").GetGuid(), document.RootElement.GetProperty("shareUrl").GetString()!);
+    }
+
+    private static string TokenFrom(string shareUrl)
+    {
+        var fragment = new Uri(new Uri("https://localhost"), shareUrl).Fragment;
+        return Uri.UnescapeDataString(fragment.TrimStart('#').Split('=', 2).Last());
+    }
+
+    private static async Task<Guid> UserIdAsync(ApiFactory factory, string subject)
+    {
+        await using var db = Db(factory);
+        return await db.ApplicationUsers.Where(x => x.Subject == subject).Select(x => x.Id).SingleAsync();
+    }
+
+    private static AppDbContext Db(ApiFactory factory) => new(new DbContextOptionsBuilder<AppDbContext>().UseNpgsql(factory.TestConnection).Options);
 
     private async Task<(Guid GroupId, Guid SelfId, Guid GuestId, Guid? OtherGuestId, Guid InstallmentId, Guid AccountId)> CreateSharedPurchaseAsync(HttpClient client, bool extraGuest = false)
     {
