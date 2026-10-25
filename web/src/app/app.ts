@@ -98,7 +98,7 @@ export class App implements OnInit, OnDestroy {
         if (!(await this.nativeAuth.prepareForegroundRestore(previousUserId))) return;
         if (generation !== this.loadGeneration) return;
         expectedEpoch = this.authEpoch?.snapshot() ?? null;
-        this.clearPrivateUi();
+        this.clearPrivateUi(true);
       }
       const session = await this.api.session();
       if (generation !== this.loadGeneration) return;
@@ -130,7 +130,7 @@ export class App implements OnInit, OnDestroy {
         this.state = state;
         this.financeAvailable = true;
       } else {
-        this.clearPrivateUi();
+        this.clearPrivateUi(true);
         this.session = session;
       }
     } catch (error) {
@@ -152,7 +152,7 @@ export class App implements OnInit, OnDestroy {
   }
   clearPrivateUiFromSignIn(): void {
     ++this.loadGeneration;
-    this.clearPrivateUi();
+    this.clearPrivateUi(!this.session?.authenticated);
     this.session = null;
     this.busy = true;
     this.error = '';
@@ -283,17 +283,17 @@ export class App implements OnInit, OnDestroy {
     return current?.epoch === expected.epoch && current.userId === expected.userId && current.workspaceId === expected.workspaceId;
   }
 
-  private clearPrivateUi(): void {
+  private clearPrivateUi(preserveInvitation = false): void {
     this.nativeLinks.setAuthenticated(false);
     this.workspaceContext.clear();
     this.api.clearWorkspace();
-    this.api.clearPendingInvitation();
+    if (!preserveInvitation) this.api.clearPendingInvitation();
     this.state = null;
     this.activeWorkspace = null;
     this.workspaces = [];
     this.currentUserId = '';
     this.personalWorkspaceId = '';
-    this.pendingInviteToken = null;
+    if (!preserveInvitation) this.pendingInviteToken = null;
     this.financeAvailable = false;
     this.showSetup = false;
   }

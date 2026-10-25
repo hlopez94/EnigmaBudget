@@ -158,12 +158,15 @@ describe('application startup', () => {
     app.currentUserId = 'user-a';
     app.workspaces = userAWorkspaces;
     app.activeWorkspace = userAWorkspaces[0] as never;
+    app.pendingInviteToken = 'identity-bound-invite';
 
     const oldReload = app.reloadWorkspaces();
     epoch.advance('user-b', null);
     app.clearPrivateUiFromSignIn();
     expect(app.currentUserId).toBe('');
     expect(app.workspaces).toEqual([]);
+    expect(app.pendingInviteToken).toBeNull();
+    expect(api.clearPendingInvitation).toHaveBeenCalledOnce();
     finishUserAList([{ id: 'space-a-stale' } as never]);
     await oldReload;
 
@@ -213,5 +216,44 @@ describe('application startup', () => {
     expect(context.workspaceId).toBe('space-b');
     expect(api.selectWorkspace).toHaveBeenLastCalledWith('space-b');
     expect(epoch.snapshot()).toMatchObject({ userId: 'user-a', workspaceId: 'space-b' });
+  });
+
+  it('preserves an invitation across anonymous bootstrap and sign-in, then clears it on explicit logout', async () => {
+    const anonymous: SessionInfo = { authenticated: false, displayName: null, googleConfigured: false, developmentLoginEnabled: true, developmentUsers: [], csrfToken: '' };
+    const authenticated: SessionInfo = { authenticated: true, displayName: 'Bob', googleConfigured: false, developmentLoginEnabled: true, developmentUsers: [], csrfToken: 'csrf' };
+    let pendingInvite: string | null = 'invite-token';
+    const api = {
+      capturePendingInvitation: vi.fn(() => pendingInvite),
+      clearPendingInvitation: vi.fn(() => { pendingInvite = null; }),
+      clearWorkspace: vi.fn(),
+      session: vi.fn().mockResolvedValueOnce(anonymous).mockResolvedValueOnce(authenticated).mockResolvedValue(anonymous),
+      me: vi.fn().mockResolvedValue({ id: 'user-bob', displayName: 'Bob', email: null, emailVerified: false, personalWorkspaceId: 'personal-bob' }),
+      workspaces: vi.fn().mockResolvedValue([{ id: 'personal-bob' }]),
+      selectWorkspace: vi.fn(),
+      loadOnboarding: vi.fn().mockResolvedValue({ version: 2, completed: true, accounts: [], cards: [] }),
+      logout: vi.fn(async (clearLocal: () => void) => { clearLocal(); return true; }),
+    };
+    const app = new App(api as unknown as ApiService, { markForCheck: vi.fn() } as never, new WorkspaceContext());
+    app.captureInviteLink();
+
+    await app.load();
+    expect(app.session?.authenticated).toBe(false);
+    expect(app.pendingInviteToken).toBe('invite-token');
+    expect(pendingInvite).toBe('invite-token');
+    expect(api.clearPendingInvitation).not.toHaveBeenCalled();
+
+    app.clearPrivateUiFromSignIn();
+    expect(app.pendingInviteToken).toBe('invite-token');
+    expect(api.clearPendingInvitation).not.toHaveBeenCalled();
+
+    await app.load();
+    expect(app.session?.authenticated).toBe(true);
+    expect(app.pendingInviteToken).toBe('invite-token');
+    expect(pendingInvite).toBe('invite-token');
+
+    await app.logout();
+    expect(app.pendingInviteToken).toBeNull();
+    expect(pendingInvite).toBeNull();
+    expect(api.clearPendingInvitation).toHaveBeenCalledOnce();
   });
 });
