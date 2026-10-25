@@ -54,10 +54,11 @@
 
 ## Task 3: Space selection and household/privacy management UI
 
-**Files:** Extend core models/ApiService, root session/context state and finance shell; create focused workspace picker/members/invites/personal-sharing components using mobile dialog pattern. Integrate permission inputs in existing feature actions; add frontend behavior tests.
+**Files:** Extend core models/ApiService, root session/context state and finance shell; create focused workspace picker/members/invites/personal-sharing components using mobile dialog pattern. Integrate permission inputs in existing feature actions; add frontend behavior tests. Small additive API metadata handoff: WorkspaceDto ownerDisplayName and its authorized list/detail serialization, with a focused API regression; no other backend behavior in this UI task.
 
 **Interfaces:** Consume docs/api/espacios.md unchanged. Selection stored per tab/user as preference, never finance data; header applied at dispatch only to financial calls. Auth/onboarding/me/workspace management use their explicit server scope. Permissions/data/context updated together.
 
+- [ ] Add ownerDisplayName metadata to authorized workspace DTOs/list/detail so multiple default-named shared Personals can be identified without exposing subject/email; focused test verifies the correct owner and denial before consent.
 - [ ] Build mobile-safe space picker and context label, Household creation/list/members/invitations/roles/leave/transfer as permitted, copy-once invite link and signed-in acceptance workflow with verified-recipient errors. Keep tokens out of URL query/server logs; preserve pending link across Google login without external messaging.
 - [ ] Add personal consent UI with private default, revocation and explanation of copies already seen/exported. Reader contexts show no write forms/buttons; existing financial methods still server-protected.
 - [ ] Handle switch with pending draft confirmation/cancel, dispose old-context forms/cache, and reject stale responses captured for another context. Logout clears context/private memory. Add deferred response tests and authenticated context/permissions interactions.

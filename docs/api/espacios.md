@@ -6,9 +6,11 @@ Contrato del próximo bloque; no declara estos endpoints ya disponibles. JSON ca
 
 X-Workspace-Id selecciona un espacio y nunca autoriza por sí mismo. Sin cabecera se usa el Personal propio; inválida/ajena404, permiso insuficiente403, versión obsoleta409. No se vuelve al Personal silenciosamente. Onboarding permanece siempre en el Personal propio, independientemente de esa cabecera.
 
-WorkspaceDto: `{id,name,kind:'Personal'|'Household',role:'Owner'|'Admin'|'Member'|'Reader',isSharedPersonalRead,isArchived,version,permissions:{read,readGroups,recordFinance,manageResources,correctHistory,manageMembers,managePrivacy}}`.
+WorkspaceDto: `{id,name,ownerDisplayName:null|string,kind:'Personal'|'Household',role:'Owner'|'Admin'|'Member'|'Reader',isSharedPersonalRead,isArchived,version,permissions:{read,readGroups,recordFinance,manageResources,correctHistory,manageMembers,managePrivacy}}`.
 
 GET /api/me: `{id,displayName,email:null|string,emailVerified,personalWorkspaceId}`. El subject interno no se toma del cliente ni se fusiona por email.
+
+ownerDisplayName identifica al titular autorizado para distinguir varios Personales compartidos con el mismo nombre; no expone subject ni correo. Se devuelve solo junto a un espacio que el solicitante puede consultar.
 
 GET /api/workspaces devuelve Personal propio, Hogares activos/accesibles y Personales con concesión válida de lectura. POST /api/workspaces: `{id,kind:'Household',name}` crea Hogar y Owner de forma atómica; no compra una suscripción ni crea nuevos Personales arbitrarios. Reintento idéntico del id devuelve el mismo recurso; datos distintos409.
 
