@@ -35,6 +35,14 @@ Cada mutación de catálogo persiste un `CatalogCommand` por workspace/RequestId
 
 API y consultas derivan el workspace del contexto resuelto por `FinanceWorkspaceFilter`. `read` consulta; `manageResources` administra catálogo/presupuesto; `recordFinance` conserva su uso para registrar movimientos. PersonalReadGrant sigue siendo read-only. Mutaciones requieren CSRF, GUID idempotente, comparar payload al reintentar (igual devuelve el mismo resultado, distinto devuelve 409), y versión en edición. Montos son cadenas decimales en API y `numeric(18,2)` en PostgreSQL. Copy en español. La UI debe distinguir gasto registrado y compromiso de tarjeta y enlazar sus orígenes.
 
+## Selección estructurada y compatibilidad
+
+Las nuevas escrituras guardan el nombre de categoría, comercio y fuente como snapshot histórico. Los campos nuevos de nombre de comercio/fuente son nulos para filas anteriores; no se infieren desde la descripción. El cliente nuevo usa selectores activos; puede crear una fuente de ingreso desde la carga si tiene permiso de administrar recursos, conservando el borrador ante un fallo.
+
+Los registros de operación/compra mantienen la comparación de sus campos financieros originales para reintentos. Un fingerprint nullable `CatalogSelectionHash` distingue las selecciones explícitas de IDs de las llamadas heredadas sin IDs, incluso después del backfill. No se agrega una tabla genérica de comandos financieros. El reintento exige permiso vigente, compara la selección original antes de consultar disponibilidad/nombres actuales y no vuelve a escribir snapshots; IDs distintos generan 409. El texto heredado sin coincidencia activa se conserva y se vincula al fallback protegido del tipo, sin crear categorías. Las fuentes son solo para ingresos.
+
+La resolución y escritura comparten el bloqueo transaccional del workspace usado al editar/archivar catálogos. La compra conserva aislamiento Serializable mediante el gate compartido, sin transacciones anidadas; las fórmulas de caja y cuotas no cambian.
+
 ## Criterios y decisiones abiertas
 
 - Historial conserva texto, ID de operación, montos y fechas; ninguna fuente/comercio se deduce automáticamente.

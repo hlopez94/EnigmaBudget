@@ -85,14 +85,22 @@
 ### Task 3: Attach catalog IDs to operations and purchases
 
 **Files:**
-- Modify: `src/EnigmaBudget.Api/Finance/Contracts.cs`, `CashService.cs`, `CardService.cs`, `FinanceQueries.cs`
-- Modify: `web/src/app/core/api.models.ts`, `api.service.ts`, `web/src/app/finance/operations.ts`, `operations.html`
+- Modify: `src/EnigmaBudget.Api/Finance/Contracts.cs`, `CashService.cs`, `CardService.cs`, `FinanceQueries.cs`, `FinanceEntities.cs`, `Data/AppDbContext.cs`, `Workspaces/WorkspaceMutationGate.cs`
+- Create: focused `Finance/CatalogSelectionResolver.cs`; additive EF migration/designer/model snapshot for historical merchant/source names and request-selection fingerprint
+- Modify: `web/src/app/core/api.models.ts`, `api.service.ts`, `web/src/app/finance/operations.ts`, `operations.html`, `cards.ts`, `cards.html`
 - Test: `tests/EnigmaBudget.Api.Tests/FinanceCatalogIntegrationTests.cs`, `web/src/app/finance/finance.spec.ts`
 
 **Interfaces:**
 - Add optional `CategoryId`, `MerchantId`, and `IncomeSourceId` to `OperationCreate`; category and merchant IDs to `PurchaseCreate`; category ID to adjustment input. Keep existing category string and expose additive ID/display-snapshot fields on read DTOs. `OperationCreate.AccountId` is currently required (`Guid`), and `OperationDto.AccountId` is also required; this plan does not make either nullable.
 - Validate each foreign key within selected workspace. Category kind must match operation kind; income source is allowed only on Income. Backend writes catalog snapshot from resolved workspace row. The new UI requires a category for a new income/expense and source for income; legacy callers may still send category text, resolved only by exact workspace match.
 - Renaming any catalog value does not alter `FinanceOperation`, `CardPurchase`, or adjustment snapshots.
+
+- Add nullable `FinanceOperation.MerchantNameSnapshot`, `IncomeSourceNameSnapshot`, and `CardPurchase.MerchantNameSnapshot`; old rows stay null. Add nullable `CatalogSelectionHash` on operations/purchases, SHA256 over the canonical tuple of raw optional selected IDs, populated only when any ID was supplied. Legacy requests and old rows have null fingerprint, even after backfill resolves their category ID. This distinguishes legacy input from explicit selection without replacing existing finance-field replay comparisons or creating a generic finance command store.
+- Replay first rechecks current `recordFinance` inside the workspace gate, then compares original financial fields and selection fingerprint before resolving current catalog availability/name. If CategoryId was supplied its stored snapshot replaces unused legacy category text for comparison; when absent compare the original trimmed category string. Changed IDs conflict, identical requests survive rename/archive. Null additions preserve legacy replay semantics.
+- New explicit IDs must be selected-workspace, correct kind and active (foreign 404, wrong kind 400, archived 409). Legacy category text matches exact active type/name; unknown/blank uses protected typed default while retaining its original trimmed text and never creating catalog rows. Income source is only valid on Income; old callers may omit it.
+- Resolve fresh catalog snapshots and save finance rows inside the same workspace mutation lock as catalog CRUD. Extend the existing gate with an optional transaction isolation parameter (default ReadCommitted, existing callers unchanged); CreatePurchase requests Serializable and removes its nested transaction. Acquire before catalog lookup and fresh permission/replay checks; preserve existing ledger/installment/payment calculations and lock ordering. MarkChanged/SaveChanges/Commit on successful mutation; read/replay rolls back the no-write lease. Preserve persistence conflict behavior.
+- New operation, purchase and statement-adjustment forms use active typed category selectors; optional merchants and required new-UI income source. An initially empty source list offers an inline manageResources-only creation action (name and allowed source kind), preserving the movement draft/request on error; users without manageResources receive an explanation to ask an administrator. Do not fabricate a source or weaken server permission. Reuse existing action-dialog/scoped visual styles and context-change guards; no new shell/redesign.
+
 
 - [ ] **Step 1: Write failing tests/specs** `operation_category_and_source_ids_match_workspace_and_kind`, `purchase_merchant_and_category_snapshot_survive_rename`, `legacy_string_resolves_without_fuzzy_match`, `income_source_is_only_valid_for_income`, `structured_selector_preserves_draft_on_failure`, and `archived_catalog_item_is_not_offered_for_new_entry`.
 - [ ] **Step 2: Check RAM; run filtered .NET tests then focused finance Vitest sequentially via wrappers.** Expected RED: request DTOs and form selectors lack IDs.
