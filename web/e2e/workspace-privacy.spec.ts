@@ -298,9 +298,9 @@ test('real Alice, Bob and Reader contexts enforce Household scope, personal cons
 
   await alice.getByLabel('Cambiar espacio').first().selectOption({ label: 'Mi espacio Personal' });
   await openSpaces(alice);
-  await expect(alice.getByRole('button', { name: 'Compartir con integrantes actuales' })).toBeVisible();
+  await expect(sharingRow.getByRole('button', { name: 'Compartir con integrantes actuales' })).toBeVisible();
   const restoredConsent = waitForApi(alice, 'PUT', `/api/personal-sharing/${household.id}`);
-  await alice.getByRole('button', { name: 'Compartir con integrantes actuales' }).click();
+  await sharingRow.getByRole('button', { name: 'Compartir con integrantes actuales' }).click();
   expect((await restoredConsent).status()).toBe(200);
   const readerPersonalRestored = await reader.evaluate(async (workspaceId) => fetch('/api/finance?period=2026-10', { headers: { 'X-Workspace-Id': workspaceId } }).then(response => response.status), sharedPersonal.workspaceId);
   expect(readerPersonalRestored).toBe(200);
