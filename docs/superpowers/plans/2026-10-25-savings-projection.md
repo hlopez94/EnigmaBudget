@@ -130,7 +130,7 @@
 - Create: `src/EnigmaBudget.Api/ExchangeRates/ExchangeRateEntities.cs`
 - Create: `src/EnigmaBudget.Api/ExchangeRates/ExchangeRateService.cs`
 - Create: `src/EnigmaBudget.Api/ExchangeRates/ExchangeRateContracts.cs`
-- Modify: `src/EnigmaBudget.Api/Savings/SavingsEntities.cs`, `src/EnigmaBudget.Api/Savings/SavingsContracts.cs`
+- Modify: `src/EnigmaBudget.Api/Savings/SavingsService.cs`; reuse `GoalRateChoiceDto` already declared in `SavingsContracts.cs`. New choice entity and request are in the ExchangeRates entities/contracts above.
 - Modify: `src/EnigmaBudget.Api/Program.cs`, `src/EnigmaBudget.Api/Data/AppDbContext.cs`
 - Create: `src/EnigmaBudget.Api/Data/Migrations/<timestamp>_ExchangeRateSnapshots.cs`
 - Modify: `src/EnigmaBudget.Api/Workspaces/FinanceWorkspaceFilter.cs`
