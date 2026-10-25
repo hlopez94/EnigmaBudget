@@ -9,7 +9,7 @@ import { FinanceOperations } from './operations';
 import { FinanceSharing } from './sharing';
 
 describe('finance workspace regressions', () => {
-  it('reaches accounts from Más without changing the selected period or section drafts', async () => {
+  it('navigates from Más to accounts without changing the selected period', async () => {
     const shell = new (await import('./finance-shell')).FinanceShell(
       { financeOverview: vi.fn() } as unknown as ApiService,
       { markForCheck: vi.fn() } as unknown as import('@angular/core').ChangeDetectorRef,
@@ -22,7 +22,7 @@ describe('finance workspace regressions', () => {
     expect(shell.period).toBe('2026-11');
   });
 
-  it('opens and dismisses the account creation action without clearing its draft', () => {
+  it('clears the active account action without clearing its draft', () => {
     const accounts = new FinanceAccounts(
       {} as ApiService,
       { markForCheck: vi.fn() } as unknown as import('@angular/core').ChangeDetectorRef,
@@ -201,8 +201,13 @@ describe('finance workspace regressions', () => {
     expect(shell.overview?.period).toBe('2026-11');
   });
 
-  it('keeps the real account form unchanged after a server conflict', async () => {
-    const api = { createAccount: vi.fn().mockRejectedValue(new Error('Versión desactualizada')) };
+  it('keeps an open account action and reuses its request ID after a failed save', async () => {
+    const api = {
+      createAccount: vi
+        .fn()
+        .mockRejectedValueOnce(new Error('Versión desactualizada'))
+        .mockResolvedValue({ id: 'account-created' }),
+    };
     const refresh = vi.fn().mockResolvedValue(undefined);
     const accounts = new FinanceAccounts(
       api as unknown as ApiService,
@@ -217,15 +222,31 @@ describe('finance workspace regressions', () => {
       openingBalance: '15200,40',
       openingDate: '2026-10-24',
     };
+    accounts.openForm('create');
 
     await accounts.saveAccount();
 
-    expect(accounts.accountDraft.name).toBe('Caja ahorro');
+    expect(accounts.activeForm).toBe('create');
+    expect(accounts.accountDraft).toEqual({
+      name: 'Caja ahorro',
+      bankName: 'Banco',
+      currency: 'ARS',
+      openingBalance: '15200,40',
+      openingDate: '2026-10-24',
+    });
     expect(accounts.error).toBe('Versión desactualizada');
     expect(refresh).not.toHaveBeenCalled();
     expect(api.createAccount).toHaveBeenCalledWith(
       expect.objectContaining({ openingBalance: '15200.40' }),
     );
+
+    const firstRequestId = api.createAccount.mock.calls[0][0].id;
+    await accounts.saveAccount();
+
+    expect(api.createAccount.mock.calls[1][0].id).toBe(firstRequestId);
+    expect(accounts.activeForm).toBe('');
+    expect(accounts.accountDraft.name).toBe('');
+    expect(refresh).toHaveBeenCalledOnce();
   });
 
   it('blocks duplicate submissions from the actual movement section while an API save is pending', async () => {
