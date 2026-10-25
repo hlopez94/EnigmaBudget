@@ -183,7 +183,7 @@
 - Create: `src/EnigmaBudget.Api/Projection/ProjectionScenarioService.cs`
 - Create: `src/EnigmaBudget.Api/Finance/ReceivableProjectionQuery.cs`
 - Modify: `src/EnigmaBudget.Api/Finance/SharingService.cs`
-- Modify: `src/EnigmaBudget.Api/Projection/ProjectionService.cs`, `ProjectionEndpoints.cs`
+- Modify: `src/EnigmaBudget.Api/Projection/ProjectionService.cs` (also contains the existing `MapProjectionEndpoints` route mappings), `src/EnigmaBudget.Api/Finance/FinanceQueries.cs` (existing overview consumer of shared receivables)
 - Test: `tests/EnigmaBudget.Api.Tests/ProjectionScenarioIntegrationTests.cs`, `WorkspaceAuthorizationTests.cs`, `SharingIntegrationTests.cs`
 
 **Interfaces:**
