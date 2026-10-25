@@ -20,7 +20,7 @@ Estado inicial auditado el 25/10/2026: rama `codex/rebuild-net10-angular22`, bas
 | Chanchitos/ahorros | Pendiente | Reservas respaldadas por cuentas, aportes/retiros, metas/fecha estimada, sin doble reserva ni gasto ficticio |
 | Proyección/disponibilidad | Pendiente | Calendario único de obligaciones/cobros, escenarios, reservas, saldo mínimo y explicación sin sumar deuda+resumen |
 | DolarAPI | Pendiente | Consulta real, tipo/compra/venta/fecha visibles, caché y errores; sin cambiar importes históricos ni mezclar monedas |
-| Tenants y RBAC | Solo espacio personal aislado por identidad | Personal/Hogar con hasta cuatro, roles, permisos de API, membresías e invitaciones |
+| Tenants y RBAC | Núcleo de API implementado y revisado: Personal/Hogar, usuarios/membresías, roles, selección autorizada, auditoría y cambios de integrantes coordinados. Migración probada con historial previo; suite completa de 54 pruebas antes del último ajuste y 10 focalizadas después (`73162f6`). Aún sin interfaz ni invitaciones. | Invitaciones con límite atómico de cuatro plazas, privacidad opt-in, selector y gestión visibles, aceptación real con varios usuarios y publicación local |
 | Privacidad personal | Aislamiento personal existente; compartir pendiente | Consentimiento opcional revocable; hogar/grupo no concede acceso privado implícito |
 | Hogar/caja común | Pendiente | Aportes, adelantos, presupuesto/reparto mensual, cierre/arrastre y trazabilidad entre cuentas |
 | Grupos independientes | Base manual de tarjeta; colaboración pendiente | Independientes del hogar, beneficiarios y pagadores, deudas por moneda, liquidación y reclamo de historial con confirmación |
