@@ -9,6 +9,7 @@ import { FinanceOperations } from './operations';
 import { FinanceSharing } from './sharing';
 import { FinanceSavings } from '../savings/savings';
 import { FinanceProjection } from '../projection/projection';
+import { FinanceCatalogScreen } from './catalog';
 import { FinanceShell } from './finance-shell';
 
 class TestFinanceOperations extends FinanceOperations {
@@ -18,11 +19,11 @@ class TestFinanceOperations extends FinanceOperations {
 }
 
 describe('finance workspace regressions', () => {
-  it('offers savings, projection, and exchange from Más while keeping the workspace name visible', () => {
+  it('offers catalog, income sources, budgets, savings, projection, and exchange from Más while keeping the workspace name visible', () => {
     const shell = new FinanceShell({} as ApiService, { markForCheck: vi.fn() } as never);
     shell.activeWorkspace = { id: 'space-1', name: 'Casa de la costa' } as never;
     expect(shell.workspaceLabel(shell.activeWorkspace as never)).toContain('Casa de la costa');
-    expect(shell.moreLinks.map((item: { label: string }) => item.label)).toEqual(expect.arrayContaining(['Ahorros', 'Proyección', 'Cotizaciones']));
+    expect(shell.moreLinks.map((item: { label: string }) => item.label)).toEqual(expect.arrayContaining(['Categorías y comercios', 'Fuentes de ingresos', 'Presupuesto', 'Ahorros', 'Proyección', 'Cotizaciones']));
   });
 
   it('keeps goal records first and preserves drafts and retry identity after a failed allocation', async () => {
@@ -213,6 +214,23 @@ describe('finance workspace regressions', () => {
     shell.navigateMore('accounts');
     expect(shell.section).toBe('accounts');
     expect(shell.period).toBe('2026-11');
+  });
+
+  it('confirms draft discard before opening monthly budgets from Más', async () => {
+    const shell = new FinanceShell({ selectWorkspace: vi.fn() } as unknown as ApiService, { markForCheck: vi.fn() } as never);
+    const catalog = new FinanceCatalogScreen({} as ApiService, { markForCheck: vi.fn() } as never);
+    catalog.newName = 'Por revisar';
+    shell.catalogComponents = { toArray: () => [catalog] } as never;
+
+    shell.navigateMore('budgets');
+    expect(shell.requestedWorkspaceId).toBe('@section:budgets');
+    expect(shell.section).toBe('home');
+    shell.cancelWorkspaceChange();
+    expect(catalog.newName).toBe('Por revisar');
+    shell.navigateMore('budgets');
+    shell.confirmWorkspaceChange();
+    expect(shell.section).toBe('budgets');
+    expect(catalog.newName).toBe('');
   });
 
   it('clears the active account action without clearing its draft', () => {

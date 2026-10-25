@@ -75,7 +75,7 @@
               @if (permissions?.manageResources && !workspaceArchived) {
                 <div class="form-grid source-create">
                   <p class="helper">Todavía no hay fuentes de ingreso. Creá una para continuar con este movimiento.</p>
-                  <label>Nombre de la fuente<input name="sourceCreateName" [(ngModel)]="sourceCreateName" required maxlength="120" [disabled]="saving" /></label>
+                  <label>Nombre de la fuente<input name="sourceCreateName" [(ngModel)]="sourceCreateName" required maxlength="80" [disabled]="saving" /></label>
                   <label>Tipo<select name="sourceCreateKind" [(ngModel)]="sourceCreateKind" [disabled]="saving"><option value="Salary">Sueldo</option><option value="Extra">Ingreso extra</option><option value="AnnualBonus">Bono anual</option><option value="IndependentWork">Trabajo independiente</option><option value="Other">Otro</option></select></label>
                   <button type="button" class="secondary" (click)="createSourceFromMovement()" [disabled]="saving">Crear fuente y continuar</button>
                 </div>

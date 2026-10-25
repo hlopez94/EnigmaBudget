@@ -277,6 +277,15 @@ export interface FinanceCatalog {
   merchants: FinanceMerchantOption[];
   incomeSources: FinanceIncomeSourceOption[];
 }
+export type FinanceCatalogResource = 'categories' | 'merchants' | 'income-sources';
+export interface FinanceCatalogCreate { id: string; name: string; kind?: OperationKind | FinanceIncomeSourceOption['kind']; }
+export interface FinanceCatalogUpdate { requestId: string; version: number; name: string; kind?: OperationKind | FinanceIncomeSourceOption['kind']; }
+export interface FinanceCatalogArchive { requestId: string; version: number; }
+export interface MonthlyBudgetSource { sourceKind: 'Operation' | 'Installment' | 'StatementAdjustment'; sourceId: string; componentId: string | null; date: string | null; description: string; categorySnapshot: string; amount: string; }
+export interface MonthlyBudgetRow { categoryId: string; categoryName: string; currency: Currency; budgetId: string | null; version: number | null; isConfigured: boolean; limitAmount: string | null; spentAmount: string; committedCardAmount: string; remainingAmount: string | null; sources: MonthlyBudgetSource[]; }
+export interface MonthlyBudgetDefinition { id: string; period: string; categoryId: string; currency: Currency; limitAmount: string; version: number; }
+export interface MonthlyBudgetCreate { id: string; period: string; categoryId: string; currency: Currency; limitAmount: string; }
+export interface MonthlyBudgetUpdate { requestId: string; version: number; limitAmount: string; }
 export interface FinanceOverview {
   period: string;
   accounts: Account[];
@@ -288,6 +297,8 @@ export interface FinanceOverview {
   budget: {
     cashExpensesArs: string;
     cashExpensesUsd: string;
+    operationExpensesArs: string;
+    operationExpensesUsd: string;
     cardInstallmentsArs: string;
     cardInstallmentsUsd: string;
     cardChargesArs: string;

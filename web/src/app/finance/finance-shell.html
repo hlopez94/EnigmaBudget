@@ -22,6 +22,12 @@
                           ? 'Proyección'
                           : section === 'exchange'
                             ? 'Cotizaciones'
+                            : section === 'catalog'
+                              ? 'Categorías y comercios'
+                              : section === 'sources'
+                                ? 'Fuentes de ingresos'
+                                : section === 'budgets'
+                                  ? 'Presupuesto'
                       : 'Más'
         }}
       </h1>
@@ -67,7 +73,7 @@
     </button>
     @if (canReadGroups) { <button type="button" [class.active]="section === 'sharing'" (click)="navigate('sharing')">Compartidos</button> }
     <button type="button" [class.active]="section === 'spaces'" (click)="navigate('spaces')">Espacios</button>
-    <button type="button" [class.active]="section === 'more' || section === 'accounts' || section === 'savings' || section === 'projection' || section === 'exchange'" (click)="navigate('more')">Más</button>
+    <button type="button" [class.active]="section === 'more' || section === 'accounts' || section === 'savings' || section === 'projection' || section === 'exchange' || section === 'catalog' || section === 'sources' || section === 'budgets'" (click)="navigate('more')">Más</button>
   </nav>
   <nav class="mobile-navigation" aria-label="Navegación principal">
     <button type="button" [class.active]="section === 'home'" (click)="navigate('home')">
@@ -90,7 +96,7 @@
     }
     <button
       type="button"
-      [class.active]="section === 'more' || section === 'accounts' || section === 'spaces' || section === 'savings' || section === 'projection' || section === 'exchange'"
+      [class.active]="section === 'more' || section === 'accounts' || section === 'spaces' || section === 'savings' || section === 'projection' || section === 'exchange' || section === 'catalog' || section === 'sources' || section === 'budgets'"
       (click)="navigate('more')"
     >
       <i class="pi pi-ellipsis-h" aria-hidden="true"></i><small>Más</small>
@@ -268,8 +274,9 @@
               </details>
             }
             <details class="month-details">
-              <summary>Otros gastos y cargos del mes</summary>
-              <div class="month-cost"><span>Gastos en efectivo · ARS</span><b>{{ money(overview.budget.cashExpensesArs, 'ARS') }}</b></div>
+              <summary>Consumo y cargos del mes</summary>
+              <div class="month-cost"><span>Consumo registrado · ARS</span><b>{{ money(overview.budget.operationExpensesArs, 'ARS') }}</b></div>
+              <div class="month-cost"><span>Consumo registrado · USD</span><b>{{ money(overview.budget.operationExpensesUsd, 'USD') }}</b></div>
               <div class="month-cost"><span>Cargos confirmados · ARS</span><b>{{ money(overview.budget.cardChargesArs, 'ARS') }}</b></div>
               <div class="month-cost"><span>Cargos confirmados · USD</span><b>{{ money(overview.budget.cardChargesUsd, 'USD') }}</b></div>
             </details>
@@ -374,12 +381,18 @@
         [workspaceName]="activeWorkspace?.name || name"
       />
     } @placeholder { @if (section === 'exchange') { <div class="loading" aria-live="polite">Abriendo cotizaciones…</div> } }
+    @defer (when section === 'catalog' || section === 'sources') {
+      <app-catalog [hidden]="section !== 'catalog' && section !== 'sources'" [view]="section === 'sources' ? 'sources' : 'catalog'" [workspaceId]="activeWorkspace?.id ?? null" [contextGeneration]="workspaceGeneration" [permissions]="permissions || null" [workspaceArchived]="!!activeWorkspace?.isArchived" />
+    } @placeholder { @if (section === 'catalog' || section === 'sources') { <div class="loading" aria-live="polite">Abriendo catálogo…</div> } }
+    @defer (when section === 'budgets') {
+      <app-budgets [hidden]="section !== 'budgets'" [workspaceId]="activeWorkspace?.id ?? null" [contextGeneration]="workspaceGeneration" [permissions]="permissions || null" [workspaceArchived]="!!activeWorkspace?.isArchived" [period]="appliedPeriod" />
+    } @placeholder { @if (section === 'budgets') { <div class="loading" aria-live="polite">Abriendo presupuesto…</div> } }
   }
   @if (requestedWorkspaceId) {
-    <app-action-dialog [title]="requestedWorkspaceId === 'setup' ? 'Abrir configuración inicial' : requestedWorkspaceId.startsWith('@section:') ? 'Cambiar de sección' : 'Cambiar de espacio'" [open]="true" (closed)="cancelWorkspaceChange()" [dismissible]="!saving">
+    <app-action-dialog [title]="requestedWorkspaceId === 'setup' ? 'Abrir configuración inicial' : requestedWorkspaceId.startsWith('@section:') ? 'Cambiar de sección' : requestedWorkspaceId.startsWith('@period:') ? 'Cambiar período' : 'Cambiar de espacio'" [open]="true" (closed)="cancelWorkspaceChange()" [dismissible]="!saving">
       <section class="panel switch-confirmation">
         <h3>Descartar los cambios pendientes</h3>
-        <p>Hay información ingresada en un formulario de este espacio. Si confirmás, se borrarán esos borradores y {{ requestedWorkspaceId === 'setup' ? 'se abrirá la configuración' : requestedWorkspaceId.startsWith('@section:') ? 'se abrirá la sección elegida' : 'se abrirá el espacio elegido' }}.</p>
+        <p>Hay información ingresada en un formulario de este espacio. Si confirmás, se borrarán esos borradores y {{ requestedWorkspaceId === 'setup' ? 'se abrirá la configuración' : requestedWorkspaceId.startsWith('@section:') ? 'se abrirá la sección elegida' : requestedWorkspaceId.startsWith('@period:') ? 'se consultará el período elegido' : 'se abrirá el espacio elegido' }}.</p>
         <div class="confirm-actions"><button type="button" class="secondary" (click)="cancelWorkspaceChange()">Seguir acá</button><button type="button" class="primary" (click)="confirmWorkspaceChange()" [disabled]="saving">{{ requestedWorkspaceId === 'setup' ? 'Descartar y abrir configuración' : 'Descartar y cambiar' }}</button></div>
       </section>
     </app-action-dialog>

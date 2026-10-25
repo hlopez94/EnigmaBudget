@@ -37,6 +37,7 @@ export abstract class FinanceActions implements OnChanges, OnDestroy {
   saving = false;
   error = '';
   notice = '';
+  protected lastFailure: unknown = null;
   private readonly idempotencyKeys = new Map<string, string>();
   private contextEpoch = 0;
   private destroyed = false;
@@ -114,6 +115,7 @@ export abstract class FinanceActions implements OnChanges, OnDestroy {
     this.saving = true;
     this.error = '';
     this.notice = '';
+    this.lastFailure = null;
     this.changeDetector.markForCheck();
     try {
       await mutation();
@@ -129,6 +131,7 @@ export abstract class FinanceActions implements OnChanges, OnDestroy {
       return this.isCurrentContext(contextEpoch);
     } catch (error) {
       if (!this.isCurrentContext(contextEpoch)) return false;
+      this.lastFailure = error;
       this.error = error instanceof Error ? error.message : 'No pudimos guardar los cambios.';
       return false;
     } finally {

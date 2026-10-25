@@ -38,6 +38,14 @@ import {
   ProjectionScenario,
   ProjectionScenarioDelete,
   ProjectionScenarioSave,
+  FinanceCatalogResource,
+  FinanceCatalogCreate,
+  FinanceCatalogUpdate,
+  FinanceCatalogArchive,
+  MonthlyBudgetCreate,
+  MonthlyBudgetRow,
+  MonthlyBudgetDefinition,
+  MonthlyBudgetUpdate,
 } from './api.models';
 
 export type Fetcher = typeof fetch;
@@ -231,6 +239,25 @@ export class ApiService {
   }
   createIncomeSource(input: Record<string, unknown>): Promise<FinanceIncomeSourceOption> {
     return this.financeMutate('/api/finance/catalog/income-sources', { method: 'POST', body: JSON.stringify(input) });
+  }
+  createCatalogItem(resource: FinanceCatalogResource, input: FinanceCatalogCreate): Promise<unknown> {
+    return this.financeMutate(`/api/finance/catalog/${resource}`, { method: 'POST', body: JSON.stringify(input) });
+  }
+  updateCatalogItem(resource: FinanceCatalogResource, id: string, input: FinanceCatalogUpdate): Promise<unknown> {
+    return this.financeMutate(`/api/finance/catalog/${resource}/${id}`, { method: 'PUT', body: JSON.stringify(input) });
+  }
+  archiveCatalogItem(resource: FinanceCatalogResource, id: string, input: FinanceCatalogArchive): Promise<unknown> {
+    return this.financeMutate(`/api/finance/catalog/${resource}/${id}`, { method: 'DELETE', body: JSON.stringify(input) });
+  }
+  budgets(period: string, currency: 'ARS' | 'USD'): Promise<MonthlyBudgetRow[]> {
+    const query = new URLSearchParams({ period, currency });
+    return this.financeRequest(`/api/budgets?${query}`);
+  }
+  createBudget(input: MonthlyBudgetCreate): Promise<MonthlyBudgetDefinition> {
+    return this.financeMutate('/api/budgets', { method: 'POST', body: JSON.stringify(input) });
+  }
+  updateBudget(id: string, input: MonthlyBudgetUpdate): Promise<MonthlyBudgetDefinition> {
+    return this.financeMutate(`/api/budgets/${id}`, { method: 'PUT', body: JSON.stringify(input) });
   }
   payOperation(id: string, input: Record<string, unknown>): Promise<Operation> {
     return this.financeMutate(`/api/operations/${id}/payments`, {
