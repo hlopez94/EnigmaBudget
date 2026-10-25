@@ -156,6 +156,58 @@ public sealed class WorkspaceManagementIntegrationTests
         Assert.Equal(2, await check.WorkspaceAuditEvents.CountAsync(x => x.WorkspaceId == workspace.Id && x.Action == "membership.role_changed"));
     }
 
+    [Fact]
+    public async Task Admin_demoted_while_waiting_for_household_lock_cannot_manage_members()
+    {
+        using var factory = new ApiFactory();
+        using var owner = factory.IdentityClient("lock-demotion-owner");
+        using var admin = factory.IdentityClient("lock-demotion-admin");
+        using var target = factory.IdentityClient("lock-demotion-target");
+        await AddCsrfAsync(owner);
+        await AddCsrfAsync(admin);
+        await target.GetAsync("/api/auth/session");
+        var created = await owner.PostAsJsonAsync("/api/workspaces", new { id = Guid.NewGuid(), kind = "Household", name = "Hogar democión" });
+        var workspace = (await created.Content.ReadFromJsonAsync<WorkspaceDto>())!;
+        Guid adminId;
+        Guid targetId;
+        await using (var setup = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>().UseNpgsql(factory.TestConnection).Options))
+        {
+            var adminUser = await setup.ApplicationUsers.SingleAsync(x => x.Subject == "lock-demotion-admin");
+            var targetUser = await setup.ApplicationUsers.SingleAsync(x => x.Subject == "lock-demotion-target");
+            adminId = adminUser.Id;
+            targetId = targetUser.Id;
+            setup.WorkspaceMemberships.AddRange(
+                new EnigmaBudget.Api.Workspaces.WorkspaceMembership { WorkspaceId = workspace.Id, UserId = adminId, Role = "Admin", JoinedAt = DateTimeOffset.UtcNow },
+                new EnigmaBudget.Api.Workspaces.WorkspaceMembership { WorkspaceId = workspace.Id, UserId = targetId, Role = "Member", JoinedAt = DateTimeOffset.UtcNow });
+            await setup.SaveChangesAsync();
+        }
+
+        await using var blocker = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>().UseNpgsql(factory.TestConnection).Options);
+        await using var transaction = await blocker.Database.BeginTransactionAsync();
+        await blocker.Workspaces.FromSqlInterpolated($"SELECT * FROM \"Workspaces\" WHERE \"Id\" = {workspace.Id} FOR UPDATE").SingleAsync();
+
+        var managementRequest = admin.PutAsJsonAsync($"/api/workspaces/{workspace.Id}/members/{targetId}", new { version = 1, role = "Reader" });
+        await WaitForWorkspaceLockWaitAsync(factory.TestConnection);
+        var adminMembership = await blocker.WorkspaceMemberships.SingleAsync(x => x.WorkspaceId == workspace.Id && x.UserId == adminId);
+        adminMembership.Role = "Reader";
+        adminMembership.Version++;
+        await blocker.SaveChangesAsync();
+        await transaction.CommitAsync();
+
+        using var response = await managementRequest;
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        await using var verify = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>().UseNpgsql(factory.TestConnection).Options);
+        Assert.Equal("Member", await verify.WorkspaceMemberships.Where(x => x.WorkspaceId == workspace.Id && x.UserId == targetId).Select(x => x.Role).SingleAsync());
+    }
+
+    private static async Task WaitForWorkspaceLockWaitAsync(string connectionString)
+    {
+        await using var observer = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>().UseNpgsql(connectionString).Options);
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        while (!await observer.Database.SqlQueryRaw<bool>("SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock' AND query LIKE '%FOR UPDATE%' AND pid <> pg_backend_pid()) AS \"Value\"").SingleAsync(timeout.Token))
+            await Task.Delay(20, timeout.Token);
+    }
+
     private static async Task AddCsrfAsync(HttpClient client)
     {
         var session = await client.GetFromJsonAsync<JsonElement>("/api/auth/session");

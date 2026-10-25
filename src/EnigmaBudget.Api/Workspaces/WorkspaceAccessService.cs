@@ -40,9 +40,12 @@ public sealed class WorkspaceAccessService(AppDbContext db, WorkspaceProvisioner
         var user = await db.ApplicationUsers.SingleOrDefaultAsync(x => x.Subject == CurrentIdentity.Subject(principal), cancellationToken);
         if (user is null) return (null, StatusCodes.Status404NotFound);
         var membership = await db.WorkspaceMemberships
-            .FirstOrDefaultAsync(x => x.WorkspaceId == workspace.Id && x.UserId == user.Id && x.Active, cancellationToken);
+            .AsNoTracking()
+            .Where(x => x.WorkspaceId == workspace.Id && x.UserId == user.Id && x.Active)
+            .Select(x => x.Role)
+            .SingleOrDefaultAsync(cancellationToken);
         if (membership is null) return (null, StatusCodes.Status404NotFound);
-        return ResolveMembership(user, workspace, membership.Role, requiredPermission, allowArchivedManagement);
+        return ResolveMembership(user, workspace, membership, requiredPermission, allowArchivedManagement);
     }
 
     private static (WorkspaceRequestContext? Context, int FailureStatus) ResolveMembership(
