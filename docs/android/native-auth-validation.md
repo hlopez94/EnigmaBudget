@@ -27,6 +27,16 @@ El build Angular conservó la advertencia existente de tamaño: **775,05 kB** in
 - `server.url` no está configurado. El host API quedó sin configurar en esta compilación; no se agregó un host de muestra.
 - Como no hay dominio configurado, el APK no contiene el filtro App Links. La prueba de manifiesto ejercitó una configuración de ejemplo solo dentro del test y no acredita asociación de dominio.
 
+## Actualización de interfaz y circuito de invitaciones
+
+Después de Task4 se corrigieron dos casos: conservar la invitación durante el ingreso y recuperar el espacio personal al salir del hogar seleccionado. El recorrido real de navegador reprodujo la pantalla vacía antes del arreglo y pasó después, incluyendo la nueva invitación y las revocaciones posteriores. También pasaron **91 pruebas de interfaz**, el build Angular, Capacitor sync y una compilación actualizada del APK.
+
+- Fuente del arreglo de reincorporación: `024192a`.
+- APK actualizado: **10 647 530 bytes**, SHA-256 `73ed4cfb88c54a3d498953df7f413d24510115ac70d0afdd4aa337245aa5ed4c`.
+- Bundle actualizado: **775,20 kB**, advertencia de **15,20 kB** sobre el presupuesto de 760 kB.
+- El índice de Angular coincide con el incluido en el APK: SHA-256 `7c88111bda2ab5b8d28ed9ea9ba551fee711999c2a02130cd971f08f52343f14`.
+- Esta actualización ejecutó un recorrido de navegador focalizado; las pruebas JVM y API de Task4 no se repitieron porque este arreglo solo modifica la interfaz. La evidencia original de Task4 se conserva arriba con su checksum correspondiente.
+
 ## Versiones seleccionadas
 
 - Node **24.22.0**, npm **11.19.1**
