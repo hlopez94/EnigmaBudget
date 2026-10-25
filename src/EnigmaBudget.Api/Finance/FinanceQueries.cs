@@ -13,14 +13,22 @@ public static partial class FinanceEndpoints
     private static async Task<IResult> FinanceOverview(
         HttpContext http,
         AppDbContext db,
+        BusinessClock clock,
         string? period = null
     )
     {
+        period ??= clock.CurrentPeriod;
         if (!MoneyRules.IsPeriod(period ?? ""))
             return Problem(400, "Período inválido.");
         var ws = await Workspace(db, Subject(http));
         var accounts = await db.Accounts.Where(x => x.WorkspaceId == ws.Id).ToArrayAsync();
-        var ledgerRows = await db.LedgerEntries.Where(x => x.WorkspaceId == ws.Id).ToArrayAsync();
+        var ledgerRows = await db.LedgerEntries.Where(x =>
+            x.WorkspaceId == ws.Id
+            && x.Date <= clock.Today
+            && db.Accounts.Any(a =>
+                a.WorkspaceId == ws.Id && a.Id == x.AccountId && x.Date >= a.OpeningDate
+            )
+        ).ToArrayAsync();
         var ledger = ledgerRows
             .GroupBy(x => x.AccountId)
             .ToDictionary(g => g.Key, g => g.Sum(x => x.Amount));
@@ -32,7 +40,7 @@ public static partial class FinanceEndpoints
                 x.Currency,
                 F(x.OpeningBalance),
                 x.OpeningDate.ToString("yyyy-MM-dd"),
-                F(x.OpeningBalance + (ledger.TryGetValue(x.Id, out var b) ? b : 0m)),
+                F((x.OpeningDate <= clock.Today ? x.OpeningBalance : 0m) + (ledger.TryGetValue(x.Id, out var b) ? b : 0m)),
                 x.IsArchived,
                 x.Version
             ))
@@ -60,7 +68,7 @@ public static partial class FinanceEndpoints
             cardDebtUsd = 0,
             cardCreditArs = 0,
             cardCreditUsd = 0;
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = clock.Today;
         foreach (var card in cards)
         {
             var installmentsForCard = await db

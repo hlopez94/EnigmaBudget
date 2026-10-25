@@ -19,6 +19,8 @@ var googleId = builder.Configuration["Authentication:Google:ClientId"];
 var googleSecret = builder.Configuration["Authentication:Google:ClientSecret"];
 var googleConfigured = !string.IsNullOrWhiteSpace(googleId) && !string.IsNullOrWhiteSpace(googleSecret);
 builder.Services.AddDbContext<AppDbContext>(o => o.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddSingleton<BusinessClock>();
 builder.Services.AddOptions<StorageOptions>().Bind(builder.Configuration.GetSection(StorageOptions.SectionName)).Validate(StorageOptions.IsValid, "S3 storage configuration must include a bucket and region, and use a valid HTTP(S) endpoint when configured.").ValidateOnStart();
 builder.Services.AddAntiforgery(o => { o.HeaderName = "X-CSRF-TOKEN"; o.Cookie.Name = "EnigmaBudget.Csrf"; o.Cookie.HttpOnly = true; o.Cookie.SecurePolicy = appDevelopmentLoginEnabled(builder) ? CookieSecurePolicy.SameAsRequest : CookieSecurePolicy.Always; o.Cookie.SameSite = SameSiteMode.Strict; });
 var auth = builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme).AddCookie(o =>

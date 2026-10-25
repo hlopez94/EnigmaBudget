@@ -100,11 +100,12 @@ public static partial class FinanceEndpoints
     private static async Task<IResult> GetGroups(
         HttpContext http,
         AppDbContext db,
+        BusinessClock clock,
         string? period = null
     )
     {
         var ws = await Workspace(db, Subject(http));
-        period ??= DateTime.UtcNow.ToString("yyyy-MM", Invariant);
+        period ??= clock.CurrentPeriod;
         var groups = await db.Groups.Where(x => x.WorkspaceId == ws.Id).ToArrayAsync();
         var result = new List<object>();
         foreach (var g in groups)
@@ -390,6 +391,7 @@ public static partial class FinanceEndpoints
         HttpContext http,
         AppDbContext db,
         IAntiforgery csrf,
+        BusinessClock clock,
         Guid groupId,
         CollectionCreate r
     )
@@ -408,7 +410,7 @@ public static partial class FinanceEndpoints
                 DateTimeStyles.None,
                 out var date
             )
-            || date > DateOnly.FromDateTime(DateTime.UtcNow)
+            || date > clock.Today
         )
             return Problem(400, "Revisá los datos del cobro.");
         var ws = await Workspace(db, Subject(http));

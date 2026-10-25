@@ -570,6 +570,7 @@ public static partial class FinanceEndpoints
         HttpContext http,
         AppDbContext db,
         IAntiforgery csrf,
+        BusinessClock clock,
         Guid cardId,
         CardPaymentCreate r
     )
@@ -589,7 +590,7 @@ public static partial class FinanceEndpoints
                 DateTimeStyles.None,
                 out var date
             )
-            || date > DateOnly.FromDateTime(DateTime.UtcNow)
+            || date > clock.Today
         )
             return Problem(400, "Revisá los datos del pago.");
 

@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.AspNetCore.Antiforgery;
@@ -281,11 +282,14 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
     private ApiFactory? _productionFactory;
     private readonly bool _relaxSecureCookiesForTests;
     private readonly string _environment;
+    private readonly TimeProvider? _timeProvider;
     public SaveChangesBarrierInterceptor SaveBarrier { get; } = new();
-    public ApiFactory(bool relaxSecureCookiesForTests = true, string environment = "Development")
+    internal string TestConnection => _connection;
+    public ApiFactory(bool relaxSecureCookiesForTests = true, string environment = "Development", TimeProvider? timeProvider = null)
     {
         _relaxSecureCookiesForTests = relaxSecureCookiesForTests;
         _environment = environment;
+        _timeProvider = timeProvider;
         var testConnection = Environment.GetEnvironmentVariable("ENIGMABUDGET_TEST_CONNECTION");
         if (string.IsNullOrWhiteSpace(testConnection)) throw new InvalidOperationException("Set ENIGMABUDGET_TEST_CONNECTION to an isolated PostgreSQL test database.");
         var b = new NpgsqlConnectionStringBuilder(testConnection);
@@ -297,6 +301,11 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
         builder.UseEnvironment(_environment);
         builder.ConfigureTestServices(services =>
         {
+            if (_timeProvider is not null)
+            {
+                services.RemoveAll<TimeProvider>();
+                services.AddSingleton(_timeProvider);
+            }
             services.AddSingleton(SaveBarrier);
             services.AddDbContext<AppDbContext>((serviceProvider, options) => options.AddInterceptors(serviceProvider.GetRequiredService<SaveChangesBarrierInterceptor>()));
             services.AddAuthentication(o => { o.DefaultAuthenticateScheme = "TestOrCookie"; o.DefaultChallengeScheme = "TestOrCookie"; }).AddPolicyScheme("TestOrCookie", "Test identity or cookie", o => o.ForwardDefaultSelector = context => context.Request.Headers.ContainsKey("X-Test-Identity") ? "TestIdentity" : CookieAuthenticationDefaults.AuthenticationScheme).AddScheme<AuthenticationSchemeOptions, TestIdentityHandler>("TestIdentity", _ => { });

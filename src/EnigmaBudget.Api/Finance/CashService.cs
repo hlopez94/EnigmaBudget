@@ -14,6 +14,7 @@ public static partial class FinanceEndpoints
         HttpContext http,
         AppDbContext db,
         IAntiforgery csrf,
+        BusinessClock clock,
         OperationCreate r
     )
     {
@@ -43,7 +44,7 @@ public static partial class FinanceEndpoints
             return Results.NotFound();
         if (account.IsArchived)
             return Problem(409, "La cuenta está archivada.");
-        if (r.Paid && (date > DateOnly.FromDateTime(DateTime.UtcNow) || date < account.OpeningDate))
+        if (r.Paid && (date > clock.Today || date < account.OpeningDate))
             return Problem(
                 400,
                 "La fecha de un movimiento confirmado debe estar entre el alta de la cuenta y hoy."
@@ -164,6 +165,7 @@ public static partial class FinanceEndpoints
         HttpContext http,
         AppDbContext db,
         IAntiforgery csrf,
+        BusinessClock clock,
         Guid id,
         PaymentCreate r
     )
@@ -180,7 +182,7 @@ public static partial class FinanceEndpoints
                 DateTimeStyles.None,
                 out var date
             )
-            || date > DateOnly.FromDateTime(DateTime.UtcNow)
+            || date > clock.Today
         )
             return Problem(400, "Revisá el importe y la fecha del pago.");
         var ws = await Workspace(db, Subject(http));
@@ -312,6 +314,7 @@ public static partial class FinanceEndpoints
         HttpContext http,
         AppDbContext db,
         IAntiforgery csrf,
+        BusinessClock clock,
         TransferCreate r
     )
     {
@@ -330,7 +333,7 @@ public static partial class FinanceEndpoints
                 DateTimeStyles.None,
                 out var date
             )
-            || date > DateOnly.FromDateTime(DateTime.UtcNow)
+            || date > clock.Today
         )
             return Problem(400, "Revisá los datos de la transferencia.");
         var ws = await Workspace(db, Subject(http));

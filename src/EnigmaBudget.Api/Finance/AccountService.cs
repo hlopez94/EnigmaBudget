@@ -10,11 +10,17 @@ namespace EnigmaBudget.Api.Finance;
 
 public static partial class FinanceEndpoints
 {
-    private static async Task<IResult> Accounts(HttpContext http, AppDbContext db)
+    private static async Task<IResult> Accounts(HttpContext http, AppDbContext db, BusinessClock clock)
     {
         var workspace = await Workspace(db, Subject(http));
         var entries = await db
-            .LedgerEntries.Where(x => x.WorkspaceId == workspace.Id)
+            .LedgerEntries.Where(x =>
+                x.WorkspaceId == workspace.Id
+                && x.Date <= clock.Today
+                && db.Accounts.Any(a =>
+                    a.WorkspaceId == workspace.Id && a.Id == x.AccountId && x.Date >= a.OpeningDate
+                )
+            )
             .GroupBy(x => x.AccountId)
             .Select(g => new { Id = g.Key, Total = g.Sum(x => x.Amount) })
             .ToDictionaryAsync(x => x.Id, x => x.Total);
@@ -32,7 +38,7 @@ public static partial class FinanceEndpoints
                     F(x.OpeningBalance),
                     x.OpeningDate.ToString("yyyy-MM-dd"),
                     F(
-                        x.OpeningBalance
+                        (x.OpeningDate <= clock.Today ? x.OpeningBalance : 0m)
                             + (entries.TryGetValue(x.Id, out var balance) ? balance : 0m)
                     ),
                     x.IsArchived,
@@ -46,6 +52,7 @@ public static partial class FinanceEndpoints
         HttpContext http,
         AppDbContext db,
         IAntiforgery csrf,
+        BusinessClock clock,
         AccountCreate r
     )
     {
@@ -76,7 +83,7 @@ public static partial class FinanceEndpoints
                 && existing.Currency == r.Currency
                 && existing.OpeningBalance == opening
                 && existing.OpeningDate == date
-                ? Results.Ok(await Account(db, existing))
+                ? Results.Ok(await Account(db, existing, clock))
                 : Problem(409, "El identificador ya está usado con otros datos.");
         var account = new BankAccount
         {
@@ -100,13 +107,14 @@ public static partial class FinanceEndpoints
             }
         );
         await db.SaveChangesAsync();
-        return Results.Ok(await Account(db, account));
+        return Results.Ok(await Account(db, account, clock));
     }
 
     private static async Task<IResult> UpdateAccount(
         HttpContext http,
         AppDbContext db,
         IAntiforgery csrf,
+        BusinessClock clock,
         Guid id,
         AccountUpdate r
     )
@@ -126,13 +134,14 @@ public static partial class FinanceEndpoints
         a.IsArchived = r.IsArchived;
         a.Version++;
         await db.SaveChangesAsync();
-        return Results.Ok(await Account(db, a));
+        return Results.Ok(await Account(db, a, clock));
     }
 
     private static async Task<IResult> AdjustAccount(
         HttpContext http,
         AppDbContext db,
         IAntiforgery csrf,
+        BusinessClock clock,
         Guid id,
         AccountAdjustmentCreate r
     )
@@ -150,7 +159,7 @@ public static partial class FinanceEndpoints
             )
             || string.IsNullOrWhiteSpace(r.Reason)
             || r.Reason.Length > 240
-            || date > DateOnly.FromDateTime(DateTime.UtcNow)
+            || date > clock.Today
         )
             return Problem(400, "Revisá los datos del ajuste.");
         var ws = await Workspace(db, Subject(http));
@@ -173,12 +182,15 @@ public static partial class FinanceEndpoints
                 && replay.Date == date
                 && replay.ObservedBalance == observed
                 && replay.Reason == r.Reason.Trim()
-                ? Results.Ok(await Account(db, account))
+                ? Results.Ok(await Account(db, account, clock))
                 : Problem(409, "El identificador del ajuste ya se usó con otros datos.");
         var prior =
             await db
                 .LedgerEntries.Where(x =>
-                    x.WorkspaceId == ws.Id && x.AccountId == id && x.Date <= date
+                    x.WorkspaceId == ws.Id
+                    && x.AccountId == id
+                    && x.Date >= account.OpeningDate
+                    && x.Date <= date
                 )
                 .SumAsync(x => (decimal?)x.Amount)
             ?? 0;
@@ -205,10 +217,10 @@ public static partial class FinanceEndpoints
             await transaction.RollbackAsync();
             return Problem(409, "La cuenta cambió durante el ajuste.");
         }
-        return Results.Ok(await Account(db, account));
+        return Results.Ok(await Account(db, account, clock));
     }
 
-    private static async Task<IResult> Cards(HttpContext http, AppDbContext db)
+    private static async Task<IResult> Cards(HttpContext http, AppDbContext db, BusinessClock clock)
     {
         var ws = await Workspace(db, Subject(http));
         var cards = await db
@@ -216,7 +228,7 @@ public static partial class FinanceEndpoints
             .OrderBy(x => x.Name)
             .ToArrayAsync();
         var output = new List<object>();
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = clock.Today;
         foreach (var card in cards)
         {
             var installments = await db
@@ -400,11 +412,11 @@ public static partial class FinanceEndpoints
         );
     }
 
-    private static async Task<object> Account(AppDbContext db, BankAccount a)
+    private static async Task<object> Account(AppDbContext db, BankAccount a, BusinessClock clock)
     {
         var delta =
             await db
-                .LedgerEntries.Where(x => x.AccountId == a.Id && x.WorkspaceId == a.WorkspaceId)
+                .LedgerEntries.Where(x => x.AccountId == a.Id && x.WorkspaceId == a.WorkspaceId && x.Date >= a.OpeningDate && x.Date <= clock.Today)
                 .SumAsync(x => (decimal?)x.Amount)
             ?? 0;
         return new AccountDto(
@@ -414,7 +426,7 @@ public static partial class FinanceEndpoints
             a.Currency,
             F(a.OpeningBalance),
             a.OpeningDate.ToString("yyyy-MM-dd"),
-            F(a.OpeningBalance + delta),
+            F((a.OpeningDate <= clock.Today ? a.OpeningBalance : 0m) + delta),
             a.IsArchived,
             a.Version
         );
