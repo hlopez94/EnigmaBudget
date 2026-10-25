@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using EnigmaBudget.Api.Workspaces;
 using EnigmaBudget.Api.Identity;
+using EnigmaBudget.Api.Savings;
 
 namespace EnigmaBudget.Api.Data;
 
@@ -155,6 +156,12 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<NativeAuthChallenge> NativeAuthChallenges => Set<NativeAuthChallenge>();
     public DbSet<NativeSession> NativeSessions => Set<NativeSession>();
     public DbSet<NativeRefreshToken> NativeRefreshTokens => Set<NativeRefreshToken>();
+    public DbSet<SavingsGoal> SavingsGoals => Set<SavingsGoal>();
+    public DbSet<SavingsAllocation> SavingsAllocations => Set<SavingsAllocation>();
+    public DbSet<SavingsMovement> SavingsMovements => Set<SavingsMovement>();
+    public DbSet<SavingsCommand> SavingsCommands => Set<SavingsCommand>();
+    public DbSet<ProjectionScenario> ProjectionScenarios => Set<ProjectionScenario>();
+    public DbSet<ProjectionAssumption> ProjectionAssumptions => Set<ProjectionAssumption>();
 
     protected override void OnModelCreating(ModelBuilder model)
     {
@@ -247,7 +254,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         model.Entity<FinanceOperation>().Property(x => x.Version).IsConcurrencyToken();
         model.Entity<FinanceOperation>().HasIndex(x => new { x.WorkspaceId, x.Id }).IsUnique();
         model.Entity<FinancePayment>().Property(x => x.Amount).HasPrecision(18, 2);
-        model.Entity<FinancePayment>().HasIndex(x => new { x.WorkspaceId, x.Id }).IsUnique();
+        model.Entity<FinancePayment>().HasAlternateKey(x => new { x.WorkspaceId, x.Id });
+        model.Entity<BankAccount>().HasAlternateKey(x => new { x.WorkspaceId, x.Id });
         model.Entity<LedgerEntry>().Property(x => x.Amount).HasPrecision(18, 2);
         model.Entity<LedgerEntry>().Property(x => x.ObservedBalance).HasPrecision(18, 2);
         model
@@ -310,5 +318,64 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             .HasOne(x => x.Draft)
             .WithOne(x => x.Workspace)
             .HasForeignKey<OnboardingDraft>(x => x.WorkspaceId);
+
+        model.Entity<SavingsGoal>().HasKey(x => x.Id);
+        model.Entity<SavingsGoal>().HasAlternateKey(x => new { x.WorkspaceId, x.Id });
+        model.Entity<SavingsGoal>().Property(x => x.Name).HasMaxLength(120);
+        model.Entity<SavingsGoal>().Property(x => x.TargetCurrency).HasMaxLength(3);
+        model.Entity<SavingsGoal>().Property(x => x.TargetAmount).HasPrecision(18, 2);
+        model.Entity<SavingsGoal>().Property(x => x.State).HasMaxLength(20);
+        model.Entity<SavingsGoal>().Property(x => x.MonthlyContribution).HasPrecision(18, 2);
+        model.Entity<SavingsGoal>().Property(x => x.Version).IsConcurrencyToken().HasDefaultValue(1);
+        model.Entity<SavingsGoal>().ToTable(table => table.HasCheckConstraint("CK_SavingsGoals_TargetAmount_Positive", "\"TargetAmount\" > 0"));
+        model.Entity<SavingsGoal>().HasOne<Workspace>().WithMany().HasForeignKey(x => x.WorkspaceId).OnDelete(DeleteBehavior.Cascade);
+
+        model.Entity<SavingsAllocation>().HasKey(x => x.Id);
+        model.Entity<SavingsAllocation>().HasAlternateKey(x => new { x.WorkspaceId, x.Id });
+        model.Entity<SavingsAllocation>().Property(x => x.Currency).HasMaxLength(3);
+        model.Entity<SavingsAllocation>().Property(x => x.ReservedAmount).HasPrecision(18, 2);
+        model.Entity<SavingsAllocation>().Property(x => x.Version).IsConcurrencyToken().HasDefaultValue(1);
+        model.Entity<SavingsAllocation>().ToTable(table => table.HasCheckConstraint("CK_SavingsAllocations_ReservedAmount_NonNegative", "\"ReservedAmount\" >= 0"));
+        model.Entity<SavingsAllocation>().HasOne<Workspace>().WithMany().HasForeignKey(x => x.WorkspaceId).OnDelete(DeleteBehavior.Cascade);
+        model.Entity<SavingsAllocation>().HasOne<SavingsGoal>().WithMany().HasForeignKey(x => new { x.WorkspaceId, x.GoalId }).HasPrincipalKey(x => new { x.WorkspaceId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+        model.Entity<SavingsAllocation>().HasOne<BankAccount>().WithMany().HasForeignKey(x => new { x.WorkspaceId, x.AccountId }).HasPrincipalKey(x => new { x.WorkspaceId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+
+        model.Entity<SavingsCommand>().HasKey(x => new { x.WorkspaceId, x.RequestId });
+        model.Entity<SavingsCommand>().Property(x => x.CommandKind).HasMaxLength(80);
+        model.Entity<SavingsCommand>().Property(x => x.PayloadHash).HasMaxLength(64);
+        model.Entity<SavingsCommand>().HasOne<Workspace>().WithMany().HasForeignKey(x => x.WorkspaceId).OnDelete(DeleteBehavior.Cascade);
+
+        model.Entity<SavingsMovement>().HasKey(x => x.Id);
+        model.Entity<SavingsMovement>().HasAlternateKey(x => new { x.WorkspaceId, x.Id });
+        model.Entity<SavingsMovement>().Property(x => x.Kind).HasMaxLength(20);
+        model.Entity<SavingsMovement>().Property(x => x.Currency).HasMaxLength(3);
+        model.Entity<SavingsMovement>().Property(x => x.Amount).HasPrecision(18, 2);
+        model.Entity<SavingsMovement>().Property(x => x.Version).HasDefaultValue(1);
+        model.Entity<SavingsMovement>().HasIndex(x => new { x.WorkspaceId, x.CommandId, x.AllocationId, x.Kind }).IsUnique().HasFilter("\"Kind\" <> 'Reversal'");
+        model.Entity<SavingsMovement>().HasIndex(x => new { x.WorkspaceId, x.ReversesMovementId }).IsUnique();
+        model.Entity<SavingsMovement>().ToTable(table => table.HasCheckConstraint("CK_SavingsMovements_Amount_Positive", "\"Amount\" > 0"));
+        model.Entity<SavingsMovement>().HasOne<Workspace>().WithMany().HasForeignKey(x => x.WorkspaceId).OnDelete(DeleteBehavior.Cascade);
+        model.Entity<SavingsMovement>().HasOne<SavingsAllocation>().WithMany().HasForeignKey(x => new { x.WorkspaceId, x.AllocationId }).HasPrincipalKey(x => new { x.WorkspaceId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+        model.Entity<SavingsMovement>().HasOne<SavingsCommand>().WithMany().HasForeignKey(x => new { x.WorkspaceId, x.CommandId }).HasPrincipalKey(x => new { x.WorkspaceId, x.RequestId }).OnDelete(DeleteBehavior.Restrict);
+        model.Entity<SavingsMovement>().HasOne<FinancePayment>().WithMany().HasForeignKey(x => new { x.WorkspaceId, x.FinancePaymentId }).HasPrincipalKey(x => new { x.WorkspaceId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+        model.Entity<SavingsMovement>().HasOne<SavingsMovement>().WithMany().HasForeignKey(x => new { x.WorkspaceId, x.ReversesMovementId }).HasPrincipalKey(x => new { x.WorkspaceId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+        model.Entity<SavingsMovement>().HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.ActorUserId).OnDelete(DeleteBehavior.Restrict);
+
+        model.Entity<ProjectionScenario>().HasKey(x => x.Id);
+        model.Entity<ProjectionScenario>().HasAlternateKey(x => new { x.WorkspaceId, x.Id });
+        model.Entity<ProjectionScenario>().Property(x => x.Name).HasMaxLength(120);
+        model.Entity<ProjectionScenario>().Property(x => x.Version).IsConcurrencyToken().HasDefaultValue(1);
+        model.Entity<ProjectionScenario>().Property(x => x.IsDeleted).HasDefaultValue(false);
+        model.Entity<ProjectionScenario>().HasOne<Workspace>().WithMany().HasForeignKey(x => x.WorkspaceId).OnDelete(DeleteBehavior.Cascade);
+        model.Entity<ProjectionScenario>().HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.ActorUserId).OnDelete(DeleteBehavior.Restrict);
+
+        model.Entity<ProjectionAssumption>().HasKey(x => x.Id);
+        model.Entity<ProjectionAssumption>().Property(x => x.Kind).HasMaxLength(40);
+        model.Entity<ProjectionAssumption>().Property(x => x.Currency).HasMaxLength(3);
+        model.Entity<ProjectionAssumption>().Property(x => x.Amount).HasPrecision(18, 2);
+        model.Entity<ProjectionAssumption>().Property(x => x.Description).HasMaxLength(500);
+        model.Entity<ProjectionAssumption>().Property(x => x.Version).IsConcurrencyToken().HasDefaultValue(1);
+        model.Entity<ProjectionAssumption>().HasOne<Workspace>().WithMany().HasForeignKey(x => x.WorkspaceId).OnDelete(DeleteBehavior.Cascade);
+        model.Entity<ProjectionAssumption>().HasOne<ProjectionScenario>().WithMany().HasForeignKey(x => new { x.WorkspaceId, x.ScenarioId }).HasPrincipalKey(x => new { x.WorkspaceId, x.Id }).OnDelete(DeleteBehavior.Cascade);
     }
 }
