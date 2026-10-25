@@ -12,6 +12,24 @@ const response = [{
 const permissions = { read: true, readGroups: false, recordFinance: false, manageResources: false, correctHistory: false, manageMembers: false, managePrivacy: false };
 
 describe('monthly budget screen', () => {
+  it('shows operation and card consumption as an exact decimal total', () => {
+    const screen = new FinanceBudgets({} as ApiService, { markForCheck: vi.fn() } as never);
+
+    expect(screen.consumptionAmount({ ...response[0], spentAmount: '0.10', committedCardAmount: '0.20' } as never)).toBe('0.30');
+    expect(screen.consumptionAmount(response[0] as never)).toBe('150.50');
+  });
+
+  it('does not show a remaining cap for an unconfigured category and names summary adjustments separately', () => {
+    const screen = new FinanceBudgets({} as ApiService, { markForCheck: vi.fn() } as never);
+    const unconfigured = { ...response[0], budgetId: null, version: null, isConfigured: false, limitAmount: null };
+
+    expect(screen.showsRemainingCap(unconfigured as never)).toBe(false);
+    expect(screen.showsRemainingCap({ ...response[0], remainingAmount: '0.00' } as never)).toBe(true);
+    expect(screen.isOverBudget({ ...response[0], remainingAmount: '0.00' } as never)).toBe(false);
+    expect(screen.isOverBudget({ ...response[0], remainingAmount: '-0.01' } as never)).toBe(true);
+    expect(screen.sourceKindLabel('StatementAdjustment')).toBe('Ajuste de resumen');
+  });
+
   it('sends budget reads and writes to the selected workspace with decimal string values', async () => {
     const fetcher = vi.fn(async () => new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }));
     const api = new ApiService(fetcher as typeof fetch);
@@ -29,12 +47,12 @@ describe('monthly budget screen', () => {
     expect(new Headers(fetcher.mock.calls[2][1]?.headers).get('X-Workspace-Id')).toBe('space-9');
   });
 
-  it('keeps currency queries separate and ignores a stale currency response', async () => {
-    let resolveArs!: (value: typeof response) => void;
+  it('clears old currency rows while a new query is pending and ignores stale responses', async () => {
+    let resolveUsd!: (value: typeof response) => void;
     const api = {
-      budgets: vi.fn((_period: string, currency: string) => currency === 'ARS'
-        ? new Promise<typeof response>(resolve => { resolveArs = resolve; })
-        : Promise.resolve([{ ...response[0], categoryName: 'USD row', currency: 'USD' as const }])),
+      budgets: vi.fn((_period: string, currency: string) => currency === 'USD'
+        ? new Promise<typeof response>(resolve => { resolveUsd = resolve; })
+        : Promise.resolve(response)),
       financeCatalog: vi.fn().mockResolvedValue({ categories: [], merchants: [], incomeSources: [] }),
     };
     const screen = new FinanceBudgets(api as unknown as ApiService, { markForCheck: vi.fn() } as never);
@@ -42,15 +60,18 @@ describe('monthly budget screen', () => {
     screen.period = '2026-10';
     screen.permissions = permissions;
     screen.currency = 'ARS';
-    const oldQuery = screen.load();
-    screen.currency = 'USD';
-    const newQuery = screen.load();
-    await newQuery;
-    resolveArs(response);
+    await screen.load();
+    screen.selectedBudget = response[0] as never;
+    const oldQuery = screen.setCurrency('USD');
+    expect(screen.rows).toEqual([]);
+    expect(screen.selectedBudget).toBeNull();
+    await screen.setCurrency('ARS');
+    resolveUsd([{ ...response[0], categoryName: 'USD row', currency: 'USD' }]);
     await oldQuery;
 
-    expect(api.budgets.mock.calls.map(call => call[1])).toEqual(['ARS', 'USD']);
-    expect(screen.rows[0].categoryName).toBe('USD row');
+    expect(api.budgets.mock.calls.map(call => call[1])).toEqual(['ARS', 'USD', 'ARS']);
+    expect(screen.currency).toBe('ARS');
+    expect(screen.rows[0].categoryName).toBe('Alimentos');
   });
 
   it('distinguishes a real zero cap from an unbudgeted category', async () => {

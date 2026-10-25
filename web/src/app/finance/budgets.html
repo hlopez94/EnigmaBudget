@@ -1,7 +1,7 @@
 <main class="content budgets-screen">
   <section class="panel">
-    <div class="budgets-heading"><div><p class="eyebrow">Presupuesto mensual</p><h2>Presupuesto</h2></div>
-      <div class="budget-filters"><label>Período<input aria-label="Período del presupuesto" type="month" [ngModel]="period" disabled /></label><label>Moneda<select aria-label="Moneda del presupuesto" [ngModel]="currency" (ngModelChange)="currency=$event;load()" [disabled]="loading"><option value="ARS">Pesos · ARS</option><option value="USD">Dólares · USD</option></select></label></div>
+    <div class="budgets-heading"><div><p class="eyebrow">Presupuesto mensual</p><h2>Límites del período</h2></div>
+      <div class="budget-filters"><label>Período<input aria-label="Período del presupuesto" type="month" [ngModel]="period" disabled /></label><label>Moneda<select aria-label="Moneda del presupuesto" [ngModel]="currency" (ngModelChange)="setCurrency($event)" [disabled]="loading"><option value="ARS">Pesos · ARS</option><option value="USD">Dólares · USD</option></select></label></div>
     </div>
     <div class="budget-intro"><span>Montos en {{ currency }}</span>@if (canManage) { <button type="button" (click)="openCreate()" [disabled]="loading || !activeExpenseCategories.length">Definir límite</button> }</div>
     @if (loading) { <p role="status">Actualizando presupuestos…</p> }
@@ -11,7 +11,7 @@
       @for (row of availableRows; track row.categoryId) {
         <article class="budget-row">
           <button class="budget-row-main" type="button" (click)="selectedBudget=row;selectedSource=null">
-            <span><b>{{ row.categoryName }}</b><small>Consumo registrado · {{ money(row.spentAmount, row.currency) }}</small><small>Cuotas de tarjeta · {{ money(row.committedCardAmount, row.currency) }}</small></span>
+          <span><b>{{ row.categoryName }}</b><small>Consumo registrado · {{ money(consumptionAmount(row), row.currency) }}</small><small>Operaciones registradas · {{ money(row.spentAmount, row.currency) }}</small><small>Cuotas y ajustes de tarjeta · {{ money(row.committedCardAmount, row.currency) }}</small></span>
             <span class="budget-values"><b>{{ limitLabel(row) }}</b><small>{{ row.isConfigured ? 'Límite mensual' : 'Sin presupuestar' }}</small></span>
           </button>
           @if (canManage && row.isConfigured) { <button type="button" class="edit-budget" (click)="openLimit(row)">Editar límite</button> }
@@ -25,15 +25,15 @@
 <app-action-dialog title="Detalle del presupuesto" visualVariant="savings-projection-dialog" [open]="!!selectedBudget && !editorOpen" (closed)="selectedBudget=null;selectedSource=null">
   @if (selectedBudget) {
     <section class="budget-detail">
-      <p class="eyebrow">{{ selectedBudget.categoryName }} · {{ period }} · {{ currency }}</p>
-      <div class="detail-total"><span>Consumo registrado</span><b>{{ money(selectedBudget.spentAmount, currency) }}</b></div>
-      <div class="detail-line"><span>Caja · operaciones</span><b>{{ money(cashAmount(selectedBudget), currency) }}</b></div>
-      <div class="detail-line"><span>Cuotas de tarjeta</span><b>{{ money(selectedBudget.committedCardAmount, currency) }}</b></div>
+      <p class="eyebrow">{{ selectedBudget.categoryName }} · {{ period }} · {{ selectedBudget.currency }}</p>
+      <div class="detail-total"><span>Consumo registrado</span><b>{{ money(consumptionAmount(selectedBudget), selectedBudget.currency) }}</b></div>
+      <div class="detail-line"><span>Operaciones registradas</span><b>{{ money(selectedBudget.spentAmount, selectedBudget.currency) }}</b></div>
+      <div class="detail-line"><span>Cuotas y ajustes de tarjeta</span><b>{{ money(selectedBudget.committedCardAmount, selectedBudget.currency) }}</b></div>
       <div class="detail-line"><span>Tope mensual</span><b>{{ limitLabel(selectedBudget) }}</b></div>
-      @if (selectedBudget.remainingAmount !== null) { <div class="detail-line remaining"><span>Restante del tope</span><b>{{ money(selectedBudget.remainingAmount, currency) }}</b></div> }
+      @if (showsRemainingCap(selectedBudget)) { <div class="detail-line remaining" [class.over-budget]="isOverBudget(selectedBudget)"><span>Restante del tope</span><b>{{ money(selectedBudget.remainingAmount!, selectedBudget.currency) }}</b></div> }
       <h3>Movimientos asociados</h3>
       @for (source of selectedBudget.sources; track sourceIdentity(source)) {
-        <button class="source-row" type="button" (click)="openSource(selectedBudget, source)"><span><b>{{ source.description }}</b><small>{{ source.categorySnapshot || selectedBudget.categoryName }} · {{ sourceKindLabel(source.sourceKind) }} · {{ sourceDateLabel(source.sourceKind) }} {{ dateLabel(source.date) }}</small></span><strong>{{ money(source.amount, currency) }}</strong></button>
+        <button class="source-row budget-source-row" type="button" (click)="openSource(selectedBudget, source)"><span><b>{{ source.description }}</b><small>{{ source.categorySnapshot || selectedBudget.categoryName }} · {{ sourceKindLabel(source.sourceKind) }} · {{ sourceDateLabel(source.sourceKind) }} {{ dateLabel(source.date) }}</small></span><strong>{{ money(source.amount, selectedBudget.currency) }}</strong></button>
       }
       @if (!selectedBudget.sources.length) { <p class="empty-state">Todavía no hay movimientos asociados.</p> }
       @if (selectedSource) { <section class="source-detail" aria-label="Detalle de origen"><h3>{{ selectedSource.kindLabel }}</h3><dl><dt>Descripción</dt><dd>{{ selectedSource.label }}</dd><dt>Categoría original</dt><dd>{{ selectedSource.category }}</dd><dt>{{ selectedSource.dateLabel }}</dt><dd>{{ selectedSource.date }}</dd><dt>Importe · {{ selectedSource.currency }}</dt><dd>{{ money(selectedSource.amount, selectedSource.currency) }}</dd></dl><button type="button" (click)="closeSource()">Volver al presupuesto</button></section> }

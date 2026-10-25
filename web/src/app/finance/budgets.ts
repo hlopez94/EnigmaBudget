@@ -40,6 +40,16 @@ export class FinanceBudgets extends FinanceActions implements OnChanges {
   get isLimitValid(): boolean { return validAmount(this.limitDraft, true) && this.limitDraft.trim() !== ''; }
   hasStaleNotice(): boolean { return /cambi[oó]|actualizá/i.test(this.notice); }
   hasStaleError(): boolean { return this.lastFailure instanceof ApiProblem && this.lastFailure.status === 409 || /versi[oó]n|cambi[oó]|conflicto/i.test(this.error); }
+  async setCurrency(currency: 'ARS' | 'USD'): Promise<void> {
+    if (currency === this.currency) return;
+    this.currency = currency;
+    this.rows = [];
+    this.selectedBudget = null;
+    this.selectedSource = null;
+    this.error = '';
+    this.notice = '';
+    await this.load();
+  }
   async load(): Promise<void> {
     const ws = this.workspaceId; const period = this.period; const currency = this.currency;
     if (!ws || !period || !this.permissions?.read) { this.rows = []; return; }
@@ -55,12 +65,11 @@ export class FinanceBudgets extends FinanceActions implements OnChanges {
   }
   override money(value: string, currency: 'ARS' | 'USD'): string { return formatMoney(value, currency); }
   sourceIdentity(source: MonthlyBudgetSource): string { return `${source.sourceKind}:${source.sourceId}:${source.componentId ?? ''}`; }
-  sourceKindLabel(kind: MonthlyBudgetSource['sourceKind']): string { return kind === 'Operation' ? 'Operación' : kind === 'Installment' ? 'Cuota de tarjeta' : 'Ajuste confirmado'; }
+  sourceKindLabel(kind: MonthlyBudgetSource['sourceKind']): string { return kind === 'Operation' ? 'Operación' : kind === 'Installment' ? 'Cuota de tarjeta' : 'Ajuste de resumen'; }
   sourceDateLabel(kind: MonthlyBudgetSource['sourceKind']): string { return kind === 'Operation' ? 'Fecha de operación' : kind === 'Installment' ? 'Fecha de compra' : 'Período del resumen'; }
-  cashAmount(row: MonthlyBudgetRow): string {
-    const total = row.sources.filter(source => source.sourceKind === 'Operation').reduce((sum, source) => sum + (toMinorUnits(source.amount) ?? 0n), 0n);
-    return formatMinorUnits(total);
-  }
+  consumptionAmount(row: MonthlyBudgetRow): string { return formatMinorUnits((toMinorUnits(row.spentAmount) ?? 0n) + (toMinorUnits(row.committedCardAmount) ?? 0n)); }
+  showsRemainingCap(row: MonthlyBudgetRow): boolean { return row.isConfigured && row.remainingAmount !== null; }
+  isOverBudget(row: MonthlyBudgetRow): boolean { return row.remainingAmount !== null && (toMinorUnits(row.remainingAmount) ?? 0n) < 0n; }
   limitLabel(row: MonthlyBudgetRow): string { return row.isConfigured && row.limitAmount !== null ? this.money(row.limitAmount, row.currency) : 'Sin presupuestar'; }
   get availableRows(): MonthlyBudgetRow[] { return this.rows; }
   openCreate(): void { if (!this.canManage) return; this.selectedBudget = null; this.editing = false; this.editorOpen = true; this.categoryId = this.activeExpenseCategories[0]?.itemId ?? ''; this.limitDraft = ''; }
@@ -93,7 +102,7 @@ export class FinanceBudgets extends FinanceActions implements OnChanges {
     this.notice = 'Datos actualizados. Revisá el límite y guardá nuevamente.';
   }
   openSource(row: MonthlyBudgetRow, source: MonthlyBudgetSource): void {
-    const kindLabel = source.sourceKind === 'Operation' ? 'Operación' : source.sourceKind === 'Installment' ? 'Cuota de tarjeta' : 'Ajuste confirmado';
+    const kindLabel = this.sourceKindLabel(source.sourceKind);
     const dateLabel = source.sourceKind === 'Operation' ? 'Fecha de operación' : source.sourceKind === 'Installment' ? 'Fecha de compra' : 'Período del resumen';
     this.selectedSource = { identity: `${source.sourceKind}:${source.sourceId}:${source.componentId ?? ''}`, label: source.description, category: source.categorySnapshot || row.categoryName, dateLabel, date: this.dateLabel(source.date), amount: source.amount, currency: row.currency, kindLabel };
   }

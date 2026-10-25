@@ -1,6 +1,6 @@
 <main class="content catalog-screen">
   <section class="panel">
-    <div class="section-heading"><div><p class="eyebrow">Administración</p><h2>{{ view === 'sources' ? 'Fuentes de ingresos' : 'Categorías y comercios' }}</h2></div>
+    <div class="section-heading"><div><p class="eyebrow">Administración</p><h2>{{ view === 'sources' ? 'Fuentes del espacio' : 'Catálogo del espacio' }}</h2></div>
       @if (loading) { <span role="status">Actualizando…</span> }
     </div>
     @if (!permissions?.read) { <p role="status">No tenés acceso de lectura a este espacio.</p> }

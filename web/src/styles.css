@@ -487,6 +487,9 @@ body .finance-action-dialog .form-grid label.check input[type='checkbox'] {
   min-width: 44px;
   min-height: 44px;
 }
+.finance-action-dialog .budget-source-row {
+  height: auto !important;
+}
 }
 
 @media(max-width:767px){

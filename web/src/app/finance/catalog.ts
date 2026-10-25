@@ -6,13 +6,19 @@ import { ActionDialog } from './ui/action-dialog';
 import { FinanceActions } from './finance-actions';
 
 type CatalogItem = FinanceCategoryOption | FinanceMerchantOption | FinanceIncomeSourceOption;
+type CatalogDraft = { name: string; kind: OperationKind | FinanceIncomeSourceOption['kind']; resource: 'categories' | 'merchants' };
 @Component({ selector: 'app-catalog', standalone: true, imports: [FormsModule, ActionDialog], templateUrl: './catalog.html', styleUrl: './catalog.css', changeDetection: ChangeDetectionStrategy.OnPush })
 export class FinanceCatalogScreen extends FinanceActions implements OnChanges {
   @Input() view: 'catalog' | 'sources' = 'catalog';
   catalog: FinanceCatalog = { categories: [], merchants: [], incomeSources: [] };
-  newName = '';
-  newKind: OperationKind | FinanceIncomeSourceOption['kind'] = 'Expense';
-  newResource: 'categories' | 'merchants' = 'categories';
+  private readonly catalogDraft: CatalogDraft = { name: '', kind: 'Expense', resource: 'categories' };
+  private readonly sourceDraft: CatalogDraft = { name: '', kind: 'Salary', resource: 'categories' };
+  get newName(): string { return this.activeDraft.name; }
+  set newName(value: string) { this.activeDraft.name = value; }
+  get newKind(): CatalogDraft['kind'] { return this.activeDraft.kind; }
+  set newKind(value: CatalogDraft['kind']) { this.activeDraft.kind = value; }
+  get newResource(): CatalogDraft['resource'] { return this.activeDraft.resource; }
+  set newResource(value: CatalogDraft['resource']) { this.activeDraft.resource = value; }
   editItem: CatalogItem | null = null;
   editName = '';
   editOpen = false;
@@ -21,6 +27,7 @@ export class FinanceCatalogScreen extends FinanceActions implements OnChanges {
   private queryGeneration = 0;
 
   constructor(api: ApiService, changeDetector: ChangeDetectorRef) { super(api, changeDetector); }
+  private get activeDraft(): CatalogDraft { return this.view === 'sources' ? this.sourceDraft : this.catalogDraft; }
   get canManage(): boolean { return !!this.permissions?.manageResources && !this.workspaceArchived; }
   get selectableCategories(): FinanceCategoryOption[] { return this.catalog.categories.filter(item => !item.isArchived); }
   get categories(): FinanceCategoryOption[] { return this.catalog.categories; }
@@ -31,7 +38,6 @@ export class FinanceCatalogScreen extends FinanceActions implements OnChanges {
 
   override ngOnChanges(changes: SimpleChanges): void {
     super.ngOnChanges(changes);
-    if (changes['view']) { this.newKind = this.view === 'sources' ? 'Salary' : 'Expense'; this.newResource = 'categories'; }
     if (changes['workspaceId'] || changes['contextGeneration']) {
       this.generation++;
       this.queryGeneration++;
@@ -40,9 +46,9 @@ export class FinanceCatalogScreen extends FinanceActions implements OnChanges {
       if (this.workspaceId && this.permissions?.read) void this.load();
     }
   }
-  override hasPendingDraft(): boolean { return !!this.newName.trim() || this.editOpen; }
+  override hasPendingDraft(): boolean { return !!this.catalogDraft.name.trim() || !!this.sourceDraft.name.trim() || this.editOpen; }
   protected override resetForContextChange(): void { this.generation++; this.queryGeneration++; this.catalog = { categories: [], merchants: [], incomeSources: [] }; this.resetDrafts(); }
-  private resetDrafts(): void { this.newName = ''; this.newKind = this.view === 'sources' ? 'Salary' : 'Expense'; this.newResource = 'categories'; this.editItem = null; this.editName = ''; this.editOpen = false; }
+  private resetDrafts(): void { this.catalogDraft.name = ''; this.catalogDraft.kind = 'Expense'; this.catalogDraft.resource = 'categories'; this.sourceDraft.name = ''; this.sourceDraft.kind = 'Salary'; this.editItem = null; this.editName = ''; this.editOpen = false; }
   async load(): Promise<void> {
     const ws = this.workspaceId; if (!ws || !this.permissions?.read) { this.catalog = { categories: [], merchants: [], incomeSources: [] }; return; }
     const epoch = this.captureContext(); const generation = this.generation; const query = ++this.queryGeneration; this.loading = true;

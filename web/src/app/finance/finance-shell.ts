@@ -285,6 +285,12 @@ export class FinanceShell implements OnInit, OnChanges {
   async changePeriod(): Promise<void> {
     const requested = this.period;
     if (this.saving) { this.period = this.appliedPeriod; this.notice = 'Esperá a que termine el guardado antes de cambiar el período.'; this.changeDetector.markForCheck(); return; }
+    if (!periodParts(requested)) {
+      this.error = 'Elegí un período válido para consultar tus finanzas.';
+      this.changeDetector.markForCheck();
+      return;
+    }
+    if (requested === this.appliedPeriod) { await this.refresh(); return; }
     if (this.hasPendingDraft) { this.period = this.appliedPeriod; this.requestedWorkspaceId = `@period:${requested}`; this.changeDetector.markForCheck(); return; }
     await this.refresh();
   }
@@ -293,7 +299,6 @@ export class FinanceShell implements OnInit, OnChanges {
     if (section === 'sharing' && !this.canReadGroups) return;
     if (section === this.section) return;
     if (this.saving) { this.notice = 'Esperá a que termine el guardado antes de cambiar de sección.'; this.changeDetector.markForCheck(); return; }
-    if (this.hasPendingDraft) { this.requestedWorkspaceId = `@section:${section}`; this.changeDetector.markForCheck(); return; }
     this.section = section;
     this.error = '';
     this.notice = '';

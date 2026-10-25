@@ -43,6 +43,31 @@ describe('catalog screen', () => {
     expect(createIncomeSource.mock.calls[1][0].id).toBe(firstId);
   });
 
+  it('keeps separate category and income-source drafts when switching catalog views', () => {
+    const screen = new FinanceCatalogScreen({} as ApiService, { markForCheck: vi.fn() } as never);
+    screen.newName = 'Comercios varios';
+    screen.newKind = 'Income';
+    screen.newResource = 'merchants';
+
+    screen.view = 'sources';
+    screen.ngOnChanges({ view: { previousValue: 'catalog', currentValue: 'sources', firstChange: false, isFirstChange: () => false } } as never);
+    expect(screen.newName).toBe('');
+    expect(screen.newKind).toBe('Salary');
+    screen.newName = 'Sueldo mensual';
+    screen.newKind = 'AnnualBonus';
+
+    screen.view = 'catalog';
+    screen.ngOnChanges({ view: { previousValue: 'sources', currentValue: 'catalog', firstChange: false, isFirstChange: () => false } } as never);
+    expect(screen.newName).toBe('Comercios varios');
+    expect(screen.newKind).toBe('Income');
+    expect(screen.newResource).toBe('merchants');
+
+    screen.view = 'sources';
+    screen.ngOnChanges({ view: { previousValue: 'catalog', currentValue: 'sources', firstChange: false, isFirstChange: () => false } } as never);
+    expect(screen.newName).toBe('Sueldo mensual');
+    expect(screen.newKind).toBe('AnnualBonus');
+  });
+
   it('clears catalog queries and drafts when the workspace context changes', async () => {
     const financeCatalog = vi.fn().mockResolvedValue(catalogData);
     const screen = new FinanceCatalogScreen({ financeCatalog } as unknown as ApiService, { markForCheck: vi.fn() } as never);
@@ -50,11 +75,19 @@ describe('catalog screen', () => {
     screen.permissions = permissions;
     await screen.load();
     screen.newName = 'Pendiente';
+    screen.view = 'sources';
+    screen.ngOnChanges({ view: { previousValue: 'catalog', currentValue: 'sources', firstChange: false, isFirstChange: () => false } } as never);
+    screen.newName = 'Ingreso pendiente';
+    screen.newKind = 'Extra';
     screen.workspaceId = 'new-space';
     screen.ngOnChanges({ workspaceId: { previousValue: 'old-space', currentValue: 'new-space', firstChange: false, isFirstChange: () => false } } as never);
 
     expect(screen.catalog.categories).toEqual([]);
     expect(screen.newName).toBe('');
+    screen.view = 'catalog';
+    screen.ngOnChanges({ view: { previousValue: 'sources', currentValue: 'catalog', firstChange: false, isFirstChange: () => false } } as never);
+    expect(screen.newName).toBe('');
+    expect(screen.newKind).toBe('Expense');
     expect(financeCatalog).toHaveBeenCalledTimes(2);
   });
 });

@@ -1,4 +1,5 @@
 .budgets-screen { display: grid; gap: 1rem; }
+.budgets-screen > .panel { padding: 1.5rem; }
 .budgets-heading, .budget-filters, .budget-intro, .budget-row, .budget-row-main, .detail-total, .detail-line, .source-row, .dialog-actions { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
 .budgets-heading { align-items: flex-start; flex-wrap: wrap; }
 .budgets-heading h2 { margin: .15rem 0; }
@@ -9,16 +10,18 @@
 .budget-intro button, .edit-budget, .source-detail button { min-height: 44px; border: 0; border-radius: .7rem; padding: .5rem .8rem; color: #124d38; background: #e8f1e7; font: inherit; font-weight: 650; }
 .budget-list { display: grid; }
 .budget-row { min-height: 76px; flex-wrap: wrap; padding: .55rem 0; border-bottom: 1px solid var(--line, #e1e6df); }
-.budget-row-main { flex: 1; min-width: 13rem; min-height: 60px; padding: .3rem 0; border: 0; background: none; color: inherit; text-align: left; cursor: pointer; }
+.budget-row-main { flex: 1; min-width: 0; min-height: 60px; padding: .3rem 0; border: 0; background: none; color: inherit; text-align: left; cursor: pointer; }
 .budget-row-main > span:first-child, .budget-values { display: grid; gap: .2rem; }
+.budget-row-main > span:first-child { min-width: 0; flex: 1; }
+.budget-values { flex: 0 0 auto; white-space: nowrap; }
 .budget-row-main small, .budget-values small { color: var(--muted, #68746a); }
 .budget-values { text-align: right; }
 .budget-detail { display: grid; gap: .4rem; }
 .detail-total, .detail-line { min-height: 46px; padding: .35rem 0; border-bottom: 1px solid var(--line, #e1e6df); }
 .detail-total { font-size: 1.08rem; }
-.remaining b { color: #8d3024; }
+.remaining.over-budget b { color: #8d3024; }
 .budget-detail h3 { margin: 1rem 0 .2rem; }
-.source-row { width: 100%; min-height: 56px; padding: .6rem 0; border: 0; border-bottom: 1px solid var(--line, #e1e6df); background: none; text-align: left; color: inherit; cursor: pointer; }
+.source-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; width: 100%; height: auto; min-height: 56px; padding: .7rem 0; border: 0; border-bottom: 1px solid var(--line, #e1e6df); background: none; text-align: left; color: inherit; cursor: pointer; }
 .source-row span { min-width: 0; display: grid; gap: .2rem; }
 .source-row b { overflow-wrap: anywhere; }
 .source-row small { color: var(--muted, #68746a); }
@@ -32,4 +35,4 @@
 .budget-form input, .budget-form select { max-width: none; }
 .budget-form small { color: var(--muted, #68746a); }
 .dialog-actions { justify-content: flex-end; }
-@media (max-width: 600px) { .budget-filters { width: 100%; } .budget-filters label { flex: 1; min-width: 8rem; } .budget-filters input, .budget-filters select { width: 100%; max-width: none; } .source-row { align-items: flex-start; } .source-row strong { white-space: normal; } }
+@media (max-width: 600px) { .budgets-screen > .panel { padding: 1rem; } .budget-filters { width: 100%; } .budget-filters label { flex: 1; min-width: 8rem; } .budget-filters input, .budget-filters select { width: 100%; max-width: none; } .budget-row-main { flex-basis: 100%; } .edit-budget { margin-left: auto; } .source-row { gap: .5rem; } .source-row strong { white-space: nowrap; } }

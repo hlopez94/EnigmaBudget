@@ -155,6 +155,45 @@ describe('finance workspace regressions', () => {
     expect(shell.notice).toMatch(/guardado/i);
   });
 
+  it('keeps the imperative section guard during a save and restores navigation when it completes', () => {
+    const shell = new FinanceShell({} as ApiService, { markForCheck: vi.fn() } as never);
+    const operations = new FinanceOperations({} as ApiService, { markForCheck: vi.fn() } as never);
+    operations.saving = true;
+    shell.operationComponents = { toArray: () => [operations] } as never;
+    shell.section = 'sharing';
+
+    shell.navigate('cards');
+    expect(shell.section).toBe('sharing');
+    expect(shell.notice).toMatch(/guardado/i);
+    operations.saving = false;
+    shell.navigate('cards');
+    expect(shell.section).toBe('cards');
+  });
+
+  it('validates periods without dropping drafts and guards only an actual period change', async () => {
+    const shell = new FinanceShell({} as ApiService, { markForCheck: vi.fn() } as never);
+    shell.appliedPeriod = '2026-10';
+    shell.period = '';
+    shell.operationComponents = { toArray: () => [{ saving: false, hasPendingDraft: () => true }] } as never;
+    const refresh = vi.spyOn(shell, 'refresh').mockResolvedValue();
+
+    await shell.changePeriod();
+
+    expect(shell.period).toBe('');
+    expect(shell.requestedWorkspaceId).toBe('');
+    expect(shell.error).toMatch(/período válido/i);
+
+    shell.period = '2026-10';
+    await shell.changePeriod();
+    expect(refresh).toHaveBeenCalledOnce();
+    expect(shell.requestedWorkspaceId).toBe('');
+
+    shell.period = '2026-11';
+    await shell.changePeriod();
+    expect(shell.period).toBe('2026-10');
+    expect(shell.requestedWorkspaceId).toBe('@period:2026-11');
+  });
+
   it('hides resource creation from Members while preserving their finance entry actions', async () => {
     const api = { createAccount: vi.fn(), adjustAccount: vi.fn() };
     const accounts = new FinanceAccounts(api as unknown as ApiService, { markForCheck: vi.fn() } as never);
@@ -216,21 +255,20 @@ describe('finance workspace regressions', () => {
     expect(shell.period).toBe('2026-11');
   });
 
-  it('confirms draft discard before opening monthly budgets from Más', async () => {
+  it('opens monthly budgets from Más without clearing a mounted catalog draft', async () => {
     const shell = new FinanceShell({ selectWorkspace: vi.fn() } as unknown as ApiService, { markForCheck: vi.fn() } as never);
     const catalog = new FinanceCatalogScreen({} as ApiService, { markForCheck: vi.fn() } as never);
     catalog.newName = 'Por revisar';
+    catalog.newKind = 'Income';
+    catalog.newResource = 'merchants';
     shell.catalogComponents = { toArray: () => [catalog] } as never;
 
     shell.navigateMore('budgets');
-    expect(shell.requestedWorkspaceId).toBe('@section:budgets');
-    expect(shell.section).toBe('home');
-    shell.cancelWorkspaceChange();
-    expect(catalog.newName).toBe('Por revisar');
-    shell.navigateMore('budgets');
-    shell.confirmWorkspaceChange();
     expect(shell.section).toBe('budgets');
-    expect(catalog.newName).toBe('');
+    expect(shell.requestedWorkspaceId).toBe('');
+    expect(catalog.newName).toBe('Por revisar');
+    expect(catalog.newKind).toBe('Income');
+    expect(catalog.newResource).toBe('merchants');
   });
 
   it('clears the active account action without clearing its draft', () => {

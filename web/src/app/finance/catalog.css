@@ -1,4 +1,5 @@
 .catalog-screen { display: grid; gap: 1rem; }
+.catalog-screen > .panel { padding: 1.5rem; }
 .section-heading, .catalog-row, .row-actions, .catalog-create, .dialog-actions { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
 .section-heading { margin-bottom: 1rem; }
 .section-heading h2 { margin: .15rem 0; }
@@ -17,4 +18,4 @@
 .error-message { padding: .75rem; border-radius: .7rem; background: #fff0ed; color: #7d2920; }
 .edit-form { display: grid; gap: 1rem; }
 .dialog-actions { justify-content: flex-end; }
-@media (max-width: 600px) { .catalog-row { align-items: flex-start; flex-direction: column; } .row-actions { width: 100%; } .row-actions button { flex: 1; } .catalog-create > button { width: 100%; } }
+@media (max-width: 600px) { .catalog-screen > .panel { padding: 1rem; } .catalog-row { align-items: flex-start; flex-direction: column; } .row-actions { width: 100%; } .row-actions button { flex: 1; } .catalog-create > button { width: 100%; } }
