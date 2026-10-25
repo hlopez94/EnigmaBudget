@@ -156,7 +156,7 @@
 - Create: `src/EnigmaBudget.Api/Projection/ProjectionContracts.cs`
 - Create: `src/EnigmaBudget.Api/Projection/ProjectionService.cs`
 - Create: `src/EnigmaBudget.Api/Finance/CardObligationCalculator.cs`
-- Modify: `src/EnigmaBudget.Api/Finance/CardService.cs`, `src/EnigmaBudget.Api/Finance/FinanceQueries.cs`
+- Modify: `src/EnigmaBudget.Api/Finance/CardService.cs`, `src/EnigmaBudget.Api/Finance/FinanceQueries.cs`, `src/EnigmaBudget.Api/Finance/AccountService.cs` (the existing cards-list debt/credit view)
 - Modify: `src/EnigmaBudget.Api/Program.cs`
 - Test: `tests/EnigmaBudget.Api.Tests/ProjectionIntegrationTests.cs`, `tests/EnigmaBudget.Api.Tests/CardCycleIntegrationTests.cs`
 
