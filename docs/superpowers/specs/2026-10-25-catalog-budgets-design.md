@@ -43,6 +43,12 @@ Los registros de operación/compra mantienen la comparación de sus campos finan
 
 La resolución y escritura comparten el bloqueo transaccional del workspace usado al editar/archivar catálogos. La compra conserva aislamiento Serializable mediante el gate compartido, sin transacciones anidadas; las fórmulas de caja y cuotas no cambian.
 
+## Edición y explicación del presupuesto
+
+Cada fila distingue presupuesto inexistente (`IsConfigured=false`, sin ID ni versión) de un límite explícito de cero. La UI muestra “Sin presupuestar” para el primero. Un límite nunca impide registrar gastos. El identificador y versión permiten crear o editar sin adivinar el recurso. La clave categoría/período/moneda no se edita; una categoría archivada conserva su presupuesto e historia y permite ajustar el límite ya existente.
+
+Las mutaciones guardan un `BudgetCommand` propio con hash del request tipado, resultado de definición inmutable, actor y fecha; comparten bloqueo, permiso vigente y transacción con presupuesto y auditoría. El reintento no se rompe por el archivo posterior de la categoría. La consulta incluye categorías activas y las archivadas con presupuesto o consumo relevante, conserva el snapshot de categoría en cada origen y explica operación, cuota y ajuste confirmado sin duplicar pagos ni totales de resúmenes. Las cuotas ya pagadas siguen siendo consumo del período. Los ajustes firmados pertenecen al componente de tarjeta; los registros sin clasificación se explican bajo el fallback protegido.
+
 ## Criterios y decisiones abiertas
 
 - Historial conserva texto, ID de operación, montos y fechas; ninguna fuente/comercio se deduce automáticamente.
