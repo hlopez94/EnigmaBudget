@@ -35,6 +35,7 @@ class NativeRequestCoordinator(
     private val transport: NativeHttpTransport,
     private val clock: () -> Long = System::currentTimeMillis,
     private val permitTtlMillis: Long = 30_000,
+    private val onSessionInvalidated: () -> Unit = {},
 ) {
     private data class Pending(
         val requestId: String,
@@ -150,6 +151,7 @@ class NativeRequestCoordinator(
     fun <T> invalidate(clearNativeState: () -> T): T = synchronized(stateLock) {
         sessionGeneration++
         contextGeneration++
+        onSessionInvalidated()
         permits.clear(); retryPending.clear(); retryMarkers.clear(); contexts.clear()
         currentCredentials = null
         refreshFlight?.future?.completeExceptionally(SecurityException("Native session changed during refresh."))

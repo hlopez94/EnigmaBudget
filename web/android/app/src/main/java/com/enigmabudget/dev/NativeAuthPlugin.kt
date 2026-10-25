@@ -33,6 +33,7 @@ import java.util.concurrent.TimeUnit
 class NativeAuthPlugin : Plugin() {
     private val executor = boundedExecutor("native-auth")
     private val networkExecutor = boundedExecutor("native-http")
+    private val protectedTransport = NativeQueuedHttpTransport(networkExecutor, ::sendProtected)
     private val logoutExecutor = ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, java.util.concurrent.SynchronousQueue(), { runnable ->
         Thread(runnable, "native-logout-${UUID.randomUUID()}").apply { isDaemon = true }
     }, ThreadPoolExecutor.AbortPolicy())
@@ -58,7 +59,7 @@ class NativeAuthPlugin : Plugin() {
                 expiresAt = value.accessExpiresAtMillis
                 return true
             }
-        }, NativeHttpTransport { request, bearer -> CompletableFuture.supplyAsync({ sendProtected(request, bearer) }, networkExecutor) })
+        }, protectedTransport, onSessionInvalidated = protectedTransport::invalidateQueued)
     }
     private val coordinator by coordinatorDelegate
     private val logoutResults = ConcurrentHashMap<String, CompletableFuture<Boolean>>()
@@ -69,8 +70,9 @@ class NativeAuthPlugin : Plugin() {
 
     @PluginMethod
     fun authOptions(call: PluginCall) = execute(call) {
-        val response = authRequest("GET", "/api/auth/native/options", null)
-        call.resolve(JSONObject(response.body).toJSObject())
+        val options = readAuthOptions()
+        call.resolve(JSObject().put("googleConfigured", options.googleConfigured)
+            .put("developmentLoginEnabled", options.developmentLoginEnabled))
     }
 
     @PluginMethod
@@ -111,8 +113,8 @@ class NativeAuthPlugin : Plugin() {
     fun signInGoogle(call: PluginCall) = execute(call) {
         if (BuildConfig.GOOGLE_SERVER_CLIENT_ID.isBlank()) throw IllegalStateException("Google sign-in is not configured.")
         val startingGeneration = coordinator.currentSessionGeneration()
-        val options = JSONObject(authRequest("GET", "/api/auth/native/options", null).body)
-        if (!options.optBoolean("googleConfigured")) throw IllegalStateException("Google sign-in is not configured on the API.")
+        val options = readAuthOptions()
+        if (!options.googleConfigured) throw IllegalStateException("Google sign-in is not configured on the API.")
         val challenge = JSONObject(authRequest("POST", "/api/auth/native/challenge", JSONObject().put("platform", "android")).body)
         if (coordinator.currentSessionGeneration() != startingGeneration) throw SecurityException("Native session changed during sign-in.")
         val generation = beginAccountReplacement()
@@ -126,8 +128,8 @@ class NativeAuthPlugin : Plugin() {
     @PluginMethod
     fun signInDevelopment(call: PluginCall) = execute(call) {
         val startingGeneration = coordinator.currentSessionGeneration()
-        val options = JSONObject(authRequest("GET", "/api/auth/native/options", null).body)
-        if (!BuildConfig.DEBUG || !options.optBoolean("developmentLoginEnabled")) throw IllegalStateException("El inicio de desarrollo no está habilitado.")
+        val options = readAuthOptions()
+        if (!BuildConfig.DEBUG || !options.developmentLoginEnabled) throw IllegalStateException("El inicio de desarrollo no está habilitado.")
         if (coordinator.currentSessionGeneration() != startingGeneration) throw SecurityException("Native session changed during sign-in.")
         val generation = beginAccountReplacement()
         val body = JSONObject().put("deviceName", android.os.Build.MODEL)
@@ -218,6 +220,8 @@ class NativeAuthPlugin : Plugin() {
         val json = JSONObject(response.body)
         return NativeCredentials(json.getString("accessToken"), json.getString("refreshToken"), java.time.Instant.parse(json.getString("accessExpiresAt")).toEpochMilli())
     }
+
+    private fun readAuthOptions(): NativeAuthOptions = NativeAuthOptionsProjection.project(authRequest("GET", "/api/auth/native/options", null))
 
     private fun installTokens(response: NativeApiResponse, generation: Long) {
         if (response.status !in 200..299) throw NativeHttpFailure(response.status)
