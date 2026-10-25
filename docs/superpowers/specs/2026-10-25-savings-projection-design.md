@@ -87,3 +87,7 @@ Un mismo origen puede producir varias filas: por ejemplo, una cuota tiene distin
 ### Crédito por período y crédito total de tarjeta
 
 El exceso de pago de un período es una lectura histórica del resumen, distinta del crédito total vigente de la tarjeta. El mismo constructor canónico calcula cortes por período para conservar esa lectura y componentes netos de todos los períodos para la proyección. Ejemplo sintético: cuotas de 40000,00 en octubre, noviembre y diciembre, ajuste confirmado de 100,00 en octubre y pago de 50100,00 en octubre. El resumen de octubre conserva pendiente 0,00 y exceso del período 10000,00; noviembre tiene pendiente 30000,00; la deuda total es 70000,00 y el crédito total 0,00. No se vuelve a restar el exceso de octubre de los 30000,00 ya netos de noviembre. El crédito por período tampoco es un ingreso de caja ni una fila adicional de proyección.
+
+### Fecha estimada dentro del período de tarjeta
+
+Si aún no existe resumen confirmado, el vencimiento estimado de una cuota usa `DueDay` en el mismo mes de su `Period`, limitado al último día válido de ese mes. El período ya fue elegido al registrar la compra; no se agrega otro mes ni se infiere nuevamente desde la fecha de compra o cierre. Por ejemplo, período octubre y día 20 produce una estimación para el 20 de octubre. Sin día configurado se mantiene sin fecha; la fecha del resumen confirmado siempre prevalece. Toda fecha de este cálculo continúa identificada como estimada.
