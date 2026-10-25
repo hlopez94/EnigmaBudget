@@ -25,7 +25,8 @@ public sealed class FinanceWorkspaceFilter : IEndpointFilter
         if (p.Equals("/api/savings/goals", StringComparison.OrdinalIgnoreCase) && method == "POST"
             || p.StartsWith("/api/savings/goals/", StringComparison.OrdinalIgnoreCase) && (method == "PUT" || method == "POST")
             || p.Equals("/api/accounts/liquidity", StringComparison.OrdinalIgnoreCase) && method == "PUT"
-            || p.StartsWith("/api/accounts/", StringComparison.OrdinalIgnoreCase) && p.EndsWith("/liquidity", StringComparison.OrdinalIgnoreCase) && method == "PUT")
+            || p.StartsWith("/api/accounts/", StringComparison.OrdinalIgnoreCase) && p.EndsWith("/liquidity", StringComparison.OrdinalIgnoreCase) && method == "PUT"
+            || p.StartsWith("/api/savings/accounts/", StringComparison.OrdinalIgnoreCase) && p.EndsWith("/liquidity", StringComparison.OrdinalIgnoreCase) && method == "PUT")
             return WorkspacePermissions.ManageResources;
         if (p.Equals("/api/savings/allocations", StringComparison.OrdinalIgnoreCase) && method == "POST"
             || p.StartsWith("/api/savings/allocations/", StringComparison.OrdinalIgnoreCase) && p.EndsWith("/release", StringComparison.OrdinalIgnoreCase) && method == "POST"

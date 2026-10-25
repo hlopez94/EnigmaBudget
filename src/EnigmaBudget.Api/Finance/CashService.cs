@@ -39,6 +39,9 @@ public static partial class FinanceEndpoints
         )
             return Problem(400, "Revisá los datos del movimiento.");
         var ws = await Workspace(db, http);
+        await using var tx = r.Paid ? await db.Database.BeginTransactionAsync() : null;
+        if (r.Paid)
+            await AccountMutationLocks.LockAsync(db, ws.Id, [r.AccountId], http.RequestAborted);
         var account = await db.Accounts.SingleOrDefaultAsync(x =>
             x.WorkspaceId == ws.Id && x.Id == r.AccountId
         );
@@ -104,6 +107,7 @@ public static partial class FinanceEndpoints
             );
         }
         await db.SaveChangesAsync();
+        if (tx is not null) await tx.CommitAsync();
         return Results.Ok(await Operation(db, op));
     }
 
@@ -189,6 +193,7 @@ public static partial class FinanceEndpoints
             return Problem(400, "Revisá el importe y la fecha del pago.");
         var ws = await Workspace(db, http);
         await using var tx = await db.Database.BeginTransactionAsync();
+        await AccountMutationLocks.LockAsync(db, ws.Id, [r.AccountId], http.RequestAborted);
         var op = await db
             .FinanceOperations.Include(x => x.Payments)
             .FirstOrDefaultAsync(x => x.WorkspaceId == ws.Id && x.Id == id);
@@ -358,6 +363,8 @@ public static partial class FinanceEndpoints
         )
             return Problem(400, "Revisá los datos de la transferencia.");
         var ws = await Workspace(db, http);
+        await using var transaction = await db.Database.BeginTransactionAsync();
+        await AccountMutationLocks.LockAsync(db, ws.Id, [r.FromAccountId, r.ToAccountId], http.RequestAborted);
         var old = await db.Transfers.SingleOrDefaultAsync(x =>
             x.WorkspaceId == ws.Id && x.Id == r.Id
         );
@@ -401,6 +408,7 @@ public static partial class FinanceEndpoints
         db.LedgerEntries.Add(Entry(ws.Id, from, date, -amount, "transfer-out", r.Id));
         db.LedgerEntries.Add(Entry(ws.Id, to, date, dest, "transfer-in", r.Id));
         await db.SaveChangesAsync();
+        await transaction.CommitAsync();
         return Results.Ok(new { id = r.Id });
     }
 

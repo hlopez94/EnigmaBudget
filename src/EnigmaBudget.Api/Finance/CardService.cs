@@ -598,6 +598,7 @@ public static partial class FinanceEndpoints
         await using var transaction = await db.Database.BeginTransactionAsync(
             IsolationLevel.Serializable
         );
+        await AccountMutationLocks.LockAsync(db, ws.Id, [r.AccountId], http.RequestAborted);
         var replay = await db.CardPayments.SingleOrDefaultAsync(x =>
             x.WorkspaceId == ws.Id && x.Id == r.Id
         );

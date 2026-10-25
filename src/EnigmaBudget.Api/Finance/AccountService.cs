@@ -166,6 +166,7 @@ public static partial class FinanceEndpoints
         await using var transaction = await db.Database.BeginTransactionAsync(
             IsolationLevel.Serializable
         );
+        await AccountMutationLocks.LockAsync(db, ws.Id, [id], http.RequestAborted);
         var account = await db.Accounts.SingleOrDefaultAsync(x =>
             x.WorkspaceId == ws.Id && x.Id == id
         );

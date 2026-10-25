@@ -14,6 +14,7 @@ public sealed class WorkspaceAuthorizationTests
     [InlineData("POST", "/api/savings/applications", WorkspacePermissions.RecordFinance)]
     [InlineData("POST", "/api/savings/applications/123/reverse", WorkspacePermissions.CorrectHistory)]
     [InlineData("PUT", "/api/accounts/123/liquidity", WorkspacePermissions.ManageResources)]
+    [InlineData("PUT", "/api/savings/accounts/123/liquidity", WorkspacePermissions.ManageResources)]
     public void Savings_route_permissions_are_explicit(string method, string path, string expected)
     {
         var routeClassifier = typeof(FinanceWorkspaceFilter).GetMethod("RequiredPermission", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;

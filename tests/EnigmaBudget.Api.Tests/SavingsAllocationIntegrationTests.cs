@@ -13,6 +13,55 @@ public sealed class SavingsAllocationIntegrationTests
     private readonly ApiFactory _factory = new(timeProvider: new FixedTimeProvider(DateTimeOffset.Parse("2026-10-25T12:00:00Z")));
 
     [Fact]
+    public async Task Paid_cash_operation_serializes_before_reservation_eligibility_read()
+    {
+        using var client = await _factory.AuthenticatedClientAsync();
+        var accountId = Guid.NewGuid();
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/api/accounts", new { id = accountId, name = "Caja", bankName = "Banco", currency = "ARS", openingBalance = "1000.00", openingDate = "2026-10-01" })).StatusCode);
+        var goalId = await CreateGoalAsync(client);
+        _factory.LedgerInsertBarrier.Arm();
+        var paymentRequest = client.PostAsJsonAsync("/api/operations", new { id = Guid.NewGuid(), kind = "Expense", accountId, date = "2026-10-20", description = "Pago", category = "Casa", amount = "500.00", paid = true });
+        try
+        {
+            await _factory.LedgerInsertBarrier.WaitUntilBlockedAsync().WaitAsync(TimeSpan.FromSeconds(15));
+            _factory.LedgerInsertBarrier.ObserveNextWorkspaceLock();
+            var reserveRequest = client.PostAsJsonAsync("/api/savings/allocations", new { id = Guid.NewGuid(), goalId, accountId, amount = "600.00" });
+            await _factory.LedgerInsertBarrier.WaitForWorkspaceLockAsync().WaitAsync(TimeSpan.FromSeconds(15));
+            Assert.False(reserveRequest.IsCompleted, "Reservation must wait for the paid ledger mutation holding the account lock.");
+            _factory.LedgerInsertBarrier.Release();
+            Assert.Equal(HttpStatusCode.OK, (await paymentRequest).StatusCode);
+            var reserveResponse = await reserveRequest;
+            Assert.True(reserveResponse.StatusCode == HttpStatusCode.Conflict, await reserveResponse.Content.ReadAsStringAsync());
+        }
+        finally { _factory.LedgerInsertBarrier.Release(); }
+        using var db = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>().UseNpgsql(_factory.TestConnection).Options);
+        Assert.Empty(await db.SavingsAllocations.Where(x => x.GoalId == goalId).ToArrayAsync());
+        Assert.Single(await db.LedgerEntries.Where(x => x.AccountId == accountId).ToArrayAsync());
+    }
+
+    [Fact]
+    public async Task Spending_after_reserve_is_allowed_and_archived_reserve_stays_visible()
+    {
+        using var client = await _factory.AuthenticatedClientAsync();
+        var accountId = Guid.NewGuid();
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/api/accounts", new { id = accountId, name = "Caja", bankName = "Banco", currency = "ARS", openingBalance = "1000.00", openingDate = "2026-10-01" })).StatusCode);
+        var goalId = await CreateGoalAsync(client);
+        await ReserveAsync(client, goalId, accountId, "600.00");
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/api/operations", new { id = Guid.NewGuid(), kind = "Expense", accountId, date = "2026-10-20", description = "Pago permitido", category = "Casa", amount = "500.00", paid = true })).StatusCode);
+        var goal = Assert.Single(await client.GetFromJsonAsync<System.Text.Json.JsonElement[]>($"/api/savings/goals" ) ?? []);
+        Assert.Equal("BackingDeficit", goal.GetProperty("estimateStatus").GetString());
+        using var db = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>().UseNpgsql(_factory.TestConnection).Options);
+        var account = await db.Accounts.SingleAsync(x => x.Id == accountId);
+        account.IsArchived = true;
+        await db.SaveChangesAsync();
+        var balance = Assert.Single(await client.GetFromJsonAsync<System.Text.Json.JsonElement[]>("/api/savings/balances") ?? []);
+        Assert.Equal("500.00", balance.GetProperty("cashBalance").GetString());
+        Assert.Equal("600.00", balance.GetProperty("totalReserved").GetString());
+        var secondGoal = await CreateGoalAsync(client);
+        Assert.Equal(HttpStatusCode.Conflict, (await client.PostAsJsonAsync("/api/savings/allocations", new { id = Guid.NewGuid(), goalId = secondGoal, accountId, amount = "1.00" })).StatusCode);
+    }
+
+    [Fact]
     public async Task Reserving_cash_keeps_ledger_unchanged_and_replay_does_not_duplicate_movement()
     {
         using var client = await _factory.AuthenticatedClientAsync();
