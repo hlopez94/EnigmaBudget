@@ -37,6 +37,14 @@ Decisiones del constructor para ejecutar sin intervención adicional; no represe
 - En Task1, hacer compilar los consumidores existentes al volver nullable la cuenta sin inventar Guid.Empty ni una cuenta: mapper compartido `CashService.Operation`, DTO de listado/overview y sitios que exigen una cuenta real. Task3 completa la semántica de pendientes y liquidaciones; el filtro por cuenta excluye los sin cuenta y el listado general los incluye. Cada Payment sigue exigiendo cuenta.
 - La confirmación admite liquidación parcial: suma de efectivo + tarjeta + retención aplicada <= bruto. Mostrar diferencia pendiente antes de guardar; no exigir igualdad ni registrar el faltante como pago. Importe y desglose médico real se validan independientemente de la estimación.
 
+## Calendario, historial y páginas
+
+Decisiones del constructor: cada llamada explora una sola ventana de hasta 36 meses y devuelve hasta 200 fechas ordenadas por fecha programada y regla; cursor validado por espacio y límites originales continúa filas o ventanas siguientes. Una consulta más extensa no se procesa completa en memoria. Si existen fechas pendientes anteriores al límite inferior pedido, informar aviso y la primera fecha omitida para consultar explícitamente ese tramo. El adapter futuro pedirá su rango vencido y futuro de forma explícita y consumirá sus páginas; el calendario no cambia el rango a escondidas por la fecha de hoy.
+
+La lista incluye estimaciones y acciones atendidas Recorded/Skipped del rango. Las acciones conservan su revisión original y siguen visibles si otra revisión posterior cambia el ancla; vencimiento/fecha real no sustituyen la fecha programada para identificar una ocurrencia. `RuleVersion` de cada fila es la versión actual de la regla para concurrencia; `RevisionId` identifica la revisión histórica aplicable. Los vínculos de operaciones/compras registradas permiten consultar sus detalles ordinarios. El estado visible se resuelve para la fecha consultada; una pausa futura no oculta fechas anteriores.
+
+La cuenta preferida tiene moneda y debe coincidir con la recurrencia. La tarjeta existente soporta transacciones ARS/USD y no tiene una moneda única: validar espacio/archivo y moneda de la transacción, sin inventar una restricción a una sola moneda por tarjeta. Income no utiliza tarjeta.
+
 ## Cobertura médica: consumo y liquidación separados
 
 Decisión del controlador: cuando una regla contiene cargos/descuentos del proveedor, su importe estimado debe coincidir con cargos menos descuentos. Exigir flujo Expense, al menos un cargo y bruto positivo; rechazar 400 sin nueva revisión si Amount difiere. Sin componentes de proveedor, la regla genérica usa Amount. Los componentes informativos, de retención, reintegro o contribución no reducen ese bruto. La confirmación posterior valida su propio desglose real, que puede diferir de la estimación anterior.
