@@ -46,12 +46,14 @@ export class App implements OnInit, OnDestroy {
   notice = '';
   async ngOnInit(): Promise<void> {
     this.nativeAuth?.setIdentityLostHandler(() => {
+      ++this.loadGeneration;
       this.clearPrivateUi();
       this.session = null;
       this.busy = true;
       void this.load();
     });
     this.nativeAuth?.setPermissionLostHandler(() => {
+      ++this.loadGeneration;
       this.clearPrivateUi();
       this.session = null;
       this.busy = true;
@@ -85,6 +87,9 @@ export class App implements OnInit, OnDestroy {
   }
   async load(): Promise<void> {
     const generation = ++this.loadGeneration;
+    let expectedEpoch = this.nativeAuth?.isNative ? this.authEpoch?.snapshot() ?? null : null;
+    const current = () => generation === this.loadGeneration
+      && (!expectedEpoch || this.matchesEpoch(expectedEpoch));
     this.busy = true;
     this.error = '';
     try {
@@ -92,31 +97,36 @@ export class App implements OnInit, OnDestroy {
         const previousUserId = this.currentUserId;
         if (!(await this.nativeAuth.prepareForegroundRestore(previousUserId))) return;
         if (generation !== this.loadGeneration) return;
+        expectedEpoch = this.authEpoch?.snapshot() ?? null;
         this.clearPrivateUi();
       }
       const session = await this.api.session();
       if (generation !== this.loadGeneration) return;
+      expectedEpoch = this.nativeAuth?.isNative ? this.authEpoch?.snapshot() ?? null : null;
+      if (!current()) return;
       const incomingUserId = this.nativeAuth?.isNative ? (this.authEpoch?.snapshot().userId ?? null) : null;
       if (this.currentUserId && incomingUserId && this.currentUserId !== incomingUserId) this.clearPrivateUi();
       this.session = session;
       this.nativeLinks.setAuthenticated(session.authenticated);
       if (session.authenticated) {
         const me = await this.api.me();
-        if (generation !== this.loadGeneration) return;
+        if (!current() || (expectedEpoch && (expectedEpoch.userId !== me.id || expectedEpoch.workspaceId !== null))) return;
         if (this.currentUserId && this.currentUserId !== me.id) this.clearPrivateUi();
         this.currentUserId = me.id;
         this.personalWorkspaceId = me.personalWorkspaceId;
         const workspaces = await this.api.workspaces();
-        if (generation !== this.loadGeneration) return;
+        if (!current() || (expectedEpoch && expectedEpoch.userId !== me.id)) return;
         this.workspaces = workspaces;
         const selectedId = this.workspaceContext.restore(me.id, workspaces.map((space) => space.id), me.personalWorkspaceId, false);
         if (this.nativeAuth?.isNative && !(await this.nativeAuth.activateWorkspace(me.id, selectedId || null))) return;
         if (generation !== this.loadGeneration) return;
+        expectedEpoch = this.nativeAuth?.isNative ? this.authEpoch?.snapshot() ?? null : null;
+        if (expectedEpoch && (expectedEpoch.userId !== me.id || expectedEpoch.workspaceId !== (selectedId || null))) return;
         this.workspaceContext.restore(me.id, workspaces.map((space) => space.id), me.personalWorkspaceId);
         this.activeWorkspace = this.workspaces.find((space) => space.id === selectedId) ?? null;
         this.api.selectWorkspace(selectedId || null);
         const state = await this.api.loadOnboarding();
-        if (generation !== this.loadGeneration) return;
+        if (!current() || (expectedEpoch && (expectedEpoch.userId !== me.id || expectedEpoch.workspaceId !== (selectedId || null)))) return;
         this.state = state;
         this.financeAvailable = true;
       } else {
@@ -124,7 +134,7 @@ export class App implements OnInit, OnDestroy {
         this.session = session;
       }
     } catch (error) {
-      if (generation !== this.loadGeneration) return;
+      if (!current()) return;
       if (this.nativeAuth?.isNative && this.currentUserId) {
         this.clearPrivateUi();
         this.session = null;
@@ -141,6 +151,7 @@ export class App implements OnInit, OnDestroy {
     await this.load();
   }
   clearPrivateUiFromSignIn(): void {
+    ++this.loadGeneration;
     this.clearPrivateUi();
     this.session = null;
     this.busy = true;
@@ -159,11 +170,13 @@ export class App implements OnInit, OnDestroy {
     this.changeDetector.markForCheck();
   }
   async logout(): Promise<void> {
+    const generation = ++this.loadGeneration;
     this.busy = true;
     this.notice = '';
     try {
       let localCleared = false;
       const clearLocally = () => {
+        if (generation !== this.loadGeneration) return;
         this.clearPrivateUi();
         this.session = { authenticated: false, displayName: null, googleConfigured: false, developmentLoginEnabled: false, developmentUsers: [], csrfToken: '' };
         this.nativeLinks.setAuthenticated(false);
@@ -172,11 +185,13 @@ export class App implements OnInit, OnDestroy {
         this.changeDetector.markForCheck();
       };
       const serverRevoked = await this.api.logout(clearLocally);
+      if (generation !== this.loadGeneration) return;
       if (!localCleared) clearLocally();
       this.notice = serverRevoked ? 'La sesión se cerró y el servidor confirmó la revocación.' : 'La sesión se cerró en este dispositivo. No pudimos confirmar la revocación en el servidor.';
       this.busy = false;
       this.changeDetector.markForCheck();
     } catch (error) {
+      if (generation !== this.loadGeneration) return;
       this.error = error instanceof Error ? error.message : 'No pudimos cerrar la sesión.';
       this.busy = false;
       this.changeDetector.markForCheck();
@@ -184,13 +199,23 @@ export class App implements OnInit, OnDestroy {
   }
 
   async selectWorkspace(id: string): Promise<void> {
+    const generation = ++this.loadGeneration;
+    const userId = this.currentUserId;
+    const startingEpoch = this.nativeAuth?.isNative ? this.authEpoch?.snapshot() ?? null : null;
     let workspace = this.workspaces.find((space) => space.id === id);
     if (!workspace) {
       await this.reloadWorkspaces();
+      if (generation !== this.loadGeneration || this.currentUserId !== userId) return;
       workspace = this.workspaces.find((space) => space.id === id);
     }
     if (!workspace) return;
-    if (this.nativeAuth?.isNative && this.currentUserId && !(await this.nativeAuth.activateWorkspace(this.currentUserId, id))) return;
+    if (generation !== this.loadGeneration || this.currentUserId !== userId || (startingEpoch && !this.matchesEpoch(startingEpoch))) return;
+    if (this.nativeAuth?.isNative && userId && !(await this.nativeAuth.activateWorkspace(userId, id))) return;
+    if (generation !== this.loadGeneration || this.currentUserId !== userId) return;
+    if (this.authEpoch && this.nativeAuth?.isNative) {
+      const snapshot = this.authEpoch.snapshot();
+      if (snapshot.userId !== userId || snapshot.workspaceId !== id) return;
+    }
     this.workspaceContext.select(id);
     this.api.selectWorkspace(id);
     this.activeWorkspace = workspace;
@@ -199,9 +224,18 @@ export class App implements OnInit, OnDestroy {
 
   async reloadWorkspaces(): Promise<void> {
     const generation = this.loadGeneration;
+    const userId = this.currentUserId;
+    const workspaceId = this.activeWorkspace?.id ?? null;
+    const contextGeneration = this.workspaceContext.generation;
+    const epoch = this.nativeAuth?.isNative ? this.authEpoch?.snapshot() ?? null : null;
+    const current = () => generation === this.loadGeneration
+      && userId === this.currentUserId
+      && workspaceId === (this.activeWorkspace?.id ?? null)
+      && contextGeneration === this.workspaceContext.generation
+      && (!epoch || this.matchesEpoch(epoch));
     try {
       const workspaces = await this.api.workspaces();
-      if (generation !== this.loadGeneration) return;
+      if (!current()) return;
       this.workspaces = workspaces;
       const currentId = this.activeWorkspace?.id;
       if (currentId) {
@@ -210,7 +244,9 @@ export class App implements OnInit, OnDestroy {
         else {
           if (this.nativeAuth?.isNative && this.currentUserId) {
             if (!(await this.nativeAuth.activateWorkspace(this.currentUserId, null))) return;
+            if (generation !== this.loadGeneration || userId !== this.currentUserId || workspaceId !== (this.activeWorkspace?.id ?? null) || contextGeneration !== this.workspaceContext.generation) return;
           }
+          ++this.loadGeneration;
           this.clearPrivateUi();
           this.activeWorkspace = null;
           this.workspaceContext.select(null);
@@ -218,6 +254,7 @@ export class App implements OnInit, OnDestroy {
         }
       }
     } catch (error) {
+      if (!current()) return;
       this.error = error instanceof Error ? error.message : 'No pudimos actualizar los espacios.';
     }
     this.changeDetector.markForCheck();
@@ -239,6 +276,11 @@ export class App implements OnInit, OnDestroy {
       this.pendingInviteToken = token;
       this.changeDetector.markForCheck();
     });
+  }
+
+  private matchesEpoch(expected: { epoch: number; userId: string | null; workspaceId: string | null }): boolean {
+    const current = this.authEpoch?.snapshot();
+    return current?.epoch === expected.epoch && current.userId === expected.userId && current.workspaceId === expected.workspaceId;
   }
 
   private clearPrivateUi(): void {
