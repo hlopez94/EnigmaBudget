@@ -35,6 +35,14 @@ export class FinanceAccounts extends FinanceActions {
   protected override permissionsChanged(): void {
     if (this.workspaceArchived || !this.allowed('manageResources') || !this.allowed('correctHistory')) this.activeForm = '';
   }
+  protected override resetForContextChange(): void {
+    this.activeForm = '';
+    this.selectedAccountId = '';
+    this.accountDraft = { name: '', bankName: '', currency: 'ARS', openingBalance: '0', openingDate: financeToday() };
+    this.accountEdit = { id: '', name: '', bankName: '', isArchived: false, version: 0 };
+    this.accountEditOriginal = null;
+    this.accountAdjustment = { date: financeToday(), observedBalance: '', reason: '' };
+  }
 
   get accounts(): Account[] {
     return this.overview?.accounts ?? [];

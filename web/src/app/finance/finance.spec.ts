@@ -8,15 +8,23 @@ import { FinanceCards } from './cards';
 import { FinanceOperations } from './operations';
 import { FinanceSharing } from './sharing';
 
+class TestFinanceOperations extends FinanceOperations {
+  idempotencyKey(payload: unknown): string {
+    return this.requestId('test-operation', payload);
+  }
+}
+
 describe('finance workspace regressions', () => {
   it('keeps a closed finance draft on the old space when switching is cancelled, then discards it only after confirmation', async () => {
     const shell = new (await import('./finance-shell')).FinanceShell(
       { selectWorkspace: vi.fn() } as unknown as ApiService,
       { markForCheck: vi.fn() } as unknown as import('@angular/core').ChangeDetectorRef,
     );
-    const operations = new FinanceOperations({} as ApiService, { markForCheck: vi.fn() } as never);
+    const operations = new TestFinanceOperations({} as ApiService, { markForCheck: vi.fn() } as never);
     operations.operationDraft.description = 'Cena familiar';
     operations.activeForm = '';
+    const payload = { description: operations.operationDraft.description };
+    const firstKey = operations.idempotencyKey(payload);
     shell.activeWorkspace = { id: 'old-space' } as never;
     shell.operationComponents = { toArray: () => [operations] } as never;
     const selected = vi.fn();
@@ -26,12 +34,65 @@ describe('finance workspace regressions', () => {
     expect(shell.requestedWorkspaceId).toBe('new-space');
     shell.cancelWorkspaceChange();
     expect(operations.operationDraft.description).toBe('Cena familiar');
+    expect(operations.idempotencyKey(payload)).toBe(firstKey);
     expect(selected).not.toHaveBeenCalled();
 
     shell.requestWorkspaceChange('new-space');
     shell.confirmWorkspaceChange();
     expect(selected).toHaveBeenCalledWith('new-space');
-    expect(operations.hasPendingDraft()).toBe(true);
+    expect(operations.operationDraft.description).toBe('');
+    expect(operations.hasPendingDraft()).toBe(false);
+    expect(operations.idempotencyKey(payload)).not.toBe(firstKey);
+  });
+
+  it('ignores delayed card purchases and errors after its workspace context is invalidated', async () => {
+    const oldResponse = deferred<never>();
+    const api = { purchases: vi.fn().mockReturnValue(oldResponse.promise) };
+    const cards = new FinanceCards(api as unknown as ApiService, { markForCheck: vi.fn() } as never);
+    cards.selectedCardId = 'old-card';
+    const oldLoad = cards.loadPurchases();
+
+    (cards as unknown as { invalidateContext: () => void }).invalidateContext.call(cards);
+    cards.selectedCardId = 'new-card';
+    api.purchases.mockResolvedValue([{ id: 'new-purchase' }]);
+    await cards.loadPurchases();
+    oldResponse.reject(new Error('old workspace failed'));
+    await oldLoad;
+
+    expect(cards.purchases).toEqual([{ id: 'new-purchase' }]);
+    expect(cards.error).toBe('');
+  });
+
+  it('ignores delayed receivables errors after its workspace context is invalidated', async () => {
+    const oldResponse = deferred<never>();
+    const api = { receivables: vi.fn().mockReturnValue(oldResponse.promise) };
+    const sharing = new FinanceSharing(api as unknown as ApiService, { markForCheck: vi.fn() } as never);
+    sharing.selectedGroupId = 'old-group';
+    const oldLoad = sharing.loadReceivables();
+
+    (sharing as unknown as { invalidateContext: () => void }).invalidateContext.call(sharing);
+    sharing.selectedGroupId = 'new-group';
+    api.receivables.mockResolvedValue([{ id: 'new-receivable' }]);
+    await sharing.loadReceivables();
+    oldResponse.reject(new Error('old workspace failed'));
+    await oldLoad;
+
+    expect(sharing.groupReceivables).toEqual([{ id: 'new-receivable' }]);
+    expect(sharing.error).toBe('');
+  });
+
+  it('keeps card details readable for Readers while denying purchase entry', async () => {
+    const api = { purchases: vi.fn().mockResolvedValue([{ id: 'purchase-1' }]) };
+    const cards = new FinanceCards(api as unknown as ApiService, { markForCheck: vi.fn() } as never);
+    cards.permissions = { read: true, readGroups: false, recordFinance: false, manageResources: false, correctHistory: false, manageMembers: false, managePrivacy: false };
+    cards.selectedCardId = 'card-1';
+
+    cards.openForm('purchase');
+    await cards.loadPurchases();
+
+    expect(cards.activeForm).toBe('');
+    expect(api.purchases).toHaveBeenCalledWith('card-1');
+    expect(cards.purchases).toEqual([{ id: 'purchase-1' }]);
   });
 
   it('blocks workspace switching while a finance save is in flight', async () => {
@@ -870,3 +931,10 @@ describe('finance workspace regressions', () => {
     expect(api.createCard.mock.calls[2][0].id).not.toBe(firstId);
   });
 });
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason: unknown) => void;
+  const promise = new Promise<T>((done, fail) => { resolve = done; reject = fail; });
+  return { promise, resolve, reject };
+}

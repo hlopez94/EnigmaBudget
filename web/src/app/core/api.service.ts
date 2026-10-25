@@ -272,6 +272,8 @@ export class ApiService {
   }
   private financeMutate<T>(url: string, init: RequestInit): Promise<T> {
     const headers = new Headers(init.headers);
+    headers.set('Content-Type', 'application/json');
+    headers.set('X-CSRF-TOKEN', this.csrfToken);
     const workspaceIdAtDispatch = this.selectedWorkspaceId;
     if (workspaceIdAtDispatch) headers.set('X-Workspace-Id', workspaceIdAtDispatch);
     return this.request(url, { ...init, headers });

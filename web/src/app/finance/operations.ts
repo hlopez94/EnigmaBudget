@@ -43,6 +43,13 @@ export class FinanceOperations extends FinanceActions {
   protected override permissionsChanged(): void {
     if (this.workspaceArchived || !this.allowed('recordFinance')) this.activeForm = '';
   }
+  protected override resetForContextChange(): void {
+    this.activeForm = '';
+    this.historyFilterAccount = '';
+    this.operationDraft = { kind: 'Expense', accountId: '', date: financeToday(), description: '', category: '', amount: '', paid: true };
+    this.payment = { operationId: '', accountId: '', amount: '', date: financeToday() };
+    this.transferDraft = { fromAccountId: '', toAccountId: '', date: financeToday(), amount: '', destinationAmount: '' };
+  }
   get accounts() {
     return this.overview?.accounts ?? [];
   }

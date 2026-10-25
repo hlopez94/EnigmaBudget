@@ -1,4 +1,4 @@
-import { ChangeDetectorRef, Directive, Input } from '@angular/core';
+import { ChangeDetectorRef, Directive, Input, OnChanges, OnDestroy, SimpleChanges } from '@angular/core';
 import { ApiService } from '../core/api.service';
 import { Currency, WorkspacePermissions } from '../core/api.models';
 import { formatMoney, normalizeDecimal } from '../onboarding/draft';
@@ -19,7 +19,7 @@ export const financeToday = (): string => {
 export const financePeriod = (): string => financeToday().slice(0, 7);
 
 @Directive()
-export abstract class FinanceActions {
+export abstract class FinanceActions implements OnChanges, OnDestroy {
   private permissionState: WorkspacePermissions | null = null;
   private archivedState = false;
   @Input() set permissions(value: WorkspacePermissions | null) {
@@ -32,10 +32,34 @@ export abstract class FinanceActions {
     if (value) this.permissionsChanged();
   }
   get workspaceArchived(): boolean { return this.archivedState; }
+  @Input() workspaceId: string | null = null;
+  @Input() contextGeneration = 0;
   saving = false;
   error = '';
   notice = '';
   private readonly idempotencyKeys = new Map<string, string>();
+  private contextEpoch = 0;
+  private destroyed = false;
+
+  ngOnChanges(changes: SimpleChanges = {}): void {
+    if (changes['workspaceId'] || changes['contextGeneration']) this.invalidateContext();
+  }
+
+  ngOnDestroy(): void {
+    this.destroyed = true;
+    this.contextEpoch++;
+    this.idempotencyKeys.clear();
+  }
+
+  invalidateContext(): void {
+    this.contextEpoch++;
+    this.idempotencyKeys.clear();
+    this.saving = false;
+    this.error = '';
+    this.notice = '';
+    this.resetForContextChange();
+    this.changeDetector.markForCheck();
+  }
 
   hasPendingDraft(): boolean {
     return false;
@@ -44,6 +68,10 @@ export abstract class FinanceActions {
     return !this.workspaceArchived && (this.permissions?.[permission] ?? true);
   }
   protected permissionsChanged(): void {}
+  protected resetForContextChange(): void {}
+
+  protected captureContext(): number { return this.contextEpoch; }
+  protected isCurrentContext(epoch: number): boolean { return !this.destroyed && epoch === this.contextEpoch; }
 
   protected constructor(
     protected readonly api: ApiService,
@@ -82,27 +110,32 @@ export abstract class FinanceActions {
     afterSuccess?: () => Promise<void>,
   ): Promise<boolean> {
     if (this.saving) return false;
+    const contextEpoch = this.captureContext();
     this.saving = true;
     this.error = '';
     this.notice = '';
     this.changeDetector.markForCheck();
     try {
       await mutation();
+      if (!this.isCurrentContext(contextEpoch)) return false;
       this.notice = success;
       if (afterSuccess) {
         try {
           await afterSuccess();
         } catch (error) {
-          this.showLoadError(error);
+          if (this.isCurrentContext(contextEpoch)) this.showLoadError(error);
         }
       }
-      return true;
+      return this.isCurrentContext(contextEpoch);
     } catch (error) {
+      if (!this.isCurrentContext(contextEpoch)) return false;
       this.error = error instanceof Error ? error.message : 'No pudimos guardar los cambios.';
       return false;
     } finally {
-      this.saving = false;
-      this.changeDetector.markForCheck();
+      if (this.isCurrentContext(contextEpoch)) {
+        this.saving = false;
+        this.changeDetector.markForCheck();
+      }
     }
   }
 

@@ -1,4 +1,4 @@
-import { ChangeDetectorRef, Component, Input, OnChanges } from '@angular/core';
+import { ChangeDetectorRef, Component, Input, OnChanges, SimpleChanges } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { FinanceOverview, Group, Receivable } from '../core/api.models';
 import { ApiService } from '../core/api.service';
@@ -40,6 +40,16 @@ export class FinanceSharing extends FinanceActions implements OnChanges {
   protected override permissionsChanged(): void {
     if (this.workspaceArchived || !this.allowed('manageResources')) this.activeForm = '';
   }
+  protected override resetForContextChange(): void {
+    this.activeForm = '';
+    this.selectedGroupId = '';
+    this.groupReceivables = [];
+    this.groupDraft = { name: '', selfName: 'Yo', others: '' };
+    this.ruleMode = 'Equal';
+    this.ruleCurrency = 'ARS';
+    this.ruleWeights = {};
+    this.collection = { participantId: '', sourceId: '', accountId: '', amount: '', appliedAmount: '', date: financeToday() };
+  }
 
   get groups(): Group[] {
     return this.overview?.groups ?? [];
@@ -80,7 +90,8 @@ export class FinanceSharing extends FinanceActions implements OnChanges {
     if (!this.saving) this.activeForm = '';
   }
 
-  ngOnChanges(): void {
+  override ngOnChanges(changes: SimpleChanges = {}): void {
+    super.ngOnChanges(changes);
     if (!this.groups.some((group) => group.id === this.selectedGroupId)) {
       this.selectedGroupId = this.groups[0]?.id ?? '';
     }
@@ -99,12 +110,17 @@ export class FinanceSharing extends FinanceActions implements OnChanges {
       this.changeDetector.markForCheck();
       return;
     }
+    const contextEpoch = this.captureContext();
+    const groupId = this.selectedGroupId;
+    const period = this.period;
     try {
-      this.groupReceivables = await this.api.receivables(this.selectedGroupId, this.period);
+      const receivables = await this.api.receivables(groupId, period);
+      if (!this.isCurrentContext(contextEpoch) || this.selectedGroupId !== groupId || this.period !== period) return;
+      this.groupReceivables = receivables;
     } catch (error) {
-      this.showLoadError(error);
+      if (this.isCurrentContext(contextEpoch) && this.selectedGroupId === groupId && this.period === period) this.showLoadError(error);
     }
-    this.changeDetector.markForCheck();
+    if (this.isCurrentContext(contextEpoch) && this.selectedGroupId === groupId && this.period === period) this.changeDetector.markForCheck();
   }
 
   async createGroup(): Promise<void> {

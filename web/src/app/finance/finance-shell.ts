@@ -117,6 +117,7 @@ export class FinanceShell implements OnInit, OnChanges {
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['pendingInviteToken'] && this.pendingInviteToken) this.section = 'spaces';
     if (changes['activeWorkspace'] && this.hasInitializedWorkspace && this.activeWorkspace?.id !== this.initializedWorkspaceId) {
+      this.invalidateFinanceChildren();
       this.initializedWorkspaceId = this.activeWorkspace?.id ?? null;
       this.workspacePickerValue = this.activeWorkspace?.id ?? '';
       this.api.selectWorkspace(this.initializedWorkspaceId);
@@ -174,6 +175,16 @@ export class FinanceShell implements OnInit, OnChanges {
   get saving(): boolean { return [...(this.accountComponents?.toArray() ?? []), ...(this.operationComponents?.toArray() ?? []), ...(this.cardComponents?.toArray() ?? []), ...(this.sharingComponents?.toArray() ?? [])].some(component => component.saving); }
   get hasPendingDraft(): boolean { return [...(this.accountComponents?.toArray() ?? []), ...(this.operationComponents?.toArray() ?? []), ...(this.cardComponents?.toArray() ?? []), ...(this.sharingComponents?.toArray() ?? [])].some(component => component.hasPendingDraft()); }
 
+  private invalidateFinanceChildren(): void {
+    this.workspaceGeneration++;
+    [...(this.accountComponents?.toArray() ?? []), ...(this.operationComponents?.toArray() ?? []), ...(this.cardComponents?.toArray() ?? []), ...(this.sharingComponents?.toArray() ?? [])].forEach(component => component.invalidateContext());
+  }
+
+  private emitWorkspaceSelection(id: string): void {
+    this.invalidateFinanceChildren();
+    this.workspaceSelected.emit(id);
+  }
+
   requestWorkspaceChange(id: string): void {
     if (!id || id === this.activeWorkspace?.id) return;
     this.workspacePickerValue = id;
@@ -188,12 +199,13 @@ export class FinanceShell implements OnInit, OnChanges {
       this.changeDetector.markForCheck();
       return;
     }
-    this.workspaceSelected.emit(id);
+    this.emitWorkspaceSelection(id);
   }
   confirmWorkspaceChange(): void {
     if (this.saving || !this.requestedWorkspaceId) return;
     const id = this.requestedWorkspaceId;
     this.requestedWorkspaceId = '';
+    this.invalidateFinanceChildren();
     if (id === 'setup') this.setupRequested.emit();
     else this.workspaceSelected.emit(id);
   }

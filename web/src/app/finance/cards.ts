@@ -1,4 +1,4 @@
-import { ChangeDetectorRef, Component, Input, OnChanges } from '@angular/core';
+import { ChangeDetectorRef, Component, Input, OnChanges, SimpleChanges } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { CardAdjustment, Currency, FinanceOverview, Purchase, Statement } from '../core/api.models';
 import { ApiService } from '../core/api.service';
@@ -77,6 +77,19 @@ export class FinanceCards extends FinanceActions implements OnChanges {
   protected override permissionsChanged(): void {
     if (this.workspaceArchived || !this.allowed('recordFinance') || (!this.allowed('manageResources') && ['create', 'edit'].includes(this.activeForm))) this.activeForm = '';
   }
+  protected override resetForContextChange(): void {
+    this.activeForm = '';
+    this.selectedCardId = '';
+    this.statement = null;
+    this.purchases = [];
+    this.cardDraft = { name: '', bankName: '', closingDay: '', dueDay: '', statementDebtArs: '0', statementDebtUsd: '0', asOfDate: financeToday() };
+    this.cardEdit = { id: '', name: '', bankName: '', closingDay: '', dueDay: '', isArchived: false, version: 0 };
+    this.cardEditOriginal = null;
+    this.purchaseDraft = { date: financeToday(), description: '', category: '', currency: 'ARS', totalAmount: '', installmentCount: 1, firstPeriod: financePeriod(), groupId: '' };
+    this.statementDraft = { currency: 'ARS', dueDate: '', actualTotal: '', adjustments: [] };
+    this.statementDraftOriginal = '';
+    this.cardPayment = { accountId: '', date: financeToday(), amount: '', appliedAmount: '', currency: 'ARS' };
+  }
   get cards() {
     return this.overview?.cards ?? [];
   }
@@ -109,7 +122,8 @@ export class FinanceCards extends FinanceActions implements OnChanges {
     if (!this.saving) this.activeForm = '';
   }
 
-  ngOnChanges(): void {
+  override ngOnChanges(changes: SimpleChanges = {}): void {
+    super.ngOnChanges(changes);
     if (!this.selectedCardId || !this.cards.some((card) => card.id === this.selectedCardId)) {
       this.selectedCardId = this.cards[0]?.id ?? '';
     }
@@ -147,13 +161,19 @@ export class FinanceCards extends FinanceActions implements OnChanges {
 
   async loadStatement(): Promise<void> {
     if (!this.selectedCardId) return;
+    const contextEpoch = this.captureContext();
+    const cardId = this.selectedCardId;
+    const period = this.period;
+    const currency = this.statementDraft.currency;
     this.statement = null;
     try {
-      this.statement = await this.api.statement(
-        this.selectedCardId,
-        this.period,
-        this.statementDraft.currency,
+      const statement = await this.api.statement(
+        cardId,
+        period,
+        currency,
       );
+      if (!this.isCurrentContext(contextEpoch) || this.selectedCardId !== cardId || this.period !== period || this.statementDraft.currency !== currency) return;
+      this.statement = statement;
       this.statementDraft.dueDate = this.statement.dueDate ?? '';
       this.statementDraft.actualTotal = this.statement.actualTotal ?? this.statement.expectedAmount;
       this.statementDraft.adjustments = this.statement.adjustments.map((adjustment) => ({
@@ -163,20 +183,24 @@ export class FinanceCards extends FinanceActions implements OnChanges {
       this.statementDraftOriginal = JSON.stringify(this.statementDraft);
       this.cardPayment.currency = this.statement.currency;
     } catch (error) {
-      this.error = this.message(error);
+      if (this.isCurrentContext(contextEpoch) && this.selectedCardId === cardId && this.period === period && this.statementDraft.currency === currency) this.error = this.message(error);
     }
-    this.changeDetector.markForCheck();
+    if (this.isCurrentContext(contextEpoch) && this.selectedCardId === cardId && this.period === period && this.statementDraft.currency === currency) this.changeDetector.markForCheck();
   }
 
   async loadPurchases(): Promise<void> {
     if (!this.selectedCardId) return;
+    const contextEpoch = this.captureContext();
+    const cardId = this.selectedCardId;
     this.purchases = [];
     try {
-      this.purchases = await this.api.purchases(this.selectedCardId);
+      const purchases = await this.api.purchases(cardId);
+      if (!this.isCurrentContext(contextEpoch) || this.selectedCardId !== cardId) return;
+      this.purchases = purchases;
     } catch (error) {
-      this.error = this.message(error);
+      if (this.isCurrentContext(contextEpoch) && this.selectedCardId === cardId) this.error = this.message(error);
     }
-    this.changeDetector.markForCheck();
+    if (this.isCurrentContext(contextEpoch) && this.selectedCardId === cardId) this.changeDetector.markForCheck();
   }
 
   async saveCard(): Promise<void> {

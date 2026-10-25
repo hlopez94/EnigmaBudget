@@ -31,6 +31,25 @@ describe('workspace context boundaries', () => {
     expect(calls.filter(call => !call.url.startsWith('/api/accounts')).every(call => !new Headers(call.init?.headers).has('X-Workspace-Id'))).toBe(true);
   });
 
+  it('sends JSON and CSRF headers with the workspace captured for a financial mutation', async () => {
+    const calls: Array<{ url: string; init?: RequestInit }> = [];
+    const api = new ApiService((async (input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push({ url: String(input), init });
+      return String(input) === '/api/auth/session'
+        ? response({ csrfToken: 'csrf-token' })
+        : response({});
+    }) as typeof fetch);
+
+    await api.session();
+    api.selectWorkspace('household-a');
+    await api.createAccount({ name: 'Cuenta' });
+
+    const headers = new Headers(calls[1].init?.headers);
+    expect(headers.get('Content-Type')).toBe('application/json');
+    expect(headers.get('X-CSRF-TOKEN')).toBe('csrf-token');
+    expect(headers.get('X-Workspace-Id')).toBe('household-a');
+  });
+
   it('does not publish a delayed overview after the selected workspace changes', async () => {
     const context = new WorkspaceContext();
     const oldResponse = deferred<{ label: string }>();

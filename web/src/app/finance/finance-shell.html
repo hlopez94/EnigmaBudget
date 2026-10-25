@@ -299,6 +299,8 @@
     @defer (when section === 'accounts') {
       <app-accounts
         [hidden]="section !== 'accounts'"
+        [workspaceId]="activeWorkspace?.id ?? null"
+        [contextGeneration]="workspaceGeneration"
         [permissions]="permissions || null"
         [workspaceArchived]="!!activeWorkspace?.isArchived"
         [overview]="overview!"
@@ -313,6 +315,8 @@
     @defer (when section === 'operations') {
       <app-operations
         [hidden]="section !== 'operations'"
+        [workspaceId]="activeWorkspace?.id ?? null"
+        [contextGeneration]="workspaceGeneration"
         [permissions]="permissions || null"
         [workspaceArchived]="!!activeWorkspace?.isArchived"
         [overview]="overview!"
@@ -327,6 +331,8 @@
     @defer (when section === 'cards') {
       <app-cards
         [hidden]="section !== 'cards'"
+        [workspaceId]="activeWorkspace?.id ?? null"
+        [contextGeneration]="workspaceGeneration"
         [permissions]="permissions || null"
         [workspaceArchived]="!!activeWorkspace?.isArchived"
         [overview]="overview!"
@@ -341,6 +347,8 @@
     @defer (when section === 'sharing') {
       <app-sharing
         [hidden]="section !== 'sharing'"
+        [workspaceId]="activeWorkspace?.id ?? null"
+        [contextGeneration]="workspaceGeneration"
         [permissions]="permissions || null"
         [workspaceArchived]="!!activeWorkspace?.isArchived"
         [overview]="overview!"
