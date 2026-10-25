@@ -25,4 +25,5 @@ public sealed record WorkspaceRequestContext(
     ApplicationUser User,
     Data.Workspace Workspace,
     string Role,
-    IReadOnlySet<string> Permissions);
+    IReadOnlySet<string> Permissions,
+    bool IsSharedPersonalRead = false);

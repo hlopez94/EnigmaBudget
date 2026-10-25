@@ -49,6 +49,11 @@ public sealed class WorkspaceMigrationTests
         Assert.Equal((opA, 321.09m, new DateOnly(2024, 2, 4)), history);
         Assert.Equal(2, await db.Workspaces.CountAsync(x => x.Kind == "Personal"));
         Assert.Equal(2, await db.WorkspaceMemberships.CountAsync(x => x.Role == "Owner" && x.Active));
+        var generations = await db.WorkspaceMemberships.Where(x => x.Active).Select(x => x.ActivationGeneration).ToArrayAsync();
+        Assert.All(generations, generation => Assert.NotEqual(Guid.Empty, generation));
+        Assert.Equal(generations.Length, generations.Distinct().Count());
+        Assert.Empty(await db.PersonalReadGrants.ToArrayAsync());
+        Assert.Empty(await db.WorkspaceInvitations.ToArrayAsync());
         Assert.Equal(2, await db.ApplicationUsers.CountAsync());
         Assert.Equal(workspaceA, await db.Workspaces.Where(x => x.OwnerSubject == "legacy-owner-a").Select(x => x.Id).SingleAsync());
         Assert.Equal(workspaceB, await db.Workspaces.Where(x => x.OwnerSubject == "legacy-owner-b").Select(x => x.Id).SingleAsync());

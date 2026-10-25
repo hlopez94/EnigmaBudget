@@ -283,13 +283,15 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
     private readonly bool _relaxSecureCookiesForTests;
     private readonly string _environment;
     private readonly TimeProvider? _timeProvider;
+    private readonly IReadOnlyDictionary<string, string?>? _extraConfiguration;
     public SaveChangesBarrierInterceptor SaveBarrier { get; } = new();
     internal string TestConnection => _connection;
-    public ApiFactory(bool relaxSecureCookiesForTests = true, string environment = "Development", TimeProvider? timeProvider = null)
+    public ApiFactory(bool relaxSecureCookiesForTests = true, string environment = "Development", TimeProvider? timeProvider = null, IReadOnlyDictionary<string, string?>? extraConfiguration = null)
     {
         _relaxSecureCookiesForTests = relaxSecureCookiesForTests;
         _environment = environment;
         _timeProvider = timeProvider;
+        _extraConfiguration = extraConfiguration;
         var testConnection = Environment.GetEnvironmentVariable("ENIGMABUDGET_TEST_CONNECTION");
         if (string.IsNullOrWhiteSpace(testConnection)) throw new InvalidOperationException("Set ENIGMABUDGET_TEST_CONNECTION to an isolated PostgreSQL test database.");
         var b = new NpgsqlConnectionStringBuilder(testConnection);
@@ -315,13 +317,19 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
                 services.Configure<CookieAuthenticationOptions>(CookieAuthenticationDefaults.AuthenticationScheme, o => o.Cookie.SecurePolicy = CookieSecurePolicy.None);
             }
         });
-        builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
+        builder.ConfigureAppConfiguration((_, config) =>
         {
+            var values = new Dictionary<string, string?>
+            {
             ["ConnectionStrings:Default"] = _connection,
             ["Authentication:DevelopmentLoginEnabled"] = "true",
             ["Authentication:Google:ClientId"] = "",
             ["Authentication:Google:ClientSecret"] = ""
-        }));
+            };
+            if (_extraConfiguration is not null)
+                foreach (var item in _extraConfiguration) values[item.Key] = item.Value;
+            config.AddInMemoryCollection(values);
+        });
     }
 
     public HttpClient CreateProductionClient()
@@ -419,7 +427,12 @@ public sealed class TestIdentityHandler(IOptionsMonitor<AuthenticationSchemeOpti
     {
         var subject = Request.Headers["X-Test-Identity"].ToString();
         if (string.IsNullOrWhiteSpace(subject)) return Task.FromResult(AuthenticateResult.NoResult());
-        var identity = new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, subject), new Claim(ClaimTypes.Name, subject)], Scheme.Name);
+        var claims = new List<Claim> { new(ClaimTypes.NameIdentifier, subject), new(ClaimTypes.Name, subject) };
+        var email = Request.Headers["X-Test-Email"].ToString();
+        if (!string.IsNullOrWhiteSpace(email)) claims.Add(new Claim(ClaimTypes.Email, email));
+        var verified = Request.Headers["X-Test-Email-Verified"].ToString();
+        if (!string.IsNullOrWhiteSpace(verified)) claims.Add(new Claim("email_verified", verified));
+        var identity = new ClaimsIdentity(claims, Scheme.Name);
         return Task.FromResult(AuthenticateResult.Success(new AuthenticationTicket(new ClaimsPrincipal(identity), Scheme.Name)));
     }
 }

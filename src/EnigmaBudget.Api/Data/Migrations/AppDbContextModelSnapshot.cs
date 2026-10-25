@@ -790,6 +790,49 @@ namespace EnigmaBudget.Api.Data.Migrations
                     b.ToTable("ApplicationUsers");
                 });
 
+            modelBuilder.Entity("EnigmaBudget.Api.Workspaces.PersonalReadGrant", b =>
+                {
+                    b.Property<Guid>("PersonalWorkspaceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("HouseholdWorkspaceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer");
+
+                    b.HasKey("PersonalWorkspaceId", "HouseholdWorkspaceId");
+
+                    b.HasIndex("HouseholdWorkspaceId");
+
+                    b.ToTable("PersonalReadGrants");
+                });
+
+            modelBuilder.Entity("EnigmaBudget.Api.Workspaces.PersonalReadGrantAudience", b =>
+                {
+                    b.Property<Guid>("PersonalWorkspaceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("HouseholdWorkspaceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("MembershipGeneration")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("PersonalWorkspaceId", "HouseholdWorkspaceId", "UserId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("PersonalReadGrantAudience");
+                });
+
             modelBuilder.Entity("EnigmaBudget.Api.Workspaces.WorkspaceAuditEvent", b =>
                 {
                     b.Property<Guid>("Id")
@@ -832,12 +875,70 @@ namespace EnigmaBudget.Api.Data.Migrations
                     b.ToTable("WorkspaceAuditEvents");
                 });
 
+            modelBuilder.Entity("EnigmaBudget.Api.Workspaces.WorkspaceInvitation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("AcceptedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("AcceptedMembershipGeneration")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<byte[]>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("bytea");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AcceptedByUserId");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique();
+
+                    b.HasIndex("WorkspaceId", "Id")
+                        .IsUnique();
+
+                    b.ToTable("WorkspaceInvitations");
+                });
+
             modelBuilder.Entity("EnigmaBudget.Api.Workspaces.WorkspaceMembership", b =>
                 {
                     b.Property<Guid>("WorkspaceId")
                         .HasColumnType("uuid");
 
                     b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ActivationGeneration")
                         .HasColumnType("uuid");
 
                     b.Property<bool>("Active")
@@ -928,11 +1029,55 @@ namespace EnigmaBudget.Api.Data.Migrations
                     b.Navigation("OwnerUser");
                 });
 
+            modelBuilder.Entity("EnigmaBudget.Api.Workspaces.PersonalReadGrant", b =>
+                {
+                    b.HasOne("EnigmaBudget.Api.Data.Workspace", null)
+                        .WithMany()
+                        .HasForeignKey("HouseholdWorkspaceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("EnigmaBudget.Api.Data.Workspace", null)
+                        .WithMany()
+                        .HasForeignKey("PersonalWorkspaceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("EnigmaBudget.Api.Workspaces.PersonalReadGrantAudience", b =>
+                {
+                    b.HasOne("EnigmaBudget.Api.Workspaces.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("EnigmaBudget.Api.Workspaces.PersonalReadGrant", null)
+                        .WithMany("Audience")
+                        .HasForeignKey("PersonalWorkspaceId", "HouseholdWorkspaceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("EnigmaBudget.Api.Workspaces.WorkspaceAuditEvent", b =>
                 {
                     b.HasOne("EnigmaBudget.Api.Workspaces.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("ActorUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("EnigmaBudget.Api.Data.Workspace", null)
+                        .WithMany()
+                        .HasForeignKey("WorkspaceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("EnigmaBudget.Api.Workspaces.WorkspaceInvitation", b =>
+                {
+                    b.HasOne("EnigmaBudget.Api.Workspaces.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("AcceptedByUserId")
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.HasOne("EnigmaBudget.Api.Data.Workspace", null)
@@ -980,6 +1125,11 @@ namespace EnigmaBudget.Api.Data.Migrations
             modelBuilder.Entity("EnigmaBudget.Api.Workspaces.ApplicationUser", b =>
                 {
                     b.Navigation("Memberships");
+                });
+
+            modelBuilder.Entity("EnigmaBudget.Api.Workspaces.PersonalReadGrant", b =>
+                {
+                    b.Navigation("Audience");
                 });
 #pragma warning restore 612, 618
         }

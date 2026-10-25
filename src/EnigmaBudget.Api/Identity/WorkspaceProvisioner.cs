@@ -27,6 +27,19 @@ public sealed class WorkspaceProvisioner(AppDbContext db, TimeProvider clock)
             };
             db.ApplicationUsers.Add(user);
         }
+        else if (principal.HasClaim(c => c.Type == "email_verified"))
+        {
+            var trustedEmail = principal.FindFirstValue(ClaimTypes.Email);
+            var trustedVerified = string.Equals(principal.FindFirstValue("email_verified"), "true", StringComparison.OrdinalIgnoreCase);
+            var trustedName = principal.Identity?.Name;
+            if (user.Email != trustedEmail || user.EmailVerified != trustedVerified || (!string.IsNullOrWhiteSpace(trustedName) && user.DisplayName != trustedName))
+            {
+                user.Email = trustedEmail;
+                user.EmailVerified = trustedVerified;
+                if (!string.IsNullOrWhiteSpace(trustedName)) user.DisplayName = trustedName;
+                await db.SaveChangesAsync(cancellationToken);
+            }
+        }
 
         var personal = await db.Workspaces
             .Include(x => x.Draft)

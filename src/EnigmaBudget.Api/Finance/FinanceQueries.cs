@@ -2,6 +2,7 @@ using System.Data;
 using System.Globalization;
 using System.Security.Claims;
 using EnigmaBudget.Api.Data;
+using EnigmaBudget.Api.Workspaces;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
@@ -169,6 +170,8 @@ public static partial class FinanceEndpoints
             .Sum(x => x.Amount);
         var groupRows = new List<object>();
         var receivableRows = new List<object>();
+        var financeContext = FinanceWorkspaceFilter.Get(http)!;
+        if (financeContext.Permissions.Contains(WorkspacePermissions.ReadGroups))
         foreach (var group in await db.Groups.Where(x => x.WorkspaceId == ws.Id).ToArrayAsync())
         {
             var participants = await db
@@ -195,17 +198,14 @@ public static partial class FinanceEndpoints
             if (shares is IValueHttpResult<List<object>> value && value.Value is not null)
                 receivableRows.AddRange(value.Value);
         }
-        return Results.Ok(
-            new
+        var overview = new Dictionary<string, object?>
             {
-                period,
-                accounts = accountDtos,
-                cards = cardDtos,
-                operations = ops,
-                groups = groupRows,
-                installments,
-                receivables = receivableRows,
-                budget = new
+                ["period"] = period,
+                ["accounts"] = accountDtos,
+                ["cards"] = cardDtos,
+                ["operations"] = ops,
+                ["installments"] = installments,
+                ["budget"] = new
                 {
                     cashExpensesArs = F(expenseArs),
                     cashExpensesUsd = F(expenseUsd),
@@ -218,7 +218,7 @@ public static partial class FinanceEndpoints
                     cardChargesArs = F(cardChargesArs),
                     cardChargesUsd = F(cardChargesUsd),
                 },
-                totals = new
+                ["totals"] = new
                 {
                     balanceArs = F(balanceArs),
                     balanceUsd = F(balanceUsd),
@@ -227,8 +227,13 @@ public static partial class FinanceEndpoints
                     cardCreditArs = F(cardCreditArs),
                     cardCreditUsd = F(cardCreditUsd),
                 },
-            }
-        );
+            };
+        if (financeContext.Permissions.Contains(WorkspacePermissions.ReadGroups))
+        {
+            overview["groups"] = groupRows;
+            overview["receivables"] = receivableRows;
+        }
+        return Results.Ok(overview);
     }
 
     private static decimal CurrentCardOpeningDebt(PaymentCard card, string currency, DateOnly today)

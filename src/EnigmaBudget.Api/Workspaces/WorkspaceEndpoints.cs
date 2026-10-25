@@ -22,6 +22,7 @@ public static class WorkspaceEndpoints
         api.MapPost("/workspaces/{id:guid}/leave", Leave);
         api.MapPost("/workspaces/{id:guid}/owner-transfer", TransferOwner);
         api.MapGet("/workspaces/{id:guid}/audit", Audit);
+        routes.MapInvitationPrivacyEndpoints();
     }
 
     private static async Task<IResult> Me(HttpContext http, WorkspaceProvisioner provisioner)
@@ -40,7 +41,20 @@ public static class WorkspaceEndpoints
             .Where(x => x.UserId == personal.OwnerUserId && x.Active)
             .OrderBy(x => x.Workspace.Kind == "Personal" ? 0 : 1).ThenBy(x => x.Workspace.Name)
             .ToArrayAsync(http.RequestAborted);
-        return Results.Ok(rows.Select(x => ToDto(x.Workspace, x.Role, personal.OwnerUserId)));
+        var result = rows.Select(x => ToDto(x.Workspace, x.Role, personal.OwnerUserId)).ToList();
+        var shared = await (
+            from grant in db.PersonalReadGrants.AsNoTracking()
+            join audience in db.PersonalReadGrantAudience.AsNoTracking()
+                on new { grant.PersonalWorkspaceId, grant.HouseholdWorkspaceId } equals new { audience.PersonalWorkspaceId, audience.HouseholdWorkspaceId }
+            join member in db.WorkspaceMemberships.AsNoTracking()
+                on new { WorkspaceId = audience.HouseholdWorkspaceId, audience.UserId } equals new { member.WorkspaceId, member.UserId }
+            join workspace in db.Workspaces.AsNoTracking() on grant.PersonalWorkspaceId equals workspace.Id
+            where grant.Enabled && audience.UserId == personal.OwnerUserId && member.Active && member.ActivationGeneration == audience.MembershipGeneration
+            select workspace
+        ).ToArrayAsync(http.RequestAborted);
+        foreach (var workspace in shared)
+            if (result.All(x => x.Id != workspace.Id)) result.Add(ToDto(workspace, "Reader", personal.OwnerUserId, sharedPersonalRead: true));
+        return Results.Ok(result);
     }
 
     private static async Task<IResult> Create(HttpContext http, AppDbContext db, WorkspaceProvisioner provisioner, IAntiforgery csrf, CreateWorkspaceRequest request)
@@ -63,11 +77,10 @@ public static class WorkspaceEndpoints
         return Results.Created($"/api/workspaces/{workspace.Id}", ToDto(workspace, "Owner", personal.OwnerUserId));
     }
 
-    private static async Task<IResult> Get(HttpContext http, AppDbContext db, Guid id)
+    private static async Task<IResult> Get(HttpContext http, WorkspaceAccessService access, Guid id)
     {
-        var row = await db.WorkspaceMemberships.AsNoTracking().Include(x => x.Workspace)
-            .SingleOrDefaultAsync(x => x.WorkspaceId == id && x.Active && x.User.Subject == CurrentIdentity.Subject(http.User), http.RequestAborted);
-        return row is null ? NotFound() : Results.Ok(ToDto(row.Workspace, row.Role, row.UserId));
+        var (context, failure) = await access.ResolveAsync(http.User, id.ToString(), WorkspacePermissions.Read, http.RequestAborted);
+        return context is null ? AccessFailure(failure) : Results.Ok(ToDto(context.Workspace, context.Role, context.User.Id, context.IsSharedPersonalRead));
     }
 
     private static async Task<IResult> Update(HttpContext http, AppDbContext db, WorkspaceAccessService access, WorkspaceMutationGate gate, IAntiforgery csrf, Guid id, UpdateWorkspaceRequest request)
@@ -138,6 +151,7 @@ public static class WorkspaceEndpoints
         if (member.Version != body.Version) return Problem(409, "La membresía cambió. Actualizá la pantalla.");
         AddAudit(db, ctx, "membership.revoked", "WorkspaceMembership", userId);
         member.Active = false; member.Version++;
+        await DisableOwnerGrantAsync(db, id, userId, http.RequestAborted);
         mutation.MarkChanged();
         try { await db.SaveChangesAsync(http.RequestAborted); await mutation.CommitAsync(http.RequestAborted); } catch (DbUpdateConcurrencyException) { return Problem(409, "La membresía cambió. Actualizá la pantalla."); }
         return Results.NoContent();
@@ -159,6 +173,7 @@ public static class WorkspaceEndpoints
         if (member.Version != request.Version) return Problem(409, "La membresía cambió. Actualizá la pantalla.");
         AddAudit(db, ctx, "membership.left", "WorkspaceMembership", ctx.User.Id);
         member.Active = false; member.Version++;
+        await DisableOwnerGrantAsync(db, id, ctx.User.Id, http.RequestAborted);
         mutation.MarkChanged();
         try { await db.SaveChangesAsync(http.RequestAborted); await mutation.CommitAsync(http.RequestAborted); } catch (DbUpdateConcurrencyException) { return Problem(409, "La membresía cambió. Actualizá la pantalla."); }
         return Results.NoContent();
@@ -197,10 +212,11 @@ public static class WorkspaceEndpoints
         return Results.Ok(rows);
     }
 
-    private static WorkspaceDto ToDto(Workspace ws, string role, Guid userId)
+    private static WorkspaceDto ToDto(Workspace ws, string role, Guid userId, bool sharedPersonalRead = false)
     {
         var permissions = WorkspacePermissions.For(role, ws.Kind == "Personal" && role == "Owner" && ws.OwnerUserId == userId);
-        return new WorkspaceDto(ws.Id, ws.Name, ws.Kind, role, false, ws.IsArchived, ws.Version,
+        if (sharedPersonalRead) permissions = new HashSet<string>([WorkspacePermissions.Read], StringComparer.Ordinal);
+        return new WorkspaceDto(ws.Id, ws.Name, ws.Kind, role, sharedPersonalRead, ws.IsArchived, ws.Version,
             new(permissions.Contains(WorkspacePermissions.Read), permissions.Contains(WorkspacePermissions.ReadGroups), permissions.Contains(WorkspacePermissions.RecordFinance), permissions.Contains(WorkspacePermissions.ManageResources), permissions.Contains(WorkspacePermissions.CorrectHistory), permissions.Contains(WorkspacePermissions.ManageMembers), permissions.Contains(WorkspacePermissions.ManagePrivacy)));
     }
 
@@ -210,5 +226,13 @@ public static class WorkspaceEndpoints
     private static bool ValidName(string? name) => !string.IsNullOrWhiteSpace(name) && name.Trim().Length <= 120;
     private static void AddAudit(AppDbContext db, WorkspaceRequestContext context, string action, string resourceType, Guid resourceId, string changesJson = "{}") =>
         db.WorkspaceAuditEvents.Add(new WorkspaceAuditEvent { WorkspaceId = context.Workspace.Id, ActorUserId = context.User.Id, Action = action, ResourceType = resourceType, ResourceId = resourceId.ToString(), OccurredAt = DateTimeOffset.UtcNow, ChangesJson = changesJson });
+    private static async Task DisableOwnerGrantAsync(AppDbContext db, Guid householdId, Guid ownerUserId, CancellationToken cancellationToken)
+    {
+        var personalId = await db.Workspaces.Where(x => x.Kind == "Personal" && x.OwnerUserId == ownerUserId).Select(x => (Guid?)x.Id).SingleOrDefaultAsync(cancellationToken);
+        if (personalId is null) return;
+        var grants = await db.PersonalReadGrants.Where(x => x.PersonalWorkspaceId == personalId && x.HouseholdWorkspaceId == householdId && x.Enabled).ToArrayAsync(cancellationToken);
+        foreach (var grant in grants) { grant.Enabled = false; grant.Version++; }
+        db.PersonalReadGrantAudience.RemoveRange(db.PersonalReadGrantAudience.Where(x => x.PersonalWorkspaceId == personalId && x.HouseholdWorkspaceId == householdId));
+    }
     private static async Task<bool> ValidCsrf(HttpContext http, IAntiforgery csrf) { try { await csrf.ValidateRequestAsync(http); return true; } catch (AntiforgeryValidationException) { return false; } }
 }

@@ -7,7 +7,10 @@ public sealed class FinanceWorkspaceFilter : IEndpointFilter
         var http = invocationContext.HttpContext;
         var permission = RequiredPermission(http.Request.Method, http.Request.Path);
         var access = http.RequestServices.GetRequiredService<WorkspaceAccessService>();
-        var (context, failure) = await access.ResolveAsync(http.User, http.Request.Headers["X-Workspace-Id"].FirstOrDefault(), permission, http.RequestAborted);
+        string? selectedWorkspaceId = null;
+        if (http.Request.Headers.TryGetValue("X-Workspace-Id", out var selectedWorkspaceHeader))
+            selectedWorkspaceId = selectedWorkspaceHeader.ToString();
+        var (context, failure) = await access.ResolveAsync(http.User, selectedWorkspaceId, permission, http.RequestAborted);
         if (context is null)
             return Results.Problem(statusCode: failure, title: "No se pudo completar la solicitud", detail: failure == StatusCodes.Status404NotFound ? "El espacio no existe o no está disponible." : "No tenés permiso para realizar esta acción en el espacio.");
         http.Items[WorkspaceRequestContextItem.Key] = context;
@@ -22,8 +25,6 @@ public sealed class FinanceWorkspaceFilter : IEndpointFilter
         if (method == "GET")
             return p.Contains("/groups", StringComparison.OrdinalIgnoreCase)
                 || p.Contains("/receivables", StringComparison.OrdinalIgnoreCase)
-                || p.Contains("/purchases", StringComparison.OrdinalIgnoreCase)
-                || p == "/api/finance"
                 ? WorkspacePermissions.ReadGroups
                 : WorkspacePermissions.Read;
         if (p.EndsWith("/adjustments", StringComparison.OrdinalIgnoreCase) || p.EndsWith("/void", StringComparison.OrdinalIgnoreCase))

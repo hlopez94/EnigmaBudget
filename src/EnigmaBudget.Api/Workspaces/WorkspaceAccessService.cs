@@ -16,7 +16,7 @@ public sealed class WorkspaceAccessService(AppDbContext db, WorkspaceProvisioner
     {
         var personal = await provisioner.EnsurePersonalAsync(principal, cancellationToken);
         var workspaceId = personal.Id;
-        if (!string.IsNullOrWhiteSpace(selectedId)
+        if (selectedId is not null
             && (!Guid.TryParse(selectedId, out workspaceId) || workspaceId == Guid.Empty))
             return (null, StatusCodes.Status404NotFound);
 
@@ -25,8 +25,23 @@ public sealed class WorkspaceAccessService(AppDbContext db, WorkspaceProvisioner
         var membership = await db.WorkspaceMemberships
             .Include(x => x.Workspace)
             .FirstOrDefaultAsync(x => x.WorkspaceId == workspaceId && x.UserId == user.Id && x.Active, cancellationToken);
-        if (membership is null) return (null, StatusCodes.Status404NotFound);
-        return ResolveMembership(user, membership.Workspace, membership.Role, requiredPermission, allowArchivedManagement);
+        if (membership is not null) return ResolveMembership(user, membership.Workspace, membership.Role, requiredPermission, allowArchivedManagement);
+        var targetPersonal = await db.Workspaces.AsNoTracking().SingleOrDefaultAsync(x => x.Id == workspaceId && x.Kind == "Personal", cancellationToken);
+        if (targetPersonal is null || targetPersonal.OwnerUserId == user.Id) return (null, StatusCodes.Status404NotFound);
+        var hasGrant = await (
+            from grant in db.PersonalReadGrants.AsNoTracking()
+            join audience in db.PersonalReadGrantAudience.AsNoTracking()
+                on new { grant.PersonalWorkspaceId, grant.HouseholdWorkspaceId } equals new { audience.PersonalWorkspaceId, audience.HouseholdWorkspaceId }
+            join membershipRow in db.WorkspaceMemberships.AsNoTracking()
+                on new { WorkspaceId = audience.HouseholdWorkspaceId, audience.UserId } equals new { membershipRow.WorkspaceId, membershipRow.UserId }
+            where grant.PersonalWorkspaceId == workspaceId && grant.Enabled && audience.UserId == user.Id
+                && membershipRow.Active && membershipRow.ActivationGeneration == audience.MembershipGeneration
+            select grant.PersonalWorkspaceId
+        ).AnyAsync(cancellationToken);
+        if (!hasGrant) return (null, StatusCodes.Status404NotFound);
+        if (requiredPermission != WorkspacePermissions.Read) return (null, StatusCodes.Status403Forbidden);
+        var permissions = new HashSet<string>([WorkspacePermissions.Read], StringComparer.Ordinal);
+        return (new WorkspaceRequestContext(user, targetPersonal, "Reader", permissions, IsSharedPersonalRead: true), StatusCodes.Status200OK);
     }
 
     /// <summary>Rechecks the actor's permission after WorkspaceMutationGate has locked and refreshed the workspace row.</summary>

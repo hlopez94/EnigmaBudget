@@ -80,6 +80,18 @@ public sealed class WorkspaceIntegrationTests
         Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync("/api/operations", new { })).StatusCode);
     }
 
+    [Fact]
+    public async Task Explicit_empty_workspace_selection_is_not_treated_as_the_default_personal_space()
+    {
+        using var factory = new ApiFactory();
+        using var client = factory.IdentityClient("empty-workspace-selection");
+        await client.GetAsync("/api/auth/session");
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/accounts")).StatusCode);
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/accounts");
+        request.Headers.TryAddWithoutValidation("X-Workspace-Id", " ");
+        Assert.Equal(HttpStatusCode.NotFound, (await client.SendAsync(request)).StatusCode);
+    }
+
     private sealed record WorkspaceDto(Guid Id, string Name, string Kind, string Role);
     private sealed record MeResponse(Guid Id, string DisplayName, string? Email, bool EmailVerified, Guid PersonalWorkspaceId);
 }

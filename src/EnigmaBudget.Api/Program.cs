@@ -24,6 +24,12 @@ builder.Services.AddScoped<WorkspaceProvisioner>();
 builder.Services.AddScoped<WorkspaceAccessService>();
 builder.Services.AddScoped<WorkspaceMutationGate>();
 builder.Services.AddScoped<WorkspaceAuditInterceptor>();
+builder.Services.AddScoped<InvitationService>();
+builder.Services.AddScoped<PrivacyGrantService>();
+var developmentIdentityOptions = builder.Services.AddOptions<DevelopmentIdentityOptions>()
+    .Bind(builder.Configuration.GetSection(DevelopmentIdentityOptions.SectionName));
+if (appDevelopmentLoginEnabled(builder))
+    developmentIdentityOptions.Validate(DevelopmentIdentityOptions.IsValid, "Configured development identities must have unique keys and subjects with valid profile fields.").ValidateOnStart();
 builder.Services.AddDbContext<AppDbContext>((services, o) => o.UseNpgsql(builder.Configuration.GetConnectionString("Default")).AddInterceptors(services.GetRequiredService<WorkspaceAuditInterceptor>()));
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<BusinessClock>();
@@ -35,7 +41,7 @@ var auth = builder.Services.AddAuthentication(CookieAuthenticationDefaults.Authe
     o.Events.OnRedirectToLogin = context => { context.Response.StatusCode = StatusCodes.Status401Unauthorized; return Task.CompletedTask; };
     o.Events.OnRedirectToAccessDenied = context => { context.Response.StatusCode = StatusCodes.Status403Forbidden; return Task.CompletedTask; };
 });
-if (googleConfigured) auth.AddGoogle(GoogleDefaults.AuthenticationScheme, o => { o.ClientId = googleId!; o.ClientSecret = googleSecret!; o.SignInScheme = CookieAuthenticationDefaults.AuthenticationScheme; o.CallbackPath = "/signin-google"; o.ClaimActions.MapJsonKey("email_verified", "email_verified", ClaimValueTypes.Boolean); o.Events.OnCreatingTicket = async context => { var sub = context.Principal?.FindFirstValue(ClaimTypes.NameIdentifier); if (string.IsNullOrWhiteSpace(sub)) throw new InvalidOperationException("Google subject missing"); await Task.CompletedTask; }; });
+if (googleConfigured) auth.AddGoogle(GoogleDefaults.AuthenticationScheme, o => { o.ClientId = googleId!; o.ClientSecret = googleSecret!; o.SignInScheme = CookieAuthenticationDefaults.AuthenticationScheme; o.CallbackPath = "/signin-google"; o.Events.OnCreatingTicket = context => { var sub = context.Principal?.FindFirstValue(ClaimTypes.NameIdentifier); if (string.IsNullOrWhiteSpace(sub)) throw new InvalidOperationException("Google subject missing"); if (context.Principal?.Identity is ClaimsIdentity identity) GoogleIdentityClaims.EnrichFromTrustedProfile(context.User, identity); return Task.CompletedTask; }; });
 builder.Services.AddAuthorization();
 builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase);
 
@@ -86,11 +92,22 @@ app.MapGet("/api/auth/session", async (HttpContext http, IAntiforgery antiforger
     return Results.Ok(new { authenticated, displayName = authenticated ? http.User.Identity!.Name : null, googleConfigured, developmentLoginEnabled = app.Environment.IsDevelopment() && builder.Configuration.GetValue<bool>("Authentication:DevelopmentLoginEnabled"), csrfToken = tokens.RequestToken });
 });
 app.MapGet("/api/auth/google", (HttpContext http) => googleConfigured ? Results.Challenge(new AuthenticationProperties { RedirectUri = "/" }, [GoogleDefaults.AuthenticationScheme]) : Results.StatusCode(503));
-if (app.Environment.IsDevelopment()) app.MapPost("/api/auth/development", async (HttpContext http, IAntiforgery antiforgery) =>
+if (app.Environment.IsDevelopment()) app.MapPost("/api/auth/development", async (HttpContext http, IAntiforgery antiforgery, Microsoft.Extensions.Options.IOptions<DevelopmentIdentityOptions> identityOptions) =>
 {
     if (!builder.Configuration.GetValue<bool>("Authentication:DevelopmentLoginEnabled")) return Results.NotFound();
     try { await antiforgery.ValidateRequestAsync(http); } catch (AntiforgeryValidationException) { return Results.BadRequest(); }
-    var identity = new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, "development-local-user"), new Claim(ClaimTypes.Name, "Usuario de desarrollo")], CookieAuthenticationDefaults.AuthenticationScheme);
+    DevelopmentLoginRequest? request = null;
+    if (http.Request.ContentLength is > 0 or null)
+    {
+        try { request = await http.Request.ReadFromJsonAsync<DevelopmentLoginRequest>(http.RequestAborted); }
+        catch (JsonException) when (http.Request.ContentLength is null) { }
+    }
+    var configured = identityOptions.Value.Users;
+    var selected = string.IsNullOrWhiteSpace(request?.Key) ? null : configured.SingleOrDefault(x => string.Equals(x.Key, request.Key, StringComparison.Ordinal));
+    if (!string.IsNullOrWhiteSpace(request?.Key) && selected is null) return Results.NotFound();
+    var identity = selected is null
+        ? new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, "development-local-user"), new Claim(ClaimTypes.Name, "Usuario de desarrollo")], CookieAuthenticationDefaults.AuthenticationScheme)
+        : new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, selected.Subject), new Claim(ClaimTypes.Name, selected.DisplayName), new Claim(ClaimTypes.Email, selected.Email), new Claim("email_verified", "true")], CookieAuthenticationDefaults.AuthenticationScheme);
     await http.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity));
     return Results.NoContent();
 });
