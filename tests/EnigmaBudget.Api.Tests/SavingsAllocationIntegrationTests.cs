@@ -40,6 +40,62 @@ public sealed class SavingsAllocationIntegrationTests
     }
 
     [Fact]
+    public async Task Reservation_read_blocks_paid_operation_until_reservation_commits()
+    {
+        using var client = await _factory.AuthenticatedClientAsync();
+        var accountId = Guid.NewGuid();
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/api/accounts", new { id = accountId, name = "Caja", bankName = "Banco", currency = "ARS", openingBalance = "1000.00", openingDate = "2026-10-01" })).StatusCode);
+        var goalId = await CreateGoalAsync(client);
+        _factory.SavingsLedgerReadBarrier.Arm();
+        var reserveRequest = client.PostAsJsonAsync("/api/savings/allocations", new { id = Guid.NewGuid(), goalId, accountId, amount = "600.00" });
+        try
+        {
+            await _factory.SavingsLedgerReadBarrier.WaitUntilReadAsync().WaitAsync(TimeSpan.FromSeconds(15));
+            _factory.LedgerInsertBarrier.ObserveNextWorkspaceKeyShare();
+            var paymentRequest = client.PostAsJsonAsync("/api/operations", new { id = Guid.NewGuid(), kind = "Expense", accountId, date = "2026-10-20", description = "Pago después de reserva", category = "Casa", amount = "500.00", paid = true });
+            await _factory.LedgerInsertBarrier.WaitForWorkspaceKeyShareAsync().WaitAsync(TimeSpan.FromSeconds(15));
+            Assert.False(paymentRequest.IsCompleted, "Payment must wait while reservation owns the workspace/account lock prefix.");
+            _factory.SavingsLedgerReadBarrier.Release();
+            Assert.Equal(HttpStatusCode.OK, (await reserveRequest).StatusCode);
+            Assert.Equal(HttpStatusCode.OK, (await paymentRequest).StatusCode);
+        }
+        finally { _factory.SavingsLedgerReadBarrier.Release(); }
+        var balance = Assert.Single(await client.GetFromJsonAsync<System.Text.Json.JsonElement[]>("/api/savings/balances") ?? []);
+        Assert.Equal("500.00", balance.GetProperty("cashBalance").GetString());
+        Assert.Equal("600.00", balance.GetProperty("totalReserved").GetString());
+        Assert.Equal("100.00", balance.GetProperty("backingDeficit").GetString());
+        using var db = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>().UseNpgsql(_factory.TestConnection).Options);
+        Assert.Single(await db.SavingsAllocations.Where(x => x.GoalId == goalId).ToArrayAsync());
+    }
+
+    [Fact(Skip = "Immutable BASE control; temporarily unskip and run against its original CashService.")]
+    public async Task Legacy_paid_operation_waits_on_account_fk_during_paused_reservation_negative_control()
+    {
+        using var client = await _factory.AuthenticatedClientAsync();
+        var accountId = Guid.NewGuid();
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/api/accounts", new { id = accountId, name = "Caja", bankName = "Banco", currency = "ARS", openingBalance = "1000.00", openingDate = "2026-10-01" })).StatusCode);
+        var goalId = await CreateGoalAsync(client);
+        _factory.SavingsLedgerReadBarrier.Arm();
+        var reserveRequest = client.PostAsJsonAsync("/api/savings/allocations", new { id = Guid.NewGuid(), goalId, accountId, amount = "600.00" });
+        try
+        {
+            await _factory.SavingsLedgerReadBarrier.WaitUntilReadAsync().WaitAsync(TimeSpan.FromSeconds(15));
+            _factory.LedgerInsertBarrier.ObserveNextLedgerInsert();
+            var paymentRequest = client.PostAsJsonAsync("/api/operations", new { id = Guid.NewGuid(), kind = "Expense", accountId, date = "2026-10-20", description = "Pago legacy", category = "Casa", amount = "500.00", paid = true });
+            await _factory.LedgerInsertBarrier.WaitForLedgerInsertAsync().WaitAsync(TimeSpan.FromSeconds(15));
+            Assert.False(paymentRequest.IsCompleted, "Legacy payment's account foreign-key lock must wait for reservation's account FOR UPDATE.");
+            _factory.SavingsLedgerReadBarrier.Release();
+            Assert.Equal(HttpStatusCode.OK, (await reserveRequest).StatusCode);
+            Assert.Equal(HttpStatusCode.OK, (await paymentRequest).StatusCode);
+        }
+        finally { _factory.SavingsLedgerReadBarrier.Release(); }
+        var balance = Assert.Single(await client.GetFromJsonAsync<System.Text.Json.JsonElement[]>("/api/savings/balances") ?? []);
+        Assert.Equal("500.00", balance.GetProperty("cashBalance").GetString());
+        Assert.Equal("600.00", balance.GetProperty("totalReserved").GetString());
+        Assert.Equal("100.00", balance.GetProperty("backingDeficit").GetString());
+    }
+
+    [Fact]
     public async Task Spending_after_reserve_is_allowed_and_archived_reserve_stays_visible()
     {
         using var client = await _factory.AuthenticatedClientAsync();
@@ -59,6 +115,45 @@ public sealed class SavingsAllocationIntegrationTests
         Assert.Equal("600.00", balance.GetProperty("totalReserved").GetString());
         var secondGoal = await CreateGoalAsync(client);
         Assert.Equal(HttpStatusCode.Conflict, (await client.PostAsJsonAsync("/api/savings/allocations", new { id = Guid.NewGuid(), goalId = secondGoal, accountId, amount = "1.00" })).StatusCode);
+    }
+
+    [Fact]
+    public async Task Owner_can_read_member_reservation_history_after_membership_deactivation()
+    {
+        using var owner = await _factory.AuthenticatedClientAsync("history-owner");
+        using var member = await _factory.AuthenticatedClientAsync("history-actor");
+        var workspaceResponse = await owner.PostAsJsonAsync("/api/workspaces", new { id = Guid.NewGuid(), kind = "Household", name = "Hogar" });
+        Assert.True(workspaceResponse.IsSuccessStatusCode, await workspaceResponse.Content.ReadAsStringAsync());
+        var workspaceId = (await workspaceResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>()).GetProperty("id").GetGuid();
+        owner.DefaultRequestHeaders.Add("X-Workspace-Id", workspaceId.ToString());
+        member.DefaultRequestHeaders.Add("X-Workspace-Id", workspaceId.ToString());
+        Guid memberUserId;
+        await using (var setup = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>().UseNpgsql(_factory.TestConnection).Options))
+        {
+            var user = await setup.ApplicationUsers.SingleAsync(x => x.Subject == "history-actor");
+            memberUserId = user.Id;
+            setup.WorkspaceMemberships.Add(new EnigmaBudget.Api.Workspaces.WorkspaceMembership { WorkspaceId = workspaceId, UserId = user.Id, Role = "Member", JoinedAt = DateTimeOffset.UtcNow });
+            await setup.SaveChangesAsync();
+        }
+        var accountId = Guid.NewGuid();
+        Assert.Equal(HttpStatusCode.OK, (await owner.PostAsJsonAsync("/api/accounts", new { id = accountId, name = "Caja", bankName = "Banco", currency = "ARS", openingBalance = "1000.00", openingDate = "2026-10-01" })).StatusCode);
+        var goalId = Guid.NewGuid();
+        Assert.Equal(HttpStatusCode.OK, (await owner.PostAsJsonAsync("/api/savings/goals", new { id = goalId, name = "Meta", targetCurrency = "ARS", targetAmount = "1000.00", desiredDate = (string?)null, monthlyContribution = (string?)null, nextContributionDate = (string?)null })).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await member.PostAsJsonAsync("/api/savings/allocations", new { id = Guid.NewGuid(), goalId, accountId, amount = "250.00" })).StatusCode);
+        await using (var revoke = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>().UseNpgsql(_factory.TestConnection).Options))
+        {
+            var membership = await revoke.WorkspaceMemberships.SingleAsync(x => x.WorkspaceId == workspaceId && x.UserId == memberUserId);
+            membership.Active = false; membership.Version++;
+            await revoke.SaveChangesAsync();
+        }
+        Assert.Equal(HttpStatusCode.NotFound, (await member.PostAsJsonAsync("/api/savings/allocations", new { id = Guid.NewGuid(), goalId, accountId, amount = "1.00" })).StatusCode);
+        var detailsResponse = await owner.GetAsync($"/api/savings/goals/{goalId}/details");
+        Assert.Equal(HttpStatusCode.OK, detailsResponse.StatusCode);
+        var details = await detailsResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+        var movement = details.GetProperty("movements").EnumerateArray().Single(x => x.GetProperty("kind").GetString() == "Allocate");
+        Assert.Equal(memberUserId, movement.GetProperty("actorUserId").GetGuid());
+        Assert.Equal("history-actor", movement.GetProperty("actorDisplayName").GetString());
+        Assert.Equal("250.00", movement.GetProperty("amount").GetString());
     }
 
     [Fact]
