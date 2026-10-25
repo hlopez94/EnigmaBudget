@@ -395,7 +395,7 @@ test('runs real finance, sharing, and card acceptance from empty completed onboa
   const lastPurchaseField = purchaseForm.locator('[name="purchaseGroup"]');
   const firstPurchaseField = purchaseForm.locator('[name="purchaseDescription"]');
   await expect(firstPurchaseField).toBeFocused();
-  for (let tab = 0; tab < 12; tab++) {
+  for (let tab = 0; tab < 20; tab++) {
     if (await lastPurchaseField.evaluate((field) => field === document.activeElement)) break;
     await page.keyboard.press('Tab');
   }

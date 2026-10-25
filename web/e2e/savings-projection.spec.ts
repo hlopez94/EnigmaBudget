@@ -190,6 +190,7 @@ const createOperation = async (
   expect(created.date).toBe(input.date);
   expect(created.amount).toBe(`${input.amount}.00`);
   if (input.paid) await expect(page.locator('.operation-row').filter({ hasText: input.description })).toBeVisible();
+  return created;
 };
 
 const openGoalDetails = async (goal: ReturnType<Page['locator']>) => {
@@ -364,9 +365,11 @@ test('real savings, existing payment, projection and scenario journey stays resp
   await openGoalDetails(goal);
   await expect(page.locator('.allocation-row').filter({ hasText: arsAccount })).toBeVisible();
 
-  await createOperation(page, {
+  const createdPaidOperation = await createOperation(page, {
     kind: 'Expense', accountLabel: accountLabels[0], date, description: paidDescription, amount: '5000', paid: true,
   });
+  expect(createdPaidOperation.payments).toHaveLength(1);
+  const expectedPaymentId = createdPaidOperation.payments[0].id as string;
   expect(await currentCash(page, arsAccount)).toBe('25000.00');
   await openMoreEntry(page, 'Ahorros');
   const selectedGoal = page.locator('.goal-panel').filter({ hasText: goalName });
@@ -380,11 +383,15 @@ test('real savings, existing payment, projection and scenario journey stays resp
   await allocationRow.getByRole('button', { name: 'Aplicar pago existente' }).click();
   const applyForm = page.locator('form').filter({ has: page.locator('[name="payment"]') });
   const paymentSelect = applyForm.locator('[name="payment"]');
+  const matchingPaymentOption = paymentSelect.locator('option').filter({ hasText: paidDescription });
+  await expect(matchingPaymentOption).toHaveCount(1);
+  await expect(paymentSelect.locator(`option[value="${expectedPaymentId}"]`)).toHaveCount(1);
   const paymentOption = await paymentSelect.locator('option').evaluateAll((items, description) => {
     const found = items.find((item) => item.textContent?.includes(String(description)));
     return found instanceof HTMLOptionElement ? found.value : '';
   }, paidDescription);
   expect(paymentOption).not.toBe('');
+  expect(paymentOption).toBe(expectedPaymentId);
   await paymentSelect.selectOption(paymentOption);
   await applyForm.locator('[name="amount"]').fill('5000');
   const applyPayment = waitForApi(page, 'POST', '/api/savings/applications');
