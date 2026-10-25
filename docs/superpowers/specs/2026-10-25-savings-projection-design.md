@@ -91,3 +91,7 @@ El exceso de pago de un período es una lectura histórica del resumen, distinta
 ### Fecha estimada dentro del período de tarjeta
 
 Si aún no existe resumen confirmado, el vencimiento estimado de una cuota usa `DueDay` en el mismo mes de su `Period`, limitado al último día válido de ese mes. El período ya fue elegido al registrar la compra; no se agrega otro mes ni se infiere nuevamente desde la fecha de compra o cierre. Por ejemplo, período octubre y día 20 produce una estimación para el 20 de octubre. Sin día configurado se mantiene sin fecha; la fecha del resumen confirmado siempre prevalece. Toda fecha de este cálculo continúa identificada como estimada.
+
+### Crédito ya vigente al iniciar una proyección
+
+La prohibición de anticipar un crédito futuro se evalúa respecto de `asOf`. Si en octubre se conoce un crédito de noviembre, no reduce una salida de octubre. Al consultar en noviembre, ese crédito ya vigente puede reducir una obligación de octubre que siga impaga: ambas se resuelven desde hoy. Para ordenar esa disponibilidad se comparan las fechas efectivas de los componentes, nunca anteriores a `asOf`; no se descarta para siempre la compensación solo porque la obligación tiene un período original más antiguo. La misma identidad y crédito se usan una sola vez; el neto global de tarjeta se conserva y no se genera ingreso bancario. Esta precisión mantiene la procedencia histórica sin sobreestimar lo que resta pagar hoy.
