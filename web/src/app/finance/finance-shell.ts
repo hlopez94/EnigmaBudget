@@ -44,7 +44,7 @@ const monthName = new Intl.DateTimeFormat('es-AR', {
 
 const periodParts = (value: string): { year: number; month: number } | null => {
   const match = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(value);
-  if (!match) return null;
+  if (!match || match[0] !== value) return null;
   const year = Number(match[1]);
   return year > 0 ? { year, month: Number(match[2]) } : null;
 };
@@ -88,13 +88,15 @@ export class FinanceShell implements OnInit, OnChanges {
   private workspaceManagerInstance: WorkspaceManager | null = null;
 
   period = today().slice(0, 7);
+  appliedPeriod = this.period;
+  private periodRequestGeneration = 0;
   get periodLabel(): string {
-    const appliedPeriod = this.overview?.period ?? this.period;
-    const parts = periodParts(appliedPeriod);
+    const period = this.overview?.period ?? this.appliedPeriod;
+    const parts = periodParts(period);
     if (!parts) return '';
     const date = new Date(0);
     date.setUTCFullYear(parts.year, parts.month - 1, 1);
-    return `${monthName.format(date)} ${appliedPeriod.slice(0, 4)}`;
+    return `${monthName.format(date)} ${period.slice(0, 4)}`;
   }
   section: FinanceSection = 'home';
   moreTarget: 'accounts' | 'setup' = 'accounts';
@@ -161,6 +163,7 @@ export class FinanceShell implements OnInit, OnChanges {
     }
     const workspaceId = this.activeWorkspace?.id ?? null;
     const generation = this.workspaceGeneration;
+    const periodRequestGeneration = ++this.periodRequestGeneration;
     this.busy = true;
     this.error = '';
     this.notice = '';
@@ -175,21 +178,22 @@ export class FinanceShell implements OnInit, OnChanges {
       const workspace = await this.api.workspace(workspaceId);
       if (generation !== this.workspaceGeneration || workspaceId !== this.activeWorkspace?.id) return;
       const overview = await this.api.financeOverview(requestedPeriod);
-      if (generation === this.workspaceGeneration && workspaceId === this.activeWorkspace?.id) {
+      if (generation === this.workspaceGeneration && periodRequestGeneration === this.periodRequestGeneration && workspaceId === this.activeWorkspace?.id) {
         if (JSON.stringify(workspace) !== JSON.stringify(this.activeWorkspace)) {
           this.activeWorkspace = workspace;
           this.workspaceUpdated.emit(workspace);
         }
         this.overview = overview;
+        this.appliedPeriod = requestedPeriod;
       }
     } catch (error) {
-      if (generation === this.workspaceGeneration && workspaceId === this.activeWorkspace?.id) {
-        this.overview = null;
+      if (generation === this.workspaceGeneration && periodRequestGeneration === this.periodRequestGeneration && workspaceId === this.activeWorkspace?.id) {
+        if (error instanceof ApiProblem && (error.status === 403 || error.status === 404)) this.overview = null;
         this.error = error instanceof Error ? error.message : 'No pudimos cargar los datos.';
         if (error instanceof ApiProblem && (error.status === 403 || error.status === 404)) this.workspacesChanged.emit();
       }
     } finally {
-      if (generation === this.workspaceGeneration) {
+      if (generation === this.workspaceGeneration && periodRequestGeneration === this.periodRequestGeneration) {
         this.busy = false;
         this.changeDetector.markForCheck();
       }

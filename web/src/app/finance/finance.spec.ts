@@ -446,25 +446,28 @@ describe('finance workspace regressions', () => {
 
     expect(api.financeOverview).toHaveBeenCalledWith('2026-11');
     expect(shell.overview?.period).toBe('2026-11');
+    expect(shell.appliedPeriod).toBe('2026-11');
   });
 
-  it('formats valid ISO months and suppresses empty or malformed captions safely', async () => {
+  it('formats the applied ISO month and keeps its caption while the editable month is invalid', async () => {
     const shell = new (await import('./finance-shell')).FinanceShell(
       {} as ApiService,
       { markForCheck: vi.fn() } as unknown as import('@angular/core').ChangeDetectorRef,
     );
 
-    shell.period = '2026-01';
+    shell.appliedPeriod = '2026-01';
     expect(shell.periodLabel).toBe('enero 2026');
     shell.period = '2026-12';
+    expect(shell.periodLabel).toBe('enero 2026');
+    shell.appliedPeriod = '2026-12';
     expect(shell.periodLabel).toBe('diciembre 2026');
-    shell.period = '0099-01';
+    shell.appliedPeriod = '0099-01';
     expect(shell.periodLabel).toBe('enero 0099');
 
-    for (const invalid of ['', '2026-00', '2026-13', '2026/01', 'abc']) {
+    for (const invalid of ['', '2026-00', '2026-13', '2026/01', '2026-10\n', 'abc']) {
       shell.period = invalid;
       expect(() => shell.periodLabel).not.toThrow();
-      expect(shell.periodLabel).toBe('');
+      expect(shell.periodLabel).toBe('enero 0099');
     }
   });
 
@@ -480,15 +483,70 @@ describe('finance workspace regressions', () => {
     const appliedOverview = { period: '2026-10', marker: 'last-good-response' };
     shell.activeWorkspace = { id: 'personal' } as never;
     shell.overview = appliedOverview as never;
+    shell.appliedPeriod = '2026-10';
 
-    for (const invalid of ['', '2026-00', '2026-13', '2026/01', 'abc']) {
+    for (const invalid of ['', '2026-00', '2026-13', '2026/01', '2026-10\n', 'abc']) {
       shell.period = invalid;
       await shell.changePeriod();
       expect(shell.error).toMatch(/período válido/i);
       expect(shell.overview).toBe(appliedOverview);
+      expect(shell.appliedPeriod).toBe('2026-10');
       expect(api.workspace).not.toHaveBeenCalled();
       expect(api.financeOverview).not.toHaveBeenCalled();
     }
+  });
+
+  it('keeps the last applied snapshot when a valid period request fails', async () => {
+    const api = {
+      workspace: vi.fn().mockResolvedValue({ id: 'personal' }),
+      financeOverview: vi.fn().mockRejectedValue(new Error('No hubo respuesta')),
+    };
+    const shell = new (await import('./finance-shell')).FinanceShell(
+      api as unknown as ApiService,
+      { markForCheck: vi.fn() } as unknown as import('@angular/core').ChangeDetectorRef,
+    );
+    const appliedOverview = { period: '2026-10', marker: 'last-good-response' };
+    shell.activeWorkspace = { id: 'personal' } as never;
+    shell.overview = appliedOverview as never;
+    shell.appliedPeriod = '2026-10';
+    shell.period = '2026-11';
+
+    await shell.refresh();
+
+    expect(shell.overview).toBe(appliedOverview);
+    expect(shell.appliedPeriod).toBe('2026-10');
+    expect(shell.periodLabel).toBe('octubre 2026');
+    expect(shell.error).toBe('No hubo respuesta');
+  });
+
+  it('ignores a late failure from an older valid period request', async () => {
+    const oldFailure = deferred<never>();
+    const api = {
+      workspace: vi.fn().mockResolvedValue({ id: 'personal' }),
+      financeOverview: vi
+        .fn()
+        .mockReturnValueOnce(oldFailure.promise)
+        .mockResolvedValueOnce({ period: '2026-12', marker: 'latest-response' }),
+    };
+    const shell = new (await import('./finance-shell')).FinanceShell(
+      api as unknown as ApiService,
+      { markForCheck: vi.fn() } as unknown as import('@angular/core').ChangeDetectorRef,
+    );
+    shell.activeWorkspace = { id: 'personal' } as never;
+    shell.appliedPeriod = '2026-10';
+    shell.period = '2026-11';
+    const oldRefresh = shell.refresh();
+    await Promise.resolve();
+
+    shell.period = '2026-12';
+    await shell.refresh();
+    oldFailure.reject(new Error('Older period failed'));
+    await oldRefresh;
+
+    expect(shell.overview).toMatchObject({ period: '2026-12', marker: 'latest-response' });
+    expect(shell.appliedPeriod).toBe('2026-12');
+    expect(shell.error).toBe('');
+    expect(shell.busy).toBe(false);
   });
 
   it('keeps an open account action and reuses its request ID after a failed save', async () => {

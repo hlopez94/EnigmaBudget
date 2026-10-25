@@ -536,12 +536,46 @@ test('runs real finance, sharing, and card acceptance from empty completed onboa
 
   await mobileNavigationButton(page, 'Compartidos').click();
   const period = page.locator('input[aria-label="Período a consultar"]');
+  const periodRequests: string[] = [];
+  const trackPeriodRequests = (request: import('@playwright/test').Request) => {
+    const url = new URL(request.url());
+    if (
+      request.method() === 'GET' &&
+      (url.pathname === '/api/finance' ||
+        /^\/api\/cards\/[^/]+\/statement$/.test(url.pathname) ||
+        /^\/api\/groups\/[^/]+\/receivables$/.test(url.pathname))
+    ) {
+      periodRequests.push(`${url.pathname}?period=${url.searchParams.get('period') ?? ''}`);
+    }
+  };
+  page.on('request', trackPeriodRequests);
+  let releasePendingFinance!: () => void;
+  let signalPendingFinance!: () => void;
+  const pendingFinance = new Promise<void>((resolve) => { signalPendingFinance = resolve; });
+  const continueFinance = new Promise<void>((resolve) => { releasePendingFinance = resolve; });
+  await page.route('**/api/finance**', async (route) => {
+    const url = new URL(route.request().url());
+    if (url.searchParams.get('period') === nextMonth) {
+      signalPendingFinance();
+      await continueFinance;
+    }
+    await route.continue();
+  });
   const nextOverview = page.waitForResponse((response) => {
     const url = new URL(response.url());
     return url.pathname === '/api/finance' && url.searchParams.get('period') === nextMonth;
   });
   await period.fill(nextMonth);
+  await pendingFinance;
+  await expect(period).toBeDisabled();
+  await expect(page.locator('app-cards h3').filter({ hasText: `Resumen ${month}` })).toHaveCount(1);
+  await expect(page.locator('app-sharing .operation-row').first()).toContainText(month);
+  expect(periodRequests.filter((request) => request.startsWith('/api/cards/') || request.startsWith('/api/groups/'))).toEqual([]);
+  releasePendingFinance();
   expect((await nextOverview).status()).toBe(200);
+  await expect.poll(() => periodRequests.filter((request) => request.startsWith('/api/cards/') || request.startsWith('/api/groups/')).length).toBe(2);
+  await expect(page.locator('app-cards h3').filter({ hasText: `Resumen ${nextMonth}` })).toHaveCount(1);
+  await page.unroute('**/api/finance**');
   overview = await (await page.request.get(`/api/finance?period=${nextMonth}`)).json();
   const futureRule = page.locator('form').filter({ has: page.locator('[name="ruleMode"]') });
   const saveFutureRule = waitForApi(page, 'PUT', `/api/groups/${groupId}/rules/${nextMonth}`);
@@ -599,7 +633,60 @@ test('runs real finance, sharing, and card acceptance from empty completed onboa
   ).toBe('100.00');
   expect(overview.totals.cardDebtArs).toBe('80000.00');
 
+  await mobileNavigationButton(page, 'Tarjetas').click();
+  await expect(page.getByRole('heading', { name: `Resumen ${month}` })).toBeVisible();
+  await page.getByRole('button', { name: 'Cargar compra' }).click();
+  const retainedPurchaseForm = page.locator('form').filter({ has: page.locator('[name="purchaseDescription"]') });
+  await retainedPurchaseForm.locator('[name="purchaseDescription"]').fill('Borrador de período');
+  await page.keyboard.press('Escape');
+  await expect(retainedPurchaseForm).toBeHidden();
+
+  await mobileNavigationButton(page, 'Compartidos').click();
+  await page.getByRole('button', { name: 'Crear grupo' }).first().click();
+  const retainedGroupForm = page.locator('form').filter({ has: page.locator('[name="groupName"]') });
+  await retainedGroupForm.locator('[name="groupName"]').fill('Borrador de período');
+  await page.keyboard.press('Escape');
+  await expect(retainedGroupForm).toBeHidden();
+
   await mobileNavigationButton(page, 'Inicio').click();
+  const periodForClear = page.getByLabel('Período a consultar');
+  const periodErrorForClear = page.getByRole('alert').filter({ hasText: /período válido/i });
+  periodRequests.length = 0;
+  await periodForClear.fill('');
+  await expect(periodErrorForClear).toBeVisible();
+  await page.waitForTimeout(150);
+  const cardError = page.locator('app-cards .feedback.error');
+  const sharingError = page.locator('app-sharing .feedback.error');
+  const invalidPeriodState = {
+    cardError: await cardError.count() ? await cardError.innerText() : '',
+    sharingError: await sharingError.count() ? await sharingError.innerText() : '',
+    requests: [...periodRequests],
+  };
+  expect(invalidPeriodState).toEqual({ cardError: '', sharingError: '', requests: [] });
+
+  const restoredOverview = page.waitForResponse((response) => {
+    const url = new URL(response.url());
+    return url.pathname === '/api/finance' && url.searchParams.get('period') === month;
+  });
+  await periodForClear.fill(month);
+  expect((await restoredOverview).status()).toBe(200);
+  await expect(cardError).toHaveCount(0);
+  await expect(sharingError).toHaveCount(0);
+  expect(periodRequests).toContain(`/api/finance?period=${month}`);
+  expect(periodRequests.some((request) => request.startsWith('/api/cards/') && request.endsWith(`?period=${month}`))).toBe(true);
+  expect(periodRequests.some((request) => request.startsWith('/api/groups/') && request.endsWith(`?period=${month}`))).toBe(true);
+  page.off('request', trackPeriodRequests);
+
+  await mobileNavigationButton(page, 'Tarjetas').click();
+  await page.getByRole('button', { name: 'Cargar compra' }).click();
+  await expect(page.locator('form').filter({ has: page.locator('[name="purchaseDescription"]') }).locator('[name="purchaseDescription"]')).toHaveValue('Borrador de período');
+  await page.keyboard.press('Escape');
+  await mobileNavigationButton(page, 'Compartidos').click();
+  await page.getByRole('button', { name: 'Crear grupo' }).first().click();
+  await expect(page.locator('form').filter({ has: page.locator('[name="groupName"]') }).locator('[name="groupName"]')).toHaveValue('Borrador de período');
+  await page.keyboard.press('Escape');
+  await mobileNavigationButton(page, 'Inicio').click();
+
   await page.reload();
   await expect(page.locator('.balance-card.ars strong')).toContainText('76.900');
   const accountsPanel = page.locator('.accounts-panel');
