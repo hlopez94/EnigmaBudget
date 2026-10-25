@@ -29,7 +29,7 @@ Estado inicial auditado el 25/10/2026: rama `codex/rebuild-net10-angular22`, bas
 | Último resumen | Mejora solicitada pendiente | Formatos explícitos soportados, propuesta revisable, cuotas y conciliación sin duplicación |
 | Planes y Mercado Pago | Pendiente | Personal/Hogar, catálogo/precios configurables, checkout, webhooks verificados, conciliación, cobertura y cancelación |
 | Administración | Pendiente | Backpanel con permisos, suscriptores/pagos/planes, auditoría y operaciones trazables |
-| Web instalable/Android | Web existente; empaquetado pendiente | PWA, Capacitor mínimo sin Ionic, Google/archivos/navegación Android y compilación verificable |
+| Web instalable/Android | Web existente; contrato backend de sesiones nativas implementado y revisado (`b004bf8`, CI: 87 API, 58 frontend y seis recorridos reales). Puente y APK debug en revisión; falta conexión con pantallas/lifecycle. Sin prueba real de Google, teléfono ni App Links. | PWA, Capacitor mínimo sin Ionic, Google/archivos/navegación Android y compilación verificable |
 | Operación VPS/Cloudflare | Host único y empaquetado existentes; arranque local de contenedor bloqueado | Arranque reproducible, proxy/TLS, R2 privado, copias/restauración, registros y comprobaciones |
 
 ## Orden de ejecución
@@ -58,7 +58,7 @@ Angular 22/OptimusUI 2, .NET 10, PostgreSQL, un solo host. Sin Ionic. S3 compati
 
 ## Hallazgo temprano Android
 
-La revisión técnica del 25/10/2026 identificó que la app Angular empaquetada tiene un origen distinto de la API y no hereda la sesión del navegador del sistema. Capacitor mínimo y el host único siguen siendo las restricciones. El siguiente corte deberá probar Google y una operación autenticada en Android, sin usar la opción de recarga remota como solución de producción. Aún no existe código Android, ni prueba real de Google o dispositivo; no se declara ese requisito completado. Referencias primarias: [Google/Credential Manager](https://developer.android.com/identity/sign-in/credential-manager-siwg-implementation), [configuración de Capacitor](https://capacitorjs.com/docs/configuration).
+La revisión técnica del 25/10/2026 identificó que la app Angular empaquetada tiene un origen distinto de la API y no hereda la sesión del navegador del sistema. Capacitor mínimo y el host único siguen siendo las restricciones. El siguiente corte deberá probar Google y una operación autenticada en Android, sin usar la opción de recarga remota como solución de producción. Se implementó el contrato backend de sesiones y se está revisando el puente Android con un primer APK debug compilado. La conexión de pantallas/ciclo de sesión y la prueba real de Google o dispositivo siguen pendientes; no se declara ese requisito completado. Referencias primarias: [Google/Credential Manager](https://developer.android.com/identity/sign-in/credential-manager-siwg-implementation), [configuración de Capacitor](https://capacitorjs.com/docs/configuration).
 
 - 25/10/2026: el usuario pidió Product Design, delegó elegir entre alternativas y confirmó ejecución autónoma sin intervención. Se generaron tres alternativas; el constructor eligió «Panorama sereno». Rediseño implementado y entregado sobre Angular/OptimusUI reales, sin prototipo separado. La revisión final corrigió consultas inválidas desde secciones montadas y el validador de período completo; la diferencia de densidad P3 se conserva para mantener legibilidad. No modifica el alcance de aplicación completa ni presenta diseños como funciones ya operativas.
 
