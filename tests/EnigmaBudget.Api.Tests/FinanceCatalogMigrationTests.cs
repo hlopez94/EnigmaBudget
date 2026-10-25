@@ -65,6 +65,7 @@ public sealed class FinanceCatalogMigrationTests
 
         Assert.Equal(1, await Scalar<int>(db, "SELECT count(*) FROM \"FinanceCategories\" WHERE \"WorkspaceId\" = @workspace AND \"Name\" = 'Sin clasificar' AND \"Kind\" = 'Expense'", workspace));
         Assert.Equal(1, await Scalar<int>(db, "SELECT count(*) FROM \"FinanceCategories\" WHERE \"WorkspaceId\" = @workspace AND \"Name\" = 'Sin clasificar' AND \"Kind\" = 'Income'", workspace));
+        Assert.Equal(2, await Scalar<int>(db, "SELECT count(*) FROM \"FinanceCategories\" WHERE \"WorkspaceId\" = @workspace AND \"IsDefault\"", workspace));
         Assert.Equal("false", await ColumnDefault(db, "FinanceCategories", "IsArchived"));
         Assert.Equal("1", await ColumnDefault(db, "FinanceCategories", "Version"));
     }

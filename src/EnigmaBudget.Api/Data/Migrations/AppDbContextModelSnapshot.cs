@@ -895,6 +895,44 @@ namespace EnigmaBudget.Api.Data.Migrations
                         });
                 });
 
+            modelBuilder.Entity("EnigmaBudget.Api.Finance.CatalogCommand", b =>
+                {
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("RequestId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ActorUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CommandKind")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("PayloadHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("ResultJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<Guid>("TargetResourceId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("WorkspaceId", "RequestId");
+
+                    b.HasIndex("ActorUserId");
+
+                    b.ToTable("CatalogCommands");
+                });
+
             modelBuilder.Entity("EnigmaBudget.Api.Finance.FinanceCategory", b =>
                 {
                     b.Property<Guid>("Id")
@@ -902,6 +940,11 @@ namespace EnigmaBudget.Api.Data.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<bool>("IsArchived")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<bool>("IsDefault")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValue(false);
@@ -925,6 +968,10 @@ namespace EnigmaBudget.Api.Data.Migrations
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("WorkspaceId", "Kind")
+                        .IsUnique()
+                        .HasFilter("\"IsDefault\"");
 
                     b.HasIndex("WorkspaceId", "Kind", "Name")
                         .IsUnique();
@@ -1761,6 +1808,21 @@ namespace EnigmaBudget.Api.Data.Migrations
                         .WithOne()
                         .HasForeignKey("EnigmaBudget.Api.ExchangeRates.SavingsGoalRateChoiceEntity", "WorkspaceId", "GoalId")
                         .HasPrincipalKey("EnigmaBudget.Api.Savings.SavingsGoal", "WorkspaceId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("EnigmaBudget.Api.Finance.CatalogCommand", b =>
+                {
+                    b.HasOne("EnigmaBudget.Api.Workspaces.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("ActorUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("EnigmaBudget.Api.Data.Workspace", null)
+                        .WithMany()
+                        .HasForeignKey("WorkspaceId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

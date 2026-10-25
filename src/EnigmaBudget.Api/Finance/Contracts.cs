@@ -154,3 +154,11 @@ public sealed record OperationDto(
     int Version,
     PaymentDto[] Payments
 );
+
+public sealed record CatalogCreate(Guid Id, string Name, string? Kind = null);
+public sealed record CatalogUpdate(Guid RequestId, int Version, string Name, string? Kind = null);
+public sealed record CatalogArchive(Guid RequestId, int Version);
+public sealed record CategoryCatalogDto(Guid ItemId, string Name, string Kind, bool IsArchived, bool IsDefault, int Version);
+public sealed record MerchantCatalogDto(Guid MerchantId, string Name, bool IsArchived, int Version);
+public sealed record IncomeSourceCatalogDto(Guid IncomeSourceId, string Name, string Kind, bool IsArchived, int Version);
+public sealed record FinanceCatalogDto(CategoryCatalogDto[] Categories, MerchantCatalogDto[] Merchants, IncomeSourceCatalogDto[] IncomeSources);

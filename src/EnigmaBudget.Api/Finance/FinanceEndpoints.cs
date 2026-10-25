@@ -16,6 +16,7 @@ public static partial class FinanceEndpoints
     public static void MapFinanceEndpoints(this RouteGroupBuilder api)
     {
         var finance = api.MapGroup("").AddEndpointFilter<FinanceWorkspaceFilter>();
+        finance.MapCatalogEndpoints();
         finance.MapGet("/accounts", Accounts);
         finance.MapGet("/finance", FinanceOverview);
         finance.MapPost("/accounts", CreateAccount);

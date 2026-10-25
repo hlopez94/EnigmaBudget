@@ -149,6 +149,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<FinanceCategory> FinanceCategories => Set<FinanceCategory>();
     public DbSet<FinanceMerchant> FinanceMerchants => Set<FinanceMerchant>();
     public DbSet<FinanceIncomeSource> FinanceIncomeSources => Set<FinanceIncomeSource>();
+    public DbSet<CatalogCommand> CatalogCommands => Set<CatalogCommand>();
     public DbSet<FinancePayment> FinancePayments => Set<FinancePayment>();
     public DbSet<LedgerEntry> LedgerEntries => Set<LedgerEntry>();
     public DbSet<TransferRecord> Transfers => Set<TransferRecord>();
@@ -270,9 +271,11 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         model.Entity<FinanceCategory>().Property(x => x.Kind).HasMaxLength(20);
         model.Entity<FinanceCategory>().Property(x => x.Name).HasColumnType("text");
         model.Entity<FinanceCategory>().Property(x => x.IsArchived).HasDefaultValue(false);
+        model.Entity<FinanceCategory>().Property(x => x.IsDefault).HasDefaultValue(false);
         model.Entity<FinanceCategory>().Property(x => x.Version).IsConcurrencyToken().HasDefaultValue(1);
         model.Entity<FinanceCategory>().ToTable(table => table.HasCheckConstraint("CK_FinanceCategories_Kind", "\"Kind\" IN ('Expense','Income')"));
         model.Entity<FinanceCategory>().HasIndex(x => new { x.WorkspaceId, x.Kind, x.Name }).IsUnique();
+        model.Entity<FinanceCategory>().HasIndex(x => new { x.WorkspaceId, x.Kind }).IsUnique().HasFilter("\"IsDefault\"");
         model.Entity<FinanceCategory>().HasOne<Workspace>().WithMany().HasForeignKey(x => x.WorkspaceId).OnDelete(DeleteBehavior.Cascade);
         model.Entity<FinanceMerchant>().HasKey(x => x.Id);
         model.Entity<FinanceMerchant>().HasAlternateKey(x => new { x.WorkspaceId, x.Id });
@@ -290,6 +293,12 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         model.Entity<FinanceIncomeSource>().ToTable(table => table.HasCheckConstraint("CK_FinanceIncomeSources_Kind", "\"Kind\" IN ('Salary','Extra','AnnualBonus','IndependentWork','Other')"));
         model.Entity<FinanceIncomeSource>().HasIndex(x => new { x.WorkspaceId, x.Kind, x.Name }).IsUnique();
         model.Entity<FinanceIncomeSource>().HasOne<Workspace>().WithMany().HasForeignKey(x => x.WorkspaceId).OnDelete(DeleteBehavior.Cascade);
+        model.Entity<CatalogCommand>().HasKey(x => new { x.WorkspaceId, x.RequestId });
+        model.Entity<CatalogCommand>().Property(x => x.CommandKind).HasMaxLength(80);
+        model.Entity<CatalogCommand>().Property(x => x.PayloadHash).HasMaxLength(64);
+        model.Entity<CatalogCommand>().Property(x => x.ResultJson).HasColumnType("jsonb");
+        model.Entity<CatalogCommand>().HasOne<Workspace>().WithMany().HasForeignKey(x => x.WorkspaceId).OnDelete(DeleteBehavior.Cascade);
+        model.Entity<CatalogCommand>().HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.ActorUserId).OnDelete(DeleteBehavior.Restrict);
         model.Entity<FinanceOperation>().HasOne<FinanceCategory>().WithMany().HasForeignKey(x => new { x.WorkspaceId, x.CategoryId }).HasPrincipalKey(x => new { x.WorkspaceId, x.Id }).OnDelete(DeleteBehavior.Restrict);
         model.Entity<FinanceOperation>().HasOne<FinanceMerchant>().WithMany().HasForeignKey(x => new { x.WorkspaceId, x.MerchantId }).HasPrincipalKey(x => new { x.WorkspaceId, x.Id }).OnDelete(DeleteBehavior.Restrict);
         model.Entity<FinanceOperation>().HasOne<FinanceIncomeSource>().WithMany().HasForeignKey(x => new { x.WorkspaceId, x.IncomeSourceId }).HasPrincipalKey(x => new { x.WorkspaceId, x.Id }).OnDelete(DeleteBehavior.Restrict);

@@ -22,6 +22,11 @@ public sealed class FinanceWorkspaceFilter : IEndpointFilter
     private static string RequiredPermission(string method, PathString path)
     {
         var p = path.Value ?? "";
+        if (p.Equals("/api/finance/catalog", StringComparison.OrdinalIgnoreCase) && method == "GET")
+            return WorkspacePermissions.Read;
+        if (p.StartsWith("/api/finance/catalog/", StringComparison.OrdinalIgnoreCase)
+            && (method == "POST" || method == "PUT" || method == "DELETE"))
+            return WorkspacePermissions.ManageResources;
         if ((p.Equals("/api/exchange-rates/refresh", StringComparison.OrdinalIgnoreCase)
             || p.Equals("/api/projection/calculate", StringComparison.OrdinalIgnoreCase)) && method == "POST")
             return WorkspacePermissions.Read;

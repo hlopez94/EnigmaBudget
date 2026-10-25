@@ -37,6 +37,7 @@ builder.Services.AddScoped<SavingsAllocationService>();
 builder.Services.AddScoped<ProjectionService>();
 builder.Services.AddScoped<ProjectionScenarioService>();
 builder.Services.AddScoped<ExchangeRateService>();
+builder.Services.AddScoped<CatalogService>();
 builder.Services.AddSingleton<ExchangeRateRefreshCoordinator>();
 if (builder.Configuration.GetValue("ExchangeRates:AutomaticRefreshEnabled", true))
     builder.Services.AddHostedService<ExchangeRateRefreshHostedService>();
