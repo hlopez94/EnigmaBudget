@@ -112,7 +112,7 @@
 
 **Files:**
 - Create: `src/EnigmaBudget.Api/Finance/BudgetEntities.cs`, `BudgetService.cs`, focused `BudgetEndpoints.cs`
-- Modify: `src/EnigmaBudget.Api/Data/AppDbContext.cs`, `FinanceEndpoints.cs`, `Contracts.cs`, `FinanceWorkspaceFilter.cs`
+- Modify: `src/EnigmaBudget.Api/Data/AppDbContext.cs`, `Finance/FinanceEndpoints.cs`, `Finance/FinanceQueries.cs`, `Finance/Contracts.cs`, `Workspaces/FinanceWorkspaceFilter.cs`, `Program.cs` (register BudgetService)
 - Generate EF migration `MonthlyFinanceBudgets` plus its generated designer/model snapshot
 - Test: `tests/EnigmaBudget.Api.Tests/MonthlyBudgetIntegrationTests.cs`, `CardCycleIntegrationTests.cs`
 
