@@ -106,7 +106,8 @@ public sealed class CardCycleIntegrationTests : IDisposable
     [Fact]
     public async Task opening_credit_reduces_later_installment_without_becoming_cash()
     {
-        using var client = await _factory.AuthenticatedClientAsync();
+        using var factory = FixedFactory();
+        using var client = await factory.AuthenticatedClientAsync();
         var today = Today();
         var card = Guid.NewGuid();
         Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/api/cards", new
@@ -138,7 +139,8 @@ public sealed class CardCycleIntegrationTests : IDisposable
     [Fact]
     public async Task confirmed_negative_adjustment_offsets_card_liability_without_cash_inflow()
     {
-        using var client = await _factory.AuthenticatedClientAsync();
+        using var factory = FixedFactory();
+        using var client = await factory.AuthenticatedClientAsync();
         var today = Today();
         var card = Guid.NewGuid();
         Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/api/cards", new
@@ -181,7 +183,8 @@ public sealed class CardCycleIntegrationTests : IDisposable
     [Fact]
     public async Task confirmed_statement_groups_installment_once_and_missing_due_day_stays_undated()
     {
-        using var client = await _factory.AuthenticatedClientAsync();
+        using var factory = FixedFactory();
+        using var client = await factory.AuthenticatedClientAsync();
         var today = Today();
         var period = today.ToString("yyyy-MM");
         var confirmedCard = Guid.NewGuid();
@@ -678,6 +681,12 @@ public sealed class CardCycleIntegrationTests : IDisposable
 
     private sealed record BankAccountBalance(string CurrentBalance);
 
-    private static DateOnly Today() => DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow,
-        TimeZoneInfo.FindSystemTimeZoneById("America/Argentina/Buenos_Aires")).DateTime);
+    private static DateOnly Today() => new(2026, 10, 25);
+
+    private static ApiFactory FixedFactory() => new(timeProvider: new FixedTimeProvider(DateTimeOffset.Parse("2026-10-25T15:00:00Z")));
+
+    private sealed class FixedTimeProvider(DateTimeOffset utcNow) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => utcNow;
+    }
 }

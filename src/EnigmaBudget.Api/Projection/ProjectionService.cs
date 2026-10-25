@@ -74,7 +74,7 @@ public sealed class ProjectionService(AppDbContext db, BusinessClock clock, Savi
                 adjustments.Where(x => statements.Any(s => s.Id == x.StatementId && s.CardId == card.Id)).ToArray(),
                 payments.Where(x => x.CardId == card.Id).ToArray());
             var built = CardObligationCalculator.Build(input, today);
-            foreach (var component in built.Components.Where(x => x.RemainingAmount > 0m))
+            foreach (var component in built.Components.Where(x => x.RemainingAmount != 0m))
             {
                 if (component.Period is null) continue;
                 var statementConfirmed = component.SummaryId is not null;
@@ -82,10 +82,22 @@ public sealed class ProjectionService(AppDbContext db, BusinessClock clock, Savi
                     continue;
                 if (component.DueDate is { } due && due > through) continue;
                 if (component.DueDate is null && component.Period.CompareTo(through.ToString("yyyy-MM", Inv)) > 0) continue;
+                if (component.RemainingAmount < 0m)
+                {
+                    rows.Add(new("CardCredit", component.SourceId, $"{component.ComponentKind}:{component.Currency}",
+                        NullableDate(component.DueDate), component.DateCertainty, component.Currency,
+                        F(-component.RemainingAmount), "Information", "Confirmed", null,
+                        $"Crédito de tarjeta sin aplicar: {component.Description}", component.SummaryId?.ToString(),
+                        ["Este crédito no es efectivo y no aumenta el saldo bancario."]));
+                    continue;
+                }
                 var warnings = component.DueDate is null
                     ? new[] { "La obligación no tiene fecha de vencimiento confiable." }
                     : component.DueDate < today ? new[] { "Vencimiento atrasado; se evalúa desde hoy." } : Array.Empty<string>();
-                rows.Add(new("CardObligation", component.SourceId, component.ComponentKind, NullableDate(component.DueDate),
+                var componentId = component.ComponentKind == "OpeningDebt"
+                    ? $"OpeningDebt:{component.Currency}"
+                    : component.ComponentKind;
+                rows.Add(new("CardObligation", component.SourceId, componentId, NullableDate(component.DueDate),
                     component.DateCertainty, component.Currency, F(component.RemainingAmount), "Outgoing", "Confirmed", null,
                     component.Description, component.SummaryId?.ToString(), warnings));
             }
@@ -130,14 +142,14 @@ public sealed class ProjectionService(AppDbContext db, BusinessClock clock, Savi
             }
             output.Add(new(currency, F(cashHeader), F(availableHeader), F(cashHeader - availableHeader), F(reserved), F(deficit),
                 F(availableHeader - reserved), F(min), NullableDate(firstShortfall), daily));
-            foreach (var row in rows.Where(x => x.Currency == currency && x.Date is null))
+            foreach (var row in rows.Where(x => x.SourceKind == "CardObligation" && x.Currency == currency && x.Date is null))
                 alerts.Add(new("UnknownDueDate", "Warning", currency, "La proyección está incompleta porque una obligación no tiene fecha confiable.", null, row.SourceId));
             if (firstShortfall is not null)
                 alerts.Add(new("CashShortfall", "Warning", currency, "El efectivo libre proyectado queda por debajo de cero.", NullableDate(firstShortfall), null));
         }
 
         // Stable identity: all rows are keyed by their source and component, never by statement summaries.
-        rows = rows.GroupBy(x => (x.SourceKind, x.SourceId, x.ComponentId)).Select(x => x.First())
+        rows = rows.GroupBy(x => (x.SourceKind, x.SourceId, x.ComponentId, x.Currency)).Select(x => x.First())
             .OrderBy(x => x.Date ?? "9999-99-99", StringComparer.Ordinal).ThenBy(x => x.SourceKind, StringComparer.Ordinal)
             .ThenBy(x => x.SourceId).ThenBy(x => x.ComponentId, StringComparer.Ordinal).ToList();
         return (new(ws.Id.ToString(), ws.Name, Date(today), output, rows, alerts), 200, null);

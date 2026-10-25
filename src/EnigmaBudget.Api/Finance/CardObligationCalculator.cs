@@ -122,7 +122,7 @@ public static class CardObligationCalculator
                 {
                     if (item.Remaining == 0m) break;
                     var credit = creditLots[i];
-                    if (credit.Amount <= 0m) continue;
+                    if (credit.Amount <= 0m || string.CompareOrdinal(credit.Source.Period, item.Period) > 0) continue;
                     var applied = Math.Min(item.Remaining, credit.Amount);
                     item.Remaining -= applied;
                     item.Applied += applied;
@@ -151,9 +151,8 @@ public static class CardObligationCalculator
         var totals = new[] { "ARS", "USD" }.Select(currency =>
         {
             var currencyRows = orderedResults.Where(x => x.Currency == currency).ToArray();
-            var values = currencyRows.Where(x => x.RemainingAmount > 0m).Sum(x => x.RemainingAmount);
-            var sourceCredit = -currencyRows.Where(x => x.RemainingAmount < 0m).Sum(x => x.RemainingAmount);
-            return new CardObligationTotals(currency, values, sourceCredit + unusedPaymentCredits.GetValueOrDefault(currency));
+            var net = currencyRows.Sum(x => x.RemainingAmount) - unusedPaymentCredits.GetValueOrDefault(currency);
+            return new CardObligationTotals(currency, Math.Max(0m, net), Math.Max(0m, -net));
         }).ToArray();
         return new(orderedResults, totals);
     }
@@ -182,10 +181,10 @@ public static class CardObligationCalculator
         var current = Build(periodInput, asOf);
         var carry = beforePeriod.Components.Where(x => x.Currency == currency && x.Period is not null
             && string.CompareOrdinal(x.Period, period) < 0).Sum(x => x.RemainingAmount);
-        var expected = beforePeriod.Components.Where(x => x.Currency == currency && x.Period is not null
-            && string.CompareOrdinal(x.Period, period) <= 0).Sum(x => x.RemainingAmount);
-        var pending = current.Components.Where(x => x.Currency == currency && x.Period is not null
-            && string.CompareOrdinal(x.Period, period) <= 0).Sum(x => x.RemainingAmount);
+        var expected = Math.Max(0m, beforePeriod.Components.Where(x => x.Currency == currency && x.Period is not null
+            && string.CompareOrdinal(x.Period, period) <= 0).Sum(x => x.RemainingAmount));
+        var pending = Math.Max(0m, current.Components.Where(x => x.Currency == currency && x.Period is not null
+            && string.CompareOrdinal(x.Period, period) <= 0).Sum(x => x.RemainingAmount));
         var periodPayments = input.Payments.Where(x => x.Currency == currency && x.Date >= start && x.Date <= asOf)
             .Sum(x => x.AppliedAmount);
         // This period-cut credit is retained for the existing statement response. It is display metadata;
