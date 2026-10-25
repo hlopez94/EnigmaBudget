@@ -2,6 +2,7 @@ import { ChangeDetectorRef, Component, Input, OnChanges } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { FinanceOverview, Group, Receivable } from '../core/api.models';
 import { ApiService } from '../core/api.service';
+import { toMinorUnits } from '../onboarding/draft';
 import { FinanceActions, financeToday, RefreshFinanceOverview } from './finance-actions';
 
 @Component({
@@ -46,6 +47,15 @@ export class FinanceSharing extends FinanceActions implements OnChanges {
   }
   get selectedGroup(): Group | undefined {
     return this.groups.find((group) => group.id === this.selectedGroupId);
+  }
+  get collectionCurrenciesDiffer(): boolean {
+    const row = this.groupReceivables.find(
+      (item) =>
+        item.sourceId === this.collection.sourceId &&
+        item.participantId === this.collection.participantId,
+    );
+    const account = this.accounts.find((item) => item.id === this.collection.accountId);
+    return !!row && !!account && account.currency !== row.currency;
   }
 
   ngOnChanges(): void {
@@ -162,13 +172,33 @@ export class FinanceSharing extends FinanceActions implements OnChanges {
     const group = this.selectedGroup;
     if (!group) return;
     const draft = { ...this.collection };
+    const account = this.activeAccounts.find((item) => item.id === draft.accountId);
+    if (!account) {
+      this.error = 'Elegí la cuenta donde se recibe el cobro.';
+      this.changeDetector.markForCheck();
+      return;
+    }
+    const amount = this.decimal(draft.amount);
+    const appliedAmountEntered = draft.appliedAmount.trim() !== '';
+    const currenciesDiffer = account.currency !== row.currency;
+    if (currenciesDiffer && !appliedAmountEntered) {
+      this.error = 'Ingresá el importe real que cancela la deuda del participante.';
+      this.changeDetector.markForCheck();
+      return;
+    }
+    const appliedAmount = appliedAmountEntered ? this.decimal(draft.appliedAmount) : amount;
+    if (!currenciesDiffer && toMinorUnits(appliedAmount) !== toMinorUnits(amount)) {
+      this.error = 'Para la misma moneda, ambos importes del cobro deben coincidir.';
+      this.changeDetector.markForCheck();
+      return;
+    }
     const payload = {
       installmentId: row.sourceId,
       participantId: row.participantId,
       accountId: draft.accountId,
       date: draft.date,
-      amount: this.decimal(draft.amount),
-      appliedAmount: this.decimal(draft.appliedAmount),
+      amount,
+      appliedAmount,
       ruleVersion: row.ruleVersion,
     };
     const request = {

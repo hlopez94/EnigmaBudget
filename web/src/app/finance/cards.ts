@@ -2,6 +2,7 @@ import { ChangeDetectorRef, Component, Input, OnChanges } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { CardAdjustment, Currency, FinanceOverview, Purchase, Statement } from '../core/api.models';
 import { ApiService } from '../core/api.service';
+import { toMinorUnits } from '../onboarding/draft';
 import {
   FinanceActions,
   financeId,
@@ -25,7 +26,6 @@ export class FinanceCards extends FinanceActions implements OnChanges {
   statement: Statement | null = null;
   purchases: Purchase[] = [];
   cardDraft = {
-    id: financeId(),
     name: '',
     bankName: '',
     closingDay: '',
@@ -78,6 +78,10 @@ export class FinanceCards extends FinanceActions implements OnChanges {
   }
   get activeAccounts() {
     return this.accounts.filter((account) => !account.isArchived);
+  }
+  get cardPaymentCurrenciesDiffer(): boolean {
+    const account = this.accounts.find((item) => item.id === this.cardPayment.accountId);
+    return !!account && !!this.statement && account.currency !== this.statement.currency;
   }
   get groups() {
     return this.overview?.groups ?? [];
@@ -153,16 +157,17 @@ export class FinanceCards extends FinanceActions implements OnChanges {
   }
 
   async saveCard(): Promise<void> {
-    const draft = {
+    const payload = {
       ...this.cardDraft,
       closingDay: this.day(this.cardDraft.closingDay),
       dueDay: this.day(this.cardDraft.dueDay),
       statementDebtArs: this.decimal(this.cardDraft.statementDebtArs),
       statementDebtUsd: this.decimal(this.cardDraft.statementDebtUsd),
     };
-    if (!(await this.runMutation(() => this.api.createCard(draft), 'Tarjeta creada.'))) return;
+    const request = { id: this.requestId('card-create', payload), ...payload };
+    if (!(await this.runMutation(() => this.api.createCard(request), 'Tarjeta creada.'))) return;
+    this.releaseRequestId('card-create', payload);
     this.cardDraft = {
-      id: financeId(),
       name: '',
       bankName: '',
       closingDay: '',
@@ -292,12 +297,32 @@ export class FinanceCards extends FinanceActions implements OnChanges {
     if (!this.selectedCardId || !this.statement) return;
     const statement = this.statement;
     const draft = { ...this.cardPayment };
+    const account = this.activeAccounts.find((item) => item.id === draft.accountId);
+    if (!account) {
+      this.error = 'Elegí la cuenta desde la que se realiza el pago.';
+      this.changeDetector.markForCheck();
+      return;
+    }
+    const amount = this.decimal(draft.amount);
+    const appliedAmountEntered = draft.appliedAmount.trim() !== '';
+    const currenciesDiffer = account.currency !== statement.currency;
+    if (currenciesDiffer && !appliedAmountEntered) {
+      this.error = 'Ingresá el importe real que se aplica a la deuda de tarjeta.';
+      this.changeDetector.markForCheck();
+      return;
+    }
+    const appliedAmount = appliedAmountEntered ? this.decimal(draft.appliedAmount) : amount;
+    if (!currenciesDiffer && toMinorUnits(appliedAmount) !== toMinorUnits(amount)) {
+      this.error = 'Para la misma moneda, el importe debitado y el aplicado deben coincidir.';
+      this.changeDetector.markForCheck();
+      return;
+    }
     const payload = {
       accountId: draft.accountId,
       date: draft.date,
-      amount: this.decimal(draft.amount),
+      amount,
       currency: statement.currency,
-      appliedAmount: this.decimal(draft.appliedAmount || draft.amount),
+      appliedAmount,
       statementId: statement.id,
     };
     if (

@@ -4,6 +4,7 @@ import { App } from '../app';
 import { ApiService } from '../core/api.service';
 import { normalizeDecimal } from '../onboarding/draft';
 import { FinanceAccounts } from './accounts';
+import { FinanceCards } from './cards';
 import { FinanceOperations } from './operations';
 import { FinanceSharing } from './sharing';
 
@@ -152,7 +153,6 @@ describe('finance workspace regressions', () => {
     accounts.overview = { accounts: [] } as never;
     accounts.refreshOverview = refresh;
     accounts.accountDraft = {
-      id: 'new-account',
       name: 'Caja ahorro',
       bankName: 'Banco',
       currency: 'ARS',
@@ -249,5 +249,291 @@ describe('finance workspace regressions', () => {
         { participantId: 'person-b', value: '70.00' },
       ],
     });
+  });
+
+  it('requires real FX transfer amounts and uses equality only for matching account currencies', async () => {
+    const api = { transfer: vi.fn().mockResolvedValue(undefined) };
+    const operations = new FinanceOperations(
+      api as unknown as ApiService,
+      { markForCheck: vi.fn() } as unknown as import('@angular/core').ChangeDetectorRef,
+    );
+    operations.overview = {
+      accounts: [
+        { id: 'ars-out', currency: 'ARS', isArchived: false },
+        { id: 'usd-in', currency: 'USD', isArchived: false },
+        { id: 'ars-in', currency: 'ARS', isArchived: false },
+      ],
+    } as never;
+    operations.refreshOverview = vi.fn().mockResolvedValue(undefined);
+    operations.transferDraft = {
+      fromAccountId: 'ars-out',
+      toAccountId: 'usd-in',
+      date: '2026-10-24',
+      amount: '100',
+      destinationAmount: '',
+    };
+
+    await operations.transfer();
+
+    expect(api.transfer).not.toHaveBeenCalled();
+    expect(operations.error).toContain('importe real');
+    expect(operations.transferDraft.destinationAmount).toBe('');
+
+    operations.transferDraft.destinationAmount = '12,50';
+    await operations.transfer();
+    expect(api.transfer).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ amount: '100', destinationAmount: '12.50' }),
+    );
+
+    operations.transferDraft = {
+      fromAccountId: 'ars-out',
+      toAccountId: 'ars-in',
+      date: '2026-10-24',
+      amount: '35,00',
+      destinationAmount: '',
+    };
+    await operations.transfer();
+    expect(api.transfer).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ amount: '35.00', destinationAmount: '35.00' }),
+    );
+  });
+
+  it('requires the real card debt amount for FX payments and defaults only for same-currency accounts', async () => {
+    const statement = {
+      id: 'statement-1',
+      cardId: 'card-1',
+      period: '2026-10',
+      currency: 'USD',
+      version: 2,
+      state: 'Confirmed',
+      dueDate: '2026-11-10',
+      actualTotal: '100',
+      expectedAmount: '100',
+      carryAmount: '0',
+      pendingAmount: '100',
+      creditBalance: '0',
+      installments: [],
+      adjustments: [],
+      payments: [],
+    };
+    const api = {
+      payCard: vi.fn().mockResolvedValue(undefined),
+      financeOverview: vi.fn().mockResolvedValue({}),
+      statement: vi.fn().mockResolvedValue(statement),
+    };
+    const cards = new FinanceCards(
+      api as unknown as ApiService,
+      { markForCheck: vi.fn() } as unknown as import('@angular/core').ChangeDetectorRef,
+    );
+    cards.selectedCardId = 'card-1';
+    cards.statement = statement as never;
+    cards.overview = {
+      accounts: [
+        { id: 'account-ars', currency: 'ARS', isArchived: false },
+        { id: 'account-usd', currency: 'USD', isArchived: false },
+      ],
+    } as never;
+    cards.refreshOverview = vi.fn().mockResolvedValue(undefined);
+    cards.cardPayment = {
+      accountId: 'account-ars',
+      date: '2026-10-24',
+      amount: '5000',
+      appliedAmount: '',
+      currency: 'USD',
+    };
+
+    await cards.payStatement();
+
+    expect(api.payCard).not.toHaveBeenCalled();
+    expect(cards.error).toContain('importe real');
+    expect(cards.cardPayment.amount).toBe('5000');
+    expect(cards.cardPayment.appliedAmount).toBe('');
+
+    cards.cardPayment.appliedAmount = '4,25';
+    await cards.payStatement();
+    expect(api.payCard).toHaveBeenNthCalledWith(
+      1,
+      'card-1',
+      expect.objectContaining({ amount: '5000', currency: 'USD', appliedAmount: '4.25' }),
+    );
+
+    cards.cardPayment = {
+      accountId: 'account-usd',
+      date: '2026-10-24',
+      amount: '8.50',
+      appliedAmount: '',
+      currency: 'USD',
+    };
+    await cards.payStatement();
+    expect(api.payCard).toHaveBeenNthCalledWith(
+      2,
+      'card-1',
+      expect.objectContaining({ amount: '8.50', currency: 'USD', appliedAmount: '8.50' }),
+    );
+  });
+
+  it('requires an explicit FX collection application amount and defaults only for same currency', async () => {
+    const row = {
+      groupId: 'group-1',
+      sourceId: 'installment-1',
+      purchaseId: 'purchase-1',
+      period: '2026-10',
+      description: 'Compra',
+      currency: 'USD',
+      participantId: 'person-b',
+      participantName: 'Beto',
+      isSelf: false,
+      amount: '20',
+      collectedAmount: '0',
+      pendingAmount: '20',
+      isEstimated: false,
+      ruleVersion: 1,
+      monthConfirmed: true,
+      status: 'Pending',
+    };
+    const group = {
+      id: 'group-1',
+      name: 'Viaje',
+      version: 1,
+      participants: [{ id: 'person-b', name: 'Beto', isSelf: false }],
+      rule: null,
+    };
+    const api = {
+      collect: vi.fn().mockResolvedValue(undefined),
+      receivables: vi.fn().mockResolvedValue([row]),
+    };
+    const sharing = new FinanceSharing(
+      api as unknown as ApiService,
+      { markForCheck: vi.fn() } as unknown as import('@angular/core').ChangeDetectorRef,
+    );
+    sharing.overview = {
+      accounts: [
+        { id: 'account-ars', currency: 'ARS', isArchived: false },
+        { id: 'account-usd', currency: 'USD', isArchived: false },
+      ],
+      groups: [group],
+    } as never;
+    sharing.selectedGroupId = 'group-1';
+    sharing.groupReceivables = [row] as never;
+    sharing.refreshOverview = vi.fn().mockResolvedValue(undefined);
+    sharing.collection = {
+      participantId: 'person-b',
+      sourceId: 'installment-1',
+      accountId: 'account-ars',
+      amount: '1200',
+      appliedAmount: '',
+      date: '2026-10-24',
+    };
+
+    await sharing.collect(row as never);
+
+    expect(api.collect).not.toHaveBeenCalled();
+    expect(sharing.error).toContain('importe real');
+    expect(sharing.collection.amount).toBe('1200');
+    expect(sharing.collection.appliedAmount).toBe('');
+
+    sharing.collection.appliedAmount = '8,25';
+    await sharing.collect(row as never);
+    expect(api.collect).toHaveBeenCalledWith(
+      'group-1',
+      expect.objectContaining({ amount: '1200', appliedAmount: '8.25' }),
+    );
+
+    sharing.collection = {
+      participantId: 'person-b',
+      sourceId: 'installment-1',
+      accountId: 'account-usd',
+      amount: '10.00',
+      appliedAmount: '',
+      date: '2026-10-24',
+    };
+    await sharing.collect(row as never);
+    expect(api.collect).toHaveBeenNthCalledWith(
+      2,
+      'group-1',
+      expect.objectContaining({ amount: '10.00', appliedAmount: '10.00' }),
+    );
+  });
+
+  it('keeps account creation IDs on identical retries, rotates edited payloads, then resets after success', async () => {
+    const api = {
+      createAccount: vi
+        .fn()
+        .mockRejectedValueOnce(new Error('Network error'))
+        .mockRejectedValueOnce(new Error('Network error'))
+        .mockRejectedValueOnce(new Error('Network error'))
+        .mockResolvedValue({ id: 'saved-account' }),
+    };
+    const accounts = new FinanceAccounts(
+      api as unknown as ApiService,
+      { markForCheck: vi.fn() } as unknown as import('@angular/core').ChangeDetectorRef,
+    );
+    accounts.overview = { accounts: [] } as never;
+    accounts.refreshOverview = vi.fn().mockResolvedValue(undefined);
+    accounts.accountDraft = {
+      name: 'Caja',
+      bankName: 'Banco',
+      currency: 'ARS',
+      openingBalance: '1000,00',
+      openingDate: '2026-10-24',
+    };
+
+    await accounts.saveAccount();
+    const firstId = api.createAccount.mock.calls[0][0].id;
+    await accounts.saveAccount();
+    expect(api.createAccount.mock.calls[1][0].id).toBe(firstId);
+
+    accounts.accountDraft.name = 'Caja principal';
+    await accounts.saveAccount();
+    const editedId = api.createAccount.mock.calls[2][0].id;
+    expect(editedId).not.toBe(firstId);
+
+    await accounts.saveAccount();
+    expect(api.createAccount.mock.calls[3][0].id).toBe(editedId);
+    accounts.accountDraft = {
+      name: 'Caja principal',
+      bankName: 'Banco',
+      currency: 'ARS',
+      openingBalance: '1000,00',
+      openingDate: '2026-10-24',
+    };
+    await accounts.saveAccount();
+    expect(api.createAccount.mock.calls[4][0].id).not.toBe(editedId);
+  });
+
+  it('keeps card creation IDs on identical retries and rotates them when the failed draft changes', async () => {
+    const api = {
+      createCard: vi
+        .fn()
+        .mockRejectedValueOnce(new Error('Network error'))
+        .mockRejectedValueOnce(new Error('Network error'))
+        .mockResolvedValue({ id: 'saved-card' }),
+    };
+    const cards = new FinanceCards(
+      api as unknown as ApiService,
+      { markForCheck: vi.fn() } as unknown as import('@angular/core').ChangeDetectorRef,
+    );
+    cards.overview = { cards: [] } as never;
+    cards.refreshOverview = vi.fn().mockResolvedValue(undefined);
+    cards.cardDraft = {
+      name: 'Visa',
+      bankName: 'Banco',
+      closingDay: '10',
+      dueDay: '20',
+      statementDebtArs: '5000,00',
+      statementDebtUsd: '0',
+      asOfDate: '2026-10-24',
+    };
+
+    await cards.saveCard();
+    const firstId = api.createCard.mock.calls[0][0].id;
+    await cards.saveCard();
+    expect(api.createCard.mock.calls[1][0].id).toBe(firstId);
+
+    cards.cardDraft.name = 'Visa principal';
+    await cards.saveCard();
+    expect(api.createCard.mock.calls[2][0].id).not.toBe(firstId);
   });
 });

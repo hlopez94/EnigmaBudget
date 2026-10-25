@@ -2,7 +2,7 @@ import { ChangeDetectorRef, Component, Input } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Account, FinanceOverview } from '../core/api.models';
 import { ApiService } from '../core/api.service';
-import { FinanceActions, financeId, financeToday, RefreshFinanceOverview } from './finance-actions';
+import { FinanceActions, financeToday, RefreshFinanceOverview } from './finance-actions';
 
 @Component({
   selector: 'app-accounts',
@@ -17,7 +17,6 @@ export class FinanceAccounts extends FinanceActions {
   @Input({ required: true }) refreshOverview!: RefreshFinanceOverview;
   selectedAccountId = '';
   accountDraft = {
-    id: financeId(),
     name: '',
     bankName: '',
     currency: 'ARS' as const,
@@ -42,13 +41,17 @@ export class FinanceAccounts extends FinanceActions {
   }
 
   async saveAccount(): Promise<void> {
-    const request = {
+    const payload = {
       ...this.accountDraft,
       openingBalance: this.decimal(this.accountDraft.openingBalance),
     };
+    const request = {
+      id: this.requestId('account-create', payload),
+      ...payload,
+    };
     if (!(await this.runMutation(() => this.api.createAccount(request), 'Cuenta creada.'))) return;
+    this.releaseRequestId('account-create', payload);
     this.accountDraft = {
-      id: financeId(),
       name: '',
       bankName: '',
       currency: 'ARS',

@@ -218,11 +218,16 @@
                 required
                 [disabled]="saving" /></label
             ><label
-              >Deuda que cancela<input
+              >Deuda que cancela
+              @if (collectionCurrenciesDiffer) {
+                (obligatorio: moneda distinta)
+              } @else {
+                (si queda vacío, se usa el mismo importe)
+              }
+              <input
                 name="appliedCollection"
                 [(ngModel)]="collection.appliedAmount"
                 inputmode="decimal"
-                required
                 [disabled]="saving" /></label
             ><label
               >Fecha<input

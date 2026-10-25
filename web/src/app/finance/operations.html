@@ -120,7 +120,13 @@
             required
             [disabled]="saving" /></label
         ><label
-          >Importe destino (si cambia moneda)<input
+          >Importe destino
+          @if (transferCurrenciesDiffer) {
+            (obligatorio: moneda distinta)
+          } @else {
+            (si queda vacío, se usa el mismo importe)
+          }
+          <input
             name="transferDestination"
             [(ngModel)]="transferDraft.destinationAmount"
             inputmode="decimal"

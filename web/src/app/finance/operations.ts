@@ -2,6 +2,7 @@ import { ChangeDetectorRef, Component, Input } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { FinanceOverview, Operation } from '../core/api.models';
 import { ApiService } from '../core/api.service';
+import { toMinorUnits } from '../onboarding/draft';
 import { FinanceActions, financeToday, RefreshFinanceOverview } from './finance-actions';
 
 @Component({
@@ -42,6 +43,13 @@ export class FinanceOperations extends FinanceActions {
   }
   get activeAccounts() {
     return this.accounts.filter((account) => !account.isArchived);
+  }
+  get transferCurrenciesDiffer(): boolean {
+    const source = this.accounts.find((account) => account.id === this.transferDraft.fromAccountId);
+    const destination = this.accounts.find(
+      (account) => account.id === this.transferDraft.toAccountId,
+    );
+    return !!source && !!destination && source.currency !== destination.currency;
   }
   get operations() {
     return this.overview?.operations ?? [];
@@ -127,10 +135,35 @@ export class FinanceOperations extends FinanceActions {
 
   async transfer(): Promise<void> {
     const draft = { ...this.transferDraft };
+    const source = this.activeAccounts.find((account) => account.id === draft.fromAccountId);
+    const destination = this.activeAccounts.find((account) => account.id === draft.toAccountId);
+    if (!source || !destination) {
+      this.error = 'Elegí las cuentas de origen y destino.';
+      this.changeDetector.markForCheck();
+      return;
+    }
+    const amount = this.decimal(draft.amount);
+    const destinationAmountEntered = draft.destinationAmount.trim() !== '';
+    if (source.currency !== destination.currency && !destinationAmountEntered) {
+      this.error = 'Ingresá el importe real que recibe la cuenta de destino.';
+      this.changeDetector.markForCheck();
+      return;
+    }
+    const destinationAmount = destinationAmountEntered
+      ? this.decimal(draft.destinationAmount)
+      : amount;
+    if (
+      source.currency === destination.currency &&
+      toMinorUnits(destinationAmount) !== toMinorUnits(amount)
+    ) {
+      this.error = 'Para cuentas en la misma moneda, ambos importes deben coincidir.';
+      this.changeDetector.markForCheck();
+      return;
+    }
     const payload = {
       ...draft,
-      amount: this.decimal(draft.amount),
-      destinationAmount: this.decimal(draft.destinationAmount || draft.amount),
+      amount,
+      destinationAmount,
     };
     if (
       !(await this.runMutation(

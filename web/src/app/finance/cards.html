@@ -383,11 +383,21 @@
                   required
                   [disabled]="saving" /></label
               ><label
-                >Importe aplicado a la tarjeta<input
+                >Importe aplicado a la tarjeta
+                @if (cardPaymentCurrenciesDiffer) {
+                  (obligatorio: moneda distinta)
+                } @else {
+                  (si queda vacío, se usa el mismo importe)
+                }
+                <input
                   name="cardPayApplied"
                   [(ngModel)]="cardPayment.appliedAmount"
                   inputmode="decimal"
-                  placeholder="Igual si no hay cambio"
+                  [placeholder]="
+                    cardPaymentCurrenciesDiffer
+                      ? 'Ingresá el importe real en ' + statement.currency
+                      : 'Igual si no hay cambio'
+                  "
                   [disabled]="saving" /></label
               ><button class="primary" type="submit" [disabled]="saving">Registrar pago</button>
             </form>
