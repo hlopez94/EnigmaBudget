@@ -251,6 +251,8 @@ export class App implements OnInit, OnDestroy {
           this.activeWorkspace = null;
           this.workspaceContext.select(null);
           this.api.clearWorkspace();
+          await this.load();
+          return;
         }
       }
     } catch (error) {

@@ -218,6 +218,51 @@ describe('application startup', () => {
     expect(epoch.snapshot()).toMatchObject({ userId: 'user-a', workspaceId: 'space-b' });
   });
 
+  it('recovers to the remaining personal workspace after leaving the active household so a same-page invite can be accepted', async () => {
+    const personal = {
+      id: 'personal-a', name: 'Personal', ownerDisplayName: 'Ana', kind: 'Personal', role: 'Owner',
+      isSharedPersonalRead: false, isArchived: false, version: 1,
+      permissions: { read: true, readGroups: true, recordFinance: true, manageResources: true, correctHistory: true, manageMembers: true, managePrivacy: true },
+    } as const;
+    const household = { ...personal, id: 'household-a', name: 'Casa de Ana', kind: 'Household' } as const;
+    const state = { version: 2, completed: false, accounts: [], cards: [] };
+    let inviteToken: string | null = null;
+    const api = {
+      session: vi.fn().mockResolvedValue({ authenticated: true, displayName: 'Ana', googleConfigured: false, developmentLoginEnabled: false, developmentUsers: [], csrfToken: 'csrf' }),
+      me: vi.fn().mockResolvedValue({ id: 'user-a', displayName: 'Ana', email: null, emailVerified: false, personalWorkspaceId: 'personal-a' }),
+      workspaces: vi.fn().mockResolvedValue([personal]),
+      loadOnboarding: vi.fn().mockResolvedValue(state),
+      capturePendingInvitation: vi.fn(() => inviteToken),
+      clearPendingInvitation: vi.fn(() => { inviteToken = null; }),
+      selectWorkspace: vi.fn(), clearWorkspace: vi.fn(),
+    };
+    const context = new WorkspaceContext();
+    context.restore('user-a', ['personal-a', 'household-a'], 'household-a');
+    const app = new App(api as unknown as ApiService, { markForCheck: vi.fn() } as never, context);
+    app.session = { authenticated: true, displayName: 'Ana', googleConfigured: false, developmentLoginEnabled: false, developmentUsers: [], csrfToken: 'csrf' };
+    app.currentUserId = 'user-a';
+    app.personalWorkspaceId = 'personal-a';
+    app.workspaces = [personal, household] as never;
+    app.activeWorkspace = household as never;
+    app.state = { version: 2, completed: true, accounts: [], cards: [] };
+    app.financeAvailable = true;
+
+    await app.reloadWorkspaces();
+
+    expect(app.session?.authenticated).toBe(true);
+    expect(app.currentUserId).toBe('user-a');
+    expect(app.activeWorkspace?.id).toBe('personal-a');
+    expect(app.workspaces.map(workspace => workspace.id)).toEqual(['personal-a']);
+    expect(app.state).toEqual(state);
+    expect(app.financeAvailable).toBe(true);
+    expect(api.clearPendingInvitation).toHaveBeenCalledOnce();
+
+    inviteToken = 'rejoin-token';
+    app.captureInviteLink();
+    expect(app.pendingInviteToken).toBe('rejoin-token');
+    expect(app.financeAvailable).toBe(true);
+  });
+
   it('preserves an invitation across anonymous bootstrap and sign-in, then clears it on explicit logout', async () => {
     const anonymous: SessionInfo = { authenticated: false, displayName: null, googleConfigured: false, developmentLoginEnabled: true, developmentUsers: [], csrfToken: '' };
     const authenticated: SessionInfo = { authenticated: true, displayName: 'Bob', googleConfigured: false, developmentLoginEnabled: true, developmentUsers: [], csrfToken: 'csrf' };
