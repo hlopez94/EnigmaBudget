@@ -11,7 +11,7 @@
       <h2>Repartos y cobros mensuales</h2>
       <p>Cada mes conserva su propio acuerdo; una previsión no se puede cobrar.</p>
     </div>
-    @if (permissions?.manageResources !== false && !workspaceArchived) { <button type="button" class="primary" (click)="openForm()">＋ Crear grupo</button> }
+    @if (permissions?.manageResources !== false && !workspaceArchived) { <button type="button" class="primary" (click)="openForm()"><i class="pi pi-plus" aria-hidden="true"></i> Crear grupo</button> }
   </div>
   <div class="two-columns">
     <app-action-dialog

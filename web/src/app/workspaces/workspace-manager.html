@@ -13,7 +13,7 @@
         <p class="eyebrow">INVITACIÓN</p>
         @if (invitePreview) {
           <h3 id="accept-title">Sumarte a {{ invitePreview.workspaceName }}</h3>
-          <p>Vas a ingresar como {{ invitePreview.role === 'Reader' ? 'lector' : invitePreview.role === 'Admin' ? 'administrador' : 'integrante' }}. La invitación requiere el correo verificado para el que se creó.</p>
+          <p>Esta invitación propone acceso como {{ invitePreview.role === 'Reader' ? 'lector' : invitePreview.role === 'Admin' ? 'administrador' : 'integrante' }}. Si ya sos integrante, conservarás tu rol actual; aceptar no modifica tus permisos existentes. Requiere el correo verificado para el que se creó.</p>
           <button class="primary" type="button" [disabled]="busy || loading" (click)="acceptInvite()">{{ busy ? 'Aceptando…' : 'Aceptar invitación' }}</button>
         } @else if (!error) { <p>Verificando el enlace de invitación…</p> }
       </section>

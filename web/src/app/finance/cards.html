@@ -12,10 +12,10 @@
       <p>Una compra crea cuotas; el pago del resumen cancela deuda y no suma otro gasto.</p>
     </div>
     <div class="quick-actions">
-      @if (permissions?.manageResources !== false && !workspaceArchived) { <button type="button" class="primary" (click)="openForm('create')">＋ Agregar tarjeta</button> }
+      @if (permissions?.manageResources !== false && !workspaceArchived) { <button type="button" class="primary" (click)="openForm('create')"><i class="pi pi-plus" aria-hidden="true"></i> Agregar tarjeta</button> }
       @if (selectedCard) {
         <button type="button" class="secondary" (click)="openForm('purchase')">
-          ＋ Cargar compra
+          <i class="pi pi-plus" aria-hidden="true"></i> Cargar compra
         </button>
       }
     </div>
@@ -391,7 +391,7 @@
           >
           @if (statement.state === 'Confirmed') {
             <button type="button" class="primary" (click)="openForm('payment')">
-              ＋ Registrar pago
+              <i class="pi pi-plus" aria-hidden="true"></i> Registrar pago
             </button>
             <app-action-dialog
               title="Registrar pago de tarjeta"

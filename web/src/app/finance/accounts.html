@@ -8,7 +8,7 @@
   <section class="panel accounts-list">
     <div class="panel-title">
       <h3>Tus cuentas</h3>
-      @if (permissions?.manageResources !== false && !workspaceArchived) { <button type="button" class="primary" (click)="openForm('create')">＋ Agregar cuenta</button> }
+      @if (permissions?.manageResources !== false && !workspaceArchived) { <button type="button" class="primary" (click)="openForm('create')"><i class="pi pi-plus" aria-hidden="true"></i> Agregar cuenta</button> }
     </div>
     @if (accounts.length === 0) {
       <div class="empty">

@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { randomUUID } from 'node:crypto';
 import { mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
@@ -35,7 +36,8 @@ test('saves and reloads an onboarding draft, then confirms an empty setup', asyn
   const signIn = waitForApi(page, 'POST', '/api/auth/development');
   await page.getByRole('button', { name: 'Ingresar como desarrollador' }).click();
   expect((await signIn).status()).toBe(204);
-  await expect(page.getByRole('heading', { name: /Tu panorama financiero/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Inicio', exact: true })).toBeVisible();
+  await expect(page.getByText('Saldo en cuentas', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Abrir configuración' }).click();
   await page.getByRole('button', { name: 'Comenzar' }).click();
   await page.getByRole('button', { name: 'Agregar cuenta' }).click();
@@ -95,7 +97,8 @@ test('runs real finance, sharing, and card acceptance from empty completed onboa
   const signIn = waitForApi(page, 'POST', '/api/auth/development');
   await page.getByRole('button', { name: 'Ingresar como desarrollador' }).click();
   expect((await signIn).status()).toBe(204);
-  await expect(page.getByRole('heading', { name: /Tu panorama financiero/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Inicio', exact: true })).toBeVisible();
+  await expect(page.getByText('Saldo en cuentas', { exact: true })).toBeVisible();
   await expect(page.getByText('Empezá por agregar una cuenta')).toBeVisible();
 
   await page.getByRole('button', { name: 'Más', exact: true }).click();
@@ -561,21 +564,21 @@ test('runs real finance, sharing, and card acceptance from empty completed onboa
   await mobileNavigationButton(page, 'Inicio').click();
   await page.reload();
   await expect(page.locator('.balance-card.ars strong')).toContainText('76.900');
-  const accountsPanel = page.locator('.dashboard-columns .dash-panel').first();
+  const accountsPanel = page.locator('.accounts-panel');
   await expect(
-    accountsPanel.locator('.list-row').filter({ hasText: 'Cuenta principal' }).locator('strong'),
+    accountsPanel.locator('.account-row').filter({ hasText: 'Cuenta principal' }).locator('strong'),
   ).toHaveText(/\$\s*76\.800,00/);
   await expect(
-    accountsPanel.locator('.list-row').filter({ hasText: 'Cuenta secundaria' }).locator('strong'),
+    accountsPanel.locator('.account-row').filter({ hasText: 'Cuenta secundaria' }).locator('strong'),
   ).toHaveText(/\$\s*100,00/);
-  await expect(page.locator('.summary-card.debt').first()).toContainText('80.000');
+  await expect(page.locator('.debt-row')).toContainText('80.000');
   const homePhoneLayout = await page.evaluate(() => {
     const rect = (selector: string) =>
       document.querySelector(selector)?.getBoundingClientRect() ?? new DOMRect();
     const summary = rect('.summary-grid');
     const actions = rect('.quick-panel');
     const register = rect('.quick-panel .quick-actions button');
-    const accounts = rect('.dashboard-columns .dash-panel');
+    const accounts = rect('.accounts-panel');
     const bottomNavigation = rect('nav.mobile-navigation');
     const period = rect('input[aria-label="Período a consultar"]');
     return {
@@ -602,7 +605,8 @@ test('runs real finance, sharing, and card acceptance from empty completed onboa
   await page.screenshot({ path: resolve(output, 'task2-finance-mobile-390.png'), fullPage: true });
 
   await page.setViewportSize({ width: 360, height: 800 });
-  await expect(page.getByRole('heading', { name: /Tu panorama financiero/ })).toBeAttached();
+  await expect(page.getByRole('heading', { name: 'Inicio', exact: true })).toBeVisible();
+  await expect(page.getByText('Saldo en cuentas', { exact: true })).toBeVisible();
   const dimensions = await page.evaluate(() => ({
     viewport: document.documentElement.clientWidth,
     document: document.documentElement.scrollWidth,
@@ -661,7 +665,8 @@ test('runs real finance, sharing, and card acceptance from empty completed onboa
 
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.locator('nav.navigation').getByRole('button', { name: 'Inicio', exact: true }).click();
-  await expect(page.getByRole('heading', { name: /Tu panorama financiero/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Inicio', exact: true })).toBeVisible();
+  await expect(page.getByText('Saldo en cuentas', { exact: true })).toBeVisible();
   const desktop = await page.evaluate(() => ({
     viewport: document.documentElement.clientWidth,
     document: document.documentElement.scrollWidth,
@@ -701,7 +706,7 @@ test('keeps populated home summary and primary action above the phone fold at bo
         summaryBottom: rect('.summary-grid').bottom,
         quickActionsBottom: rect('.quick-panel').bottom,
         registerBottom: rect('.quick-panel .quick-actions button').bottom,
-        accountListTop: rect('.dashboard-columns .dash-panel').top,
+        accountListTop: rect('.accounts-panel').top,
         navigationTop: rect('nav.mobile-navigation').top,
         periodWidth: period?.getBoundingClientRect().width ?? 0,
         periodValue: period?.value,
@@ -720,4 +725,124 @@ test('keeps populated home summary and primary action above the phone fold at bo
     expect.soft(layout.periodValue).toMatch(/^\d{4}-\d{2}$/);
     expect.soft(layout.phoneNavigationVisible).toBe(true);
   }
+});
+
+test('keeps live ARS and USD balances readable with a long workspace name on phones', async ({ page }) => {
+  await page.goto('/');
+  const signIn = waitForApi(page, 'POST', '/api/auth/development');
+  await page.getByRole('button', { name: 'Ingresar como desarrollador' }).click();
+  expect((await signIn).status()).toBe(204);
+  await expect(page.getByRole('heading', { name: 'Inicio', exact: true })).toBeVisible();
+  await expect(page.locator('.summary-grid')).toBeVisible();
+
+  const workspaceIdInput = randomUUID();
+  const name = `Hogar de prueba con un nombre deliberadamente extenso para revisar el selector ${workspaceIdInput.slice(0, 6)}`;
+  const created = await page.evaluate(async ({ id, name }) => {
+    const session = await (await fetch('/api/auth/session')).json();
+    const response = await fetch('/api/workspaces', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': session.csrfToken },
+      body: JSON.stringify({ id, kind: 'Household', name }),
+    });
+    return { status: response.status, workspace: await response.json() };
+  }, { id: workspaceIdInput, name });
+  expect(created.status).toBe(201);
+  const workspaceId = created.workspace.id as string;
+
+  await page.reload();
+  await expect(page.locator('.workspace-picker select')).toBeVisible();
+  await page.locator('.workspace-picker select').selectOption(workspaceId);
+  await expect(page.locator('.workspace-picker select')).toHaveValue(workspaceId);
+  const date = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Argentina/Buenos_Aires',
+  }).format(new Date());
+  const accounts = await page.evaluate(async ({ workspaceId, date }) => {
+    const session = await (await fetch('/api/auth/session')).json();
+    const baseHeaders = {
+      'Content-Type': 'application/json',
+      'X-CSRF-TOKEN': session.csrfToken,
+      'X-Workspace-Id': workspaceId,
+    };
+    const resources = [
+      { name: 'Reserva en pesos', currency: 'ARS', openingBalance: '9999999999.99' },
+      { name: 'Fondo en dólares', currency: 'USD', openingBalance: '123456789.12' },
+    ];
+    const responses = [];
+    for (const resource of resources) {
+      const response = await fetch('/api/accounts', {
+        method: 'POST',
+        headers: baseHeaders,
+        body: JSON.stringify({
+          id: crypto.randomUUID(),
+          bankName: 'Banco de prueba',
+          openingDate: date,
+          ...resource,
+        }),
+      });
+      responses.push(response.status);
+    }
+    return responses;
+  }, { workspaceId, date });
+  expect(accounts).toEqual([200, 200]);
+
+  await page.reload();
+  await expect(page.locator('.summary-grid')).toBeVisible();
+  await expect(page.getByText('Saldo en cuentas', { exact: true })).toBeVisible();
+  await expect(page.locator('.workspace-picker select')).toHaveValue(workspaceId);
+  await expect(page.getByText('Pesos argentinos · ARS')).toBeVisible();
+  await expect(page.getByText('Dólares estadounidenses · USD')).toBeVisible();
+
+  for (const viewport of [
+    { width: 360, height: 844 },
+    { width: 390, height: 844 },
+  ]) {
+    await page.setViewportSize(viewport);
+    const layout = await page.evaluate(() => {
+      const bounds = (element: Element | null) => {
+        const rect = element?.getBoundingClientRect() ?? new DOMRect();
+        return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom };
+      };
+      const amounts = [...document.querySelectorAll<HTMLElement>('.balance-summary .summary-card strong')];
+      const nav = document.querySelector('nav.mobile-navigation');
+      const accountHeading = [...document.querySelectorAll('.accounts-panel h3')].find(item => item.textContent?.includes('Tus cuentas')) ?? null;
+      const register = [...document.querySelectorAll<HTMLButtonElement>('.quick-panel button')].find(button => button.textContent?.includes('Registrar movimiento')) ?? null;
+      return {
+        viewport: window.innerWidth,
+        documentWidth: document.documentElement.scrollWidth,
+        balances: amounts.map(amount => ({ ...bounds(amount), contentWidth: amount.scrollWidth, innerWidth: amount.clientWidth, text: amount.textContent })),
+        register: bounds(register),
+        monthlyQuota: bounds([...document.querySelectorAll('.finance-row')].find(row => row.textContent?.includes('Cuotas de tarjeta del mes') ?? false) ?? null),
+        cardDebt: bounds(document.querySelector('.debt-row')),
+        accounts: bounds(accountHeading),
+        navigation: bounds(nav),
+      };
+    });
+    expect(layout.documentWidth, JSON.stringify(layout)).toBeLessThanOrEqual(viewport.width);
+    expect(layout.balances).toHaveLength(2);
+    for (const amount of layout.balances) {
+      expect(amount.left, JSON.stringify(layout)).toBeGreaterThanOrEqual(0);
+      expect(amount.right, JSON.stringify(layout)).toBeLessThanOrEqual(viewport.width);
+      expect(amount.contentWidth, JSON.stringify(layout)).toBeLessThanOrEqual(amount.innerWidth);
+    }
+    expect(layout.register.bottom, JSON.stringify(layout)).toBeLessThan(layout.navigation.top);
+    expect(layout.monthlyQuota.top, JSON.stringify(layout)).toBeLessThan(layout.accounts.top);
+    expect(layout.monthlyQuota.bottom, JSON.stringify(layout)).toBeLessThanOrEqual(layout.navigation.top);
+    expect(layout.cardDebt.bottom, JSON.stringify(layout)).toBeLessThanOrEqual(layout.navigation.top);
+    await page.screenshot({
+      path: resolve(process.cwd(), `../work/task1-panorama-live-${viewport.width}.png`),
+      fullPage: true,
+    });
+  }
+
+  await page.setViewportSize({ width: 1280, height: 900 });
+  const desktop = await page.evaluate(() => ({
+    viewport: document.documentElement.clientWidth,
+    page: document.documentElement.scrollWidth,
+    homeColumns: getComputedStyle(document.querySelector('.dashboard-columns')!).gridTemplateColumns,
+    mobileNavigation: getComputedStyle(document.querySelector('nav.mobile-navigation')!).display,
+  }));
+  expect(desktop.page).toBeLessThanOrEqual(desktop.viewport);
+  expect(desktop.homeColumns.split(' ').length).toBe(2);
+  expect(desktop.mobileNavigation).toBe('none');
+  await page.screenshot({ path: resolve(process.cwd(), '../work/task1-panorama-live-desktop-1280.png'), fullPage: true });
 });

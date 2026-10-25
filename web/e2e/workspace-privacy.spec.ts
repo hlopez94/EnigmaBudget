@@ -13,7 +13,8 @@ const signInAs = async (page: Page, key: string) => {
   const login = waitForApi(page, 'POST', '/api/auth/development');
   await page.getByRole('button', { name: 'Ingresar como usuario de prueba' }).click();
   expect((await login).status()).toBe(204);
-  await expect(page.getByRole('heading', { name: 'Tu panorama financiero' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Inicio', exact: true })).toBeVisible();
+  await expect(page.getByText('Saldo en cuentas', { exact: true })).toBeVisible();
 };
 
 const openMore = async (page: Page) => page.locator('nav.mobile-navigation').getByRole('button', { name: 'Más' }).click();
@@ -90,6 +91,7 @@ test('real Alice, Bob and Reader contexts enforce Household scope, personal cons
   await bob.getByRole('button', { name: 'Ingresar como usuario de prueba' }).click();
   expect((await bobLogin).status()).toBe(204);
   await expect(bob.getByRole('heading', { name: /Sumarte a Casa de Ana/ })).toBeVisible();
+  await expect(bob.getByText(/Si ya sos integrante, conservarás tu rol actual/)).toBeVisible();
   const bobAccepted = waitForApi(bob, 'POST', '/api/invitations/accept');
   await bob.getByRole('button', { name: 'Aceptar invitación' }).click();
   expect((await bobAccepted).status()).toBe(200);
@@ -395,12 +397,20 @@ test('mobile workspace header stays readable and in bounds at 360 and 390 px', a
     expect(geometry.titleFont, JSON.stringify(geometry)).toBeGreaterThanOrEqual(20);
     expect(geometry.eyebrow.width, JSON.stringify(geometry)).toBeGreaterThanOrEqual(width - 48);
     expect(geometry.titleBlock.bottom, JSON.stringify(geometry)).toBeLessThanOrEqual(geometry.workspace.top);
-    expect(geometry.workspace.bottom, JSON.stringify(geometry)).toBeLessThanOrEqual(geometry.period.top);
+    expect(geometry.workspace.top, JSON.stringify(geometry)).toBeGreaterThanOrEqual(geometry.titleBlock.bottom);
+    expect(geometry.period.top, JSON.stringify(geometry)).toBeGreaterThanOrEqual(geometry.titleBlock.bottom);
+    const controlsOverlap = !(
+      geometry.workspace.right <= geometry.period.left ||
+      geometry.period.right <= geometry.workspace.left ||
+      geometry.workspace.bottom <= geometry.period.top ||
+      geometry.period.bottom <= geometry.workspace.top
+    );
+    expect(controlsOverlap, JSON.stringify(geometry)).toBe(false);
     expect(geometry.workspace.height, JSON.stringify(geometry)).toBeGreaterThanOrEqual(44);
-    expect(geometry.workspace.width, JSON.stringify(geometry)).toBeGreaterThanOrEqual(width - 48);
+    expect(geometry.workspace.width, JSON.stringify(geometry)).toBeGreaterThanOrEqual(140);
     expect(geometry.workspaceFont, JSON.stringify(geometry)).toBeGreaterThanOrEqual(16);
     expect(geometry.period.height, JSON.stringify(geometry)).toBeGreaterThanOrEqual(44);
-    expect(geometry.period.width, JSON.stringify(geometry)).toBeGreaterThanOrEqual(140);
+    expect(geometry.period.width, JSON.stringify(geometry)).toBeGreaterThanOrEqual(170);
     for (const control of [geometry.titleBlock, geometry.workspace, geometry.period]) {
       expect(control.left, JSON.stringify(geometry)).toBeGreaterThanOrEqual(0);
       expect(control.right, JSON.stringify(geometry)).toBeLessThanOrEqual(width);

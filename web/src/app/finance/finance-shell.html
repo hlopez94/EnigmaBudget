@@ -1,7 +1,7 @@
 <div class="workspace" [class.read-only]="!canWrite" [class.no-groups]="!canReadGroups" [class.no-resources]="!canManageResources" [class.archived]="activeWorkspace?.isArchived">
   <header class="workspace-heading">
     <div>
-      <p class="eyebrow">ENIGMABUDGET · {{ name }}</p>
+      <p class="eyebrow">{{ activeWorkspace ? workspaceLabel(activeWorkspace) : name }}</p>
       <h1>
         {{
           section === 'home'
@@ -67,25 +67,25 @@
   </nav>
   <nav class="mobile-navigation" aria-label="Navegación principal">
     <button type="button" [class.active]="section === 'home'" (click)="navigate('home')">
-      <span aria-hidden="true">⌂</span><small>Inicio</small>
+      <i class="pi pi-home" aria-hidden="true"></i><small>Inicio</small>
     </button>
     <button
       type="button"
       [class.active]="section === 'operations'"
       (click)="navigate('operations')"
     >
-      <span aria-hidden="true">↕</span><small>Movimientos</small>
+      <i class="pi pi-arrow-right-arrow-left" aria-hidden="true"></i><small>Movimientos</small>
     </button>
     <button type="button" [class.active]="section === 'cards'" (click)="navigate('cards')">
-      <span aria-hidden="true">▣</span><small>Tarjetas</small>
+      <i class="pi pi-credit-card" aria-hidden="true"></i><small>Tarjetas</small>
     </button>
-    @if (canReadGroups) { <button type="button" [class.active]="section === 'sharing'" (click)="navigate('sharing')"><span aria-hidden="true">◎</span><small>Compartidos</small></button> }
+    @if (canReadGroups) { <button type="button" [class.active]="section === 'sharing'" (click)="navigate('sharing')"><i class="pi pi-users" aria-hidden="true"></i><small>Compartidos</small></button> }
     <button
       type="button"
-      [class.active]="section === 'more' || section === 'accounts'"
+      [class.active]="section === 'more' || section === 'accounts' || section === 'spaces'"
       (click)="navigate('more')"
     >
-      <span aria-hidden="true">•••</span><small>Más</small>
+      <i class="pi pi-ellipsis-h" aria-hidden="true"></i><small>Más</small>
     </button>
   </nav>
   @if (setupIncomplete) {
@@ -148,84 +148,116 @@
           <h2>Administrar espacio</h2>
           @if (canManageResources) { <button type="button" class="more-link" (click)="navigateMore('accounts')">
             <span><b>Cuentas</b><small>Ver saldos, conciliar o agregar una cuenta</small></span
-            ><span aria-hidden="true">›</span>
+            ><i class="pi pi-chevron-right" aria-hidden="true"></i>
           </button> }
           @if (setupIncomplete) {
             <button type="button" class="more-link" (click)="navigateMore('setup')">
               <span><b>Configuración inicial</b><small>Continuar donde lo dejaste</small></span
-              ><span aria-hidden="true">›</span>
+              ><i class="pi pi-chevron-right" aria-hidden="true"></i>
             </button>
           }
           <button type="button" class="more-link" (click)="refresh()" [disabled]="busy">
             <span><b>Actualizar datos</b><small>Sincronizar el resumen</small></span
-            ><span aria-hidden="true">↻</span>
+            ><i class="pi pi-refresh" aria-hidden="true"></i>
           </button>
           <button type="button" class="more-link" (click)="navigate('spaces')">
             <span><b>Hogares, integrantes y privacidad</b><small>Administrar espacios y permisos</small></span
-            ><span aria-hidden="true">›</span>
+            ><i class="pi pi-chevron-right" aria-hidden="true"></i>
           </button>
         </section>
       </main>
     }
     @if (section === 'home') {
-      <main class="content">
+      <main class="content home-content">
         <div class="overview-intro">
-          <div>
-            <p class="eyebrow">VISTA DEL PERÍODO · {{ period }}</p>
-            <h2>Tu panorama financiero</h2>
-          </div>
-          <span class="period-caption">Los saldos bancarios y de tarjeta son actuales.</span>
+          <p class="eyebrow">Saldo en cuentas</p>
         </div>
         @if (activeAccounts.length === 0 && cards.length === 0) {
           <p class="ready-note">
             <b>Tu base ya está lista.</b> Elegí una acción para continuar con tus finanzas.
           </p>
         }
-        <section class="summary-grid" aria-label="Resumen separado por moneda y obligación">
+        <section class="summary-grid balance-summary" aria-label="Saldo actual en cuentas, separado por moneda">
           <article class="summary-card cash balance-card ars">
-            <span>Saldo en cuentas · ARS</span
+            <span>Pesos argentinos · ARS</span
             ><strong>{{ money(overview.totals.balanceArs, 'ARS') }}</strong
             ><small>Dinero registrado en bancos</small>
           </article>
           <article class="summary-card cash balance-card usd">
-            <span>Saldo en cuentas · USD</span
+            <span>Dólares estadounidenses · USD</span
             ><strong>{{ money(overview.totals.balanceUsd, 'USD') }}</strong
             ><small>Se mantiene separado de pesos</small>
           </article>
-          <article class="summary-card debt">
-            <span>Deuda de tarjetas · ARS</span
-            ><strong>{{ money(overview.totals.cardDebtArs, 'ARS') }}</strong
-            ><small>Crédito a favor: {{ money(overview.totals.cardCreditArs, 'ARS') }}</small>
-          </article>
-          <article class="summary-card debt">
-            <span>Deuda de tarjetas · USD</span
-            ><strong>{{ money(overview.totals.cardDebtUsd, 'USD') }}</strong
-            ><small>Crédito a favor: {{ money(overview.totals.cardCreditUsd, 'USD') }}</small>
-          </article>
         </section>
-        <section class="panel quick-panel">
-          <div>
-            <p class="eyebrow">ACCESOS DIRECTOS</p>
-            <h3>¿Qué querés hacer?</h3>
-          </div>
+        <section class="quick-panel" aria-label="Acciones de finanzas">
           <div class="quick-actions">
             @if (canWrite) {
-            <button type="button" (click)="navigate('operations')">＋ Registrar movimiento</button
-            ><button type="button" (click)="navigate('cards')">＋ Cargar compra</button>
+              <button class="primary main-action" type="button" (click)="navigate('operations')"><i class="pi pi-plus" aria-hidden="true"></i><span>Registrar movimiento</span><i class="pi pi-chevron-right action-arrow" aria-hidden="true"></i></button>
+              <button type="button" (click)="navigate('cards')"><i class="pi pi-plus" aria-hidden="true"></i> Cargar compra</button>
             }
             @if (canReadGroups) { <button type="button" (click)="navigate('sharing')">Ver cobros compartidos</button> }
           </div>
         </section>
         <div class="overview-columns dashboard-columns">
-          <section class="panel dash-panel">
+          <section class="panel dash-panel commitments-panel">
             <div class="panel-title">
               <div>
-                <p class="eyebrow">DINERO REAL</p>
-                <h3>Cuentas bancarias</h3>
+                <p class="eyebrow">{{ period }}</p>
+                <h3>Este mes</h3>
               </div>
-              <button type="button" class="text-action" (click)="navigate('accounts')">
-                Administrar
-              </button>
+              <button type="button" class="text-action" (click)="navigate('cards')">{{ cards.length === 0 && canManageResources ? 'Agregar tarjeta' : 'Ver tarjetas' }}</button>
+            </div>
+            <div class="finance-row">
+              <span class="finance-row-icon" aria-hidden="true"><i class="pi pi-credit-card"></i></span>
+              <div class="finance-row-label"><b>Cuotas de tarjeta del mes</b><small>{{ period }} · ARS</small></div>
+              <strong>{{ money(overview.budget.cardInstallmentsArs, 'ARS') }}</strong>
+            </div>
+            <div class="finance-row">
+              <span class="finance-row-icon" aria-hidden="true"><i class="pi pi-credit-card"></i></span>
+              <div class="finance-row-label"><b>Cuotas de tarjeta del mes</b><small>{{ period }} · USD</small></div>
+              <strong>{{ money(overview.budget.cardInstallmentsUsd, 'USD') }}</strong>
+            </div>
+            <div class="finance-row debt-row">
+              <span class="finance-row-icon warm" aria-hidden="true"><i class="pi pi-credit-card"></i></span>
+              <div class="finance-row-label"><b>Deuda total de tarjetas</b><small>Pendiente de pago</small></div>
+              <div class="finance-row-values">
+                <strong>{{ money(overview.totals.cardDebtArs, 'ARS') }}</strong><small>ARS</small>
+                <strong>{{ money(overview.totals.cardDebtUsd, 'USD') }}</strong><small>USD</small>
+              </div>
+            </div>
+            @if (cards.length > 0) {
+              <div class="credit-balances" aria-label="Crédito a favor de tarjetas, separado por moneda">
+                <span>Crédito a favor</span>
+                <b>{{ money(overview.totals.cardCreditArs, 'ARS') }} ARS</b>
+                <b>{{ money(overview.totals.cardCreditUsd, 'USD') }} USD</b>
+              </div>
+            }
+            @if (cards.length > 0) {
+              <details class="card-details">
+                <summary>Detalle por tarjeta</summary>
+                @for (card of cards; track card.id) {
+                  <div class="finance-row card-detail-row">
+                    <span class="finance-row-icon" aria-hidden="true"><i class="pi pi-credit-card"></i></span>
+                    <div class="finance-row-label"><b>{{ card.name }}</b><small>{{ card.bankName }} · deuda actual</small></div>
+                    <div class="finance-row-values">
+                      <strong>{{ money(card.debtArs, 'ARS') }}</strong><small>ARS</small>
+                      <strong>{{ money(card.debtUsd, 'USD') }}</strong><small>USD</small>
+                    </div>
+                  </div>
+                }
+              </details>
+            }
+            <details class="month-details">
+              <summary>Otros gastos y cargos del mes</summary>
+              <div class="month-cost"><span>Gastos en efectivo · ARS</span><b>{{ money(overview.budget.cashExpensesArs, 'ARS') }}</b></div>
+              <div class="month-cost"><span>Cargos confirmados · ARS</span><b>{{ money(overview.budget.cardChargesArs, 'ARS') }}</b></div>
+              <div class="month-cost"><span>Cargos confirmados · USD</span><b>{{ money(overview.budget.cardChargesUsd, 'USD') }}</b></div>
+            </details>
+          </section>
+          <section class="panel dash-panel accounts-panel">
+            <div class="panel-title">
+              <div><p class="eyebrow">DINERO REGISTRADO EN BANCOS</p><h3>Tus cuentas</h3></div>
+              <button type="button" class="text-action" (click)="navigate('accounts')">Administrar cuentas</button>
             </div>
             @if (activeAccounts.length === 0) {
               <div class="empty">
@@ -235,66 +267,12 @@
               </div>
             }
             @for (account of activeAccounts; track account.id) {
-              <div class="list-row">
-                <div>
-                  <b>{{ account.name }}</b
-                  ><small>{{ account.bankName }} · {{ account.currency }}</small>
-                </div>
+              <div class="finance-row account-row">
+                <span class="finance-row-icon" aria-hidden="true"><i class="pi pi-building-columns"></i></span>
+                <div class="finance-row-label"><b>{{ account.name }}</b><small>{{ account.bankName }} · {{ account.currency }}</small></div>
                 <strong>{{ money(account.currentBalance, account.currency) }}</strong>
               </div>
             }
-          </section>
-          <section class="panel dash-panel">
-            <div class="panel-title">
-              <div>
-                <p class="eyebrow">COMPROMISOS DE {{ period }}</p>
-                <h3>Tarjetas y cuotas del mes</h3>
-              </div>
-              <button type="button" class="text-action" (click)="navigate('cards')">
-                Ver tarjetas
-              </button>
-            </div>
-            @if (cards.length === 0) {
-              <div class="empty">
-                <b>No hay tarjetas configuradas</b>
-                <p>Agregá una tarjeta para revisar deuda y compromisos.</p>
-                <button type="button" (click)="navigate('cards')">Agregar tarjeta</button>
-              </div>
-            }
-            @for (card of cards; track card.id) {
-              <div class="list-row">
-                <div>
-                  <b>{{ card.name }}</b
-                  ><small>{{ card.bankName }} · deuda actual</small>
-                </div>
-                <strong
-                  >{{ money(card.debtArs, 'ARS') }} <small>ARS</small><br />{{
-                    money(card.debtUsd, 'USD')
-                  }}
-                  <small>USD</small></strong
-                >
-              </div>
-            }
-            <div class="month-cost">
-              <span>Cuotas de tarjeta · ARS</span
-              ><b>{{ money(overview.budget.cardInstallmentsArs, 'ARS') }}</b>
-            </div>
-            <div class="month-cost">
-              <span>Cuotas de tarjeta · USD</span
-              ><b>{{ money(overview.budget.cardInstallmentsUsd, 'USD') }}</b>
-            </div>
-            <div class="month-cost">
-              <span>Gastos en efectivo · ARS</span
-              ><b>{{ money(overview.budget.cashExpensesArs, 'ARS') }}</b>
-            </div>
-            <div class="month-cost">
-              <span>Cargos confirmados · ARS</span
-              ><b>{{ money(overview.budget.cardChargesArs, 'ARS') }}</b>
-            </div>
-            <div class="month-cost">
-              <span>Cargos confirmados · USD</span
-              ><b>{{ money(overview.budget.cardChargesUsd, 'USD') }}</b>
-            </div>
           </section>
         </div>
       </main>
