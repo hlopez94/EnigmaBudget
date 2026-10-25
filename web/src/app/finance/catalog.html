@@ -39,6 +39,6 @@
     @if (notice) { <p role="status">{{ notice }} @if (hasStaleNotice()) { <button type="button" (click)="reloadStale()">Actualizar lista</button> }</p> }
   </section>
 </main>
-<app-action-dialog title="Editar elemento" [open]="editOpen" (closed)="closeEdit()" [dismissible]="!saving">
+<app-action-dialog title="Editar elemento" visualVariant="savings-projection-dialog" [open]="editOpen" (closed)="closeEdit()" [dismissible]="!saving">
   <form class="edit-form" (ngSubmit)="saveEdit()"><label>Nombre<input name="editName" [(ngModel)]="editName" maxlength="80" required [disabled]="saving" /></label>@if (error) { <p role="alert">{{ error }}</p> }<div class="dialog-actions"><button type="button" class="secondary" (click)="closeEdit()" [disabled]="saving">Cancelar</button><button type="submit" class="primary" [disabled]="saving || !editName.trim()">Guardar</button></div></form>
 </app-action-dialog>

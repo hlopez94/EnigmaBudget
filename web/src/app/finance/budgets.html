@@ -22,7 +22,7 @@
     @if (notice) { <p role="status">{{ notice }} @if (hasStaleNotice()) { <button type="button" (click)="reloadStale()">Actualizar datos</button> }</p> }
   </section>
 </main>
-<app-action-dialog title="Detalle del presupuesto" [open]="!!selectedBudget && !editorOpen" (closed)="selectedBudget=null;selectedSource=null">
+<app-action-dialog title="Detalle del presupuesto" visualVariant="savings-projection-dialog" [open]="!!selectedBudget && !editorOpen" (closed)="selectedBudget=null;selectedSource=null">
   @if (selectedBudget) {
     <section class="budget-detail">
       <p class="eyebrow">{{ selectedBudget.categoryName }} · {{ period }} · {{ currency }}</p>
@@ -40,7 +40,7 @@
     </section>
   }
 </app-action-dialog>
-<app-action-dialog [title]="editing ? 'Editar límite mensual' : 'Definir límite mensual'" [open]="editorOpen" (closed)="closeEditor()" [dismissible]="!saving">
+<app-action-dialog [title]="editing ? 'Editar límite mensual' : 'Definir límite mensual'" visualVariant="savings-projection-dialog" [open]="editorOpen" (closed)="closeEditor()" [dismissible]="!saving">
   <form class="budget-form" (ngSubmit)="saveLimit()">
     @if (editing && selectedBudget) { <p><b>{{ selectedBudget.categoryName }}</b> · {{ period }} · {{ currency }}</p> }
     @else { <label>Categoría<select name="categoryId" [(ngModel)]="categoryId" [disabled]="saving" required>@for (category of activeExpenseCategories; track category.itemId) { <option [value]="category.itemId">{{ category.name }}</option> }</select></label> }
