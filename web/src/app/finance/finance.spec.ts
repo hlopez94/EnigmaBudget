@@ -67,6 +67,91 @@ describe('finance workspace regressions', () => {
     expect(cards.activeForm).toBe('payment');
   });
 
+  it('closes a confirmed statement before switching cards but retains the form on failure', async () => {
+    const api = {
+      confirmStatement: vi.fn().mockResolvedValue(undefined),
+      statement: vi.fn().mockImplementation((cardId: string) =>
+        Promise.resolve({
+          id: `statement-${cardId}`,
+          cardId,
+          period: '2026-10',
+          currency: 'ARS',
+          version: 1,
+          state: cardId === 'card-1' ? 'Confirmed' : 'Draft',
+          dueDate: null,
+          actualTotal: null,
+          expectedAmount: '0.00',
+          carryAmount: '0.00',
+          pendingAmount: '0.00',
+          creditBalance: '0.00',
+          installments: [],
+          adjustments: [],
+          payments: [],
+        }),
+      ),
+      purchases: vi.fn().mockResolvedValue([]),
+    };
+    const cards = new FinanceCards(
+      api as unknown as ApiService,
+      { markForCheck: vi.fn() } as unknown as import('@angular/core').ChangeDetectorRef,
+    );
+    cards.overview = { cards: [{ id: 'card-1' }, { id: 'card-2' }] } as never;
+    cards.selectedCardId = 'card-1';
+    cards.statement = {
+      id: 'statement-card-1',
+      cardId: 'card-1',
+      period: '2026-10',
+      currency: 'ARS',
+      version: 1,
+      state: 'Draft',
+      dueDate: null,
+      actualTotal: null,
+      expectedAmount: '0.00',
+      carryAmount: '0.00',
+      pendingAmount: '0.00',
+      creditBalance: '0.00',
+      installments: [],
+      adjustments: [],
+      payments: [],
+    };
+    cards.activeForm = 'statement';
+    cards.refreshOverview = vi.fn().mockResolvedValue(undefined);
+
+    await cards.confirmStatement();
+    cards.selectCard('card-2');
+    await cards.loadStatement();
+
+    expect(cards.activeForm).toBe('');
+    expect(cards.statement?.state).toBe('Draft');
+    cards.openForm('statement');
+    expect(cards.activeForm).toBe('statement');
+
+    cards.activeForm = 'statement';
+    cards.statement = { ...cards.statement!, state: 'Draft' };
+    cards.statementDraft = {
+      currency: 'ARS',
+      dueDate: '2026-11-02',
+      actualTotal: '123.45',
+      adjustments: [
+        { id: 'adjustment-1', description: 'Ajuste', category: 'Otros', amount: '1.25' },
+      ],
+    };
+    api.confirmStatement.mockRejectedValueOnce(new Error('Conflicto'));
+    await cards.confirmStatement();
+
+    expect(cards.activeForm).toBe('statement');
+    expect(cards.statement?.state).toBe('Draft');
+    expect(cards.statementDraft).toEqual({
+      currency: 'ARS',
+      dueDate: '2026-11-02',
+      actualTotal: '123.45',
+      adjustments: [
+        { id: 'adjustment-1', description: 'Ajuste', category: 'Otros', amount: '1.25' },
+      ],
+    });
+    expect(cards.error).toBe('Conflicto');
+  });
+
   it('opens usable finance actions for an authenticated user before onboarding is complete', async () => {
     const api = {
       session: vi.fn().mockResolvedValue({

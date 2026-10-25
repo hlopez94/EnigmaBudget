@@ -301,6 +301,7 @@ export class FinanceCards extends FinanceActions implements OnChanges {
       ))
     )
       return;
+    this.activeForm = '';
     await this.refreshOverview();
     await this.loadStatement();
   }

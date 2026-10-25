@@ -232,6 +232,13 @@ test('runs real finance, sharing, and card acceptance from empty completed onboa
   await cardForm.locator('[name="cardAsOf"]').fill(date);
   await cardForm.getByRole('button', { name: 'Guardar tarjeta' }).click();
   expect((await createCard).status()).toBe(200);
+  await page.getByRole('button', { name: 'Agregar tarjeta' }).first().click();
+  const createSecondCard = waitForApi(page, 'POST', '/api/cards');
+  await cardForm.locator('[name="cardName"]').fill('Visa secundaria');
+  await cardForm.locator('[name="cardBank"]').fill('Banco Dos');
+  await cardForm.locator('[name="cardAsOf"]').fill(date);
+  await cardForm.getByRole('button', { name: 'Guardar tarjeta' }).click();
+  expect((await createSecondCard).status()).toBe(200);
 
   await mobileNavigationButton(page, 'Movimientos').click();
   await page.getByRole('button', { name: 'Ingreso o gasto' }).click();
@@ -448,7 +455,21 @@ test('runs real finance, sharing, and card acceptance from empty completed onboa
   const confirmStatement = waitForApi(page, 'POST', `/api/cards/${cardId}/statement/confirm`);
   await statementForm.getByRole('button', { name: 'Confirmar resumen' }).click();
   expect((await confirmStatement).status()).toBe(200);
+  const secondCardResource = page.locator('.resource-card').filter({ hasText: 'Visa secundaria' });
+  const secondStatement = page.waitForResponse((response) => {
+    const url = new URL(response.url());
+    return (
+      response.request().method() === 'GET' &&
+      /^\/api\/cards\/[^/]+\/statement$/.test(url.pathname)
+    );
+  });
+  await secondCardResource.getByRole('button', { name: 'Ver resumen y compras' }).click();
+  await secondStatement;
+  await expect(statementForm).toBeHidden();
+  await page.getByRole('button', { name: 'Revisar resumen' }).click();
+  await expect(statementForm).toBeVisible();
   await page.keyboard.press('Escape');
+  await cardResource.getByRole('button', { name: 'Ver resumen y compras' }).click();
   await page.getByRole('button', { name: 'Registrar pago' }).click();
   await expect(page.locator('form.pay-card')).toBeVisible();
 
