@@ -63,14 +63,20 @@
 - Create: `src/EnigmaBudget.Api/Finance/CatalogEndpoints.cs`, `CatalogService.cs`
 - Modify: `src/EnigmaBudget.Api/Finance/FinanceEndpoints.cs`, `Contracts.cs`, `src/EnigmaBudget.Api/Workspaces/FinanceWorkspaceFilter.cs`
 - Test: `tests/EnigmaBudget.Api.Tests/FinanceCatalogIntegrationTests.cs`, `WorkspaceAuthorizationTests.cs`
+- Modify: `src/EnigmaBudget.Api/Finance/CatalogEntities.cs`, `CatalogDefaults.cs`, `src/EnigmaBudget.Api/Data/AppDbContext.cs`, `src/EnigmaBudget.Api/Program.cs`
+- Generate additive EF migration `CatalogCommandsAndDefaults` plus designer/model snapshot
 
 **Interfaces:**
 - `GET /api/finance/catalog` returns selected-workspace categories, merchants and income sources.
+- Routes for mutations: `/api/finance/catalog/categories`, `/merchants`, `/income-sources`, with `/{id}` for PUT/DELETE. Create `(Guid Id,string Name,string? Kind)` uses Id as resource/request ID; update `(Guid RequestId,int Version,string Name)` changes name only; archive DELETE `(Guid RequestId,int Version)` never deletes history. Category/income-source kind is immutable after creation. New names are trimmed, nonblank, at most 80 characters, and contain no control characters. Historical labels remain untouched.
+- Add `CatalogCommand` keyed by `(WorkspaceId,RequestId)` with command kind, target resource ID, canonical raw-payload SHA256, stored result JSON, server actor ID and UTC timestamp, plus workspace/actor FKs. Hash before trimming so a changed payload conflicts. Preserve all existing checks and revalidate permissions under the workspace lock before replay; resource/audit/command are atomic.
+- Add `FinanceCategory.IsDefault`; backfill only the seeded exact `Sin clasificar` rows, enforce unique `(WorkspaceId,Kind)` when IsDefault, and set it in `CatalogDefaults` for fresh spaces. Default category name/kind/archive state is protected (409); client input cannot set the flag. Other referenced entries may be archived without losing history. Expose IsDefault in category DTOs.
+
 - `POST/PUT` for categories, merchants and income sources; `POST` uses GUID RequestId and stored canonical payload hash; `PUT` requires current `Version`. `DELETE` means archive. Archived referenced IDs remain valid for history.
 - Route filter maps `GET` to `read`, all catalog mutations to `manageResources`; write handlers validate CSRF and perform workspace-scoped idempotency/version checks under `WorkspaceMutationGate`, re-resolving authorization inside the locked workspace. Workspace and actor always come from `FinanceWorkspaceFilter.Get(http)`.
 - Exact trimmed, case-sensitive name uniqueness only within the workspace/kind. Cross-workspace lookups return 404; active incompatible category kind returns 400/409.
 
-- [ ] **Step 1: Write failing API tests** `catalog_crud_requires_manage_resources`, `catalog_replay_compares_payload`, `catalog_edit_requires_current_version`, `archive_retains_historical_reference`, `same_name_conflicts_only_inside_workspace`, `foreign_catalog_id_is_not_found_and_shared_reader_is_read_only`, and `category_kind_is_validated`.
+- [ ] **Step 1: Write failing API tests** `catalog_crud_requires_manage_resources`, `catalog_replay_compares_payload`, `catalog_edit_requires_current_version`, `archive_retains_historical_reference`, `same_name_conflicts_only_inside_workspace`, `foreign_catalog_id_is_not_found_and_shared_reader_is_read_only`, and `category_kind_is_validated`, `default_category_cannot_be_renamed_or_archived`, `catalog_kind_is_immutable`, `catalog_replay_revalidates_permission_after_workspace_lock`, `catalog_request_id_cannot_be_reused_for_another_resource_kind`, and `catalog_mutation_and_audit_are_atomic`.
 - [ ] **Step 2: Check RAM; run only the filtered catalog and authorization integration tests via wrapper.** Expected RED: routes and permission mapping are missing.
 - [ ] **Step 3: Implement workspace-scoped catalog CRUD/archive and typed DTOs.** Trim new user-entered names once at the write boundary; compare and enforce uniqueness on the exact stored value, case- and space-sensitive. Do not normalize or rewrite historical label buckets.
 - [ ] **Step 4: Rerun filtered tests.** Expected GREEN: versions, permissions, replay and isolation hold.

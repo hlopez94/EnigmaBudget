@@ -29,6 +29,10 @@ Incluye: categorías de gasto/ingreso, comercios frecuentes y fuentes de ingreso
 
 ## Permisos, seguridad y experiencia
 
+Decisiones del controlador: las dos categorías iniciales se identifican con `IsDefault` y conservan nombre/tipo; no se renombran ni archivan, porque sostienen la clasificación de registros heredados sin coincidencia. Las demás categorías, comercios y fuentes admiten renombre y archivo, manteniendo sus snapshots. Los nombres nuevos se recortan en los extremos, aceptan hasta 80 caracteres y no incluyen caracteres de control; la historia almacenada no se recorta ni normaliza.
+
+Cada mutación de catálogo persiste un `CatalogCommand` por workspace/RequestId, con tipo de comando, recurso, hash del payload original, resultado JSON, actor de servidor y hora UTC. Comando, cambio y auditoría comparten transacción; un replay exige permiso vigente y devuelve el resultado guardado sin repetir escrituras.
+
 API y consultas derivan el workspace del contexto resuelto por `FinanceWorkspaceFilter`. `read` consulta; `manageResources` administra catálogo/presupuesto; `recordFinance` conserva su uso para registrar movimientos. PersonalReadGrant sigue siendo read-only. Mutaciones requieren CSRF, GUID idempotente, comparar payload al reintentar (igual devuelve el mismo resultado, distinto devuelve 409), y versión en edición. Montos son cadenas decimales en API y `numeric(18,2)` en PostgreSQL. Copy en español. La UI debe distinguir gasto registrado y compromiso de tarjeta y enlazar sus orígenes.
 
 ## Criterios y decisiones abiertas
