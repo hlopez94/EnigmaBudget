@@ -459,32 +459,35 @@ public sealed class SharingIntegrationTests : IDisposable
             }
         );
         var responses = await Task.WhenAll(p1, p2);
-        Assert.True(
-            responses.Any(x => x.StatusCode == HttpStatusCode.OK),
-            string.Join(
-                " | ",
-                await Task.WhenAll(
-                    responses.Select(async x =>
-                        $"{(int)x.StatusCode}: {await x.Content.ReadAsStringAsync()}"
-                    )
-                )
-            )
+        Assert.Equal(2, responses.Length);
+        var success = Assert.Single(responses, x => x.StatusCode == HttpStatusCode.OK);
+        var rejected = Assert.Single(
+            responses,
+            x => x.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.Conflict
         );
-        Assert.True(
-            responses.Any(x => x.StatusCode == HttpStatusCode.Conflict),
-            string.Join(
-                " | ",
-                await Task.WhenAll(
-                    responses.Select(async x =>
-                        $"{(int)x.StatusCode}: {await x.Content.ReadAsStringAsync()}"
-                    )
-                )
-            )
-        );
+        if (rejected.StatusCode == HttpStatusCode.BadRequest)
+        {
+            using var rejectionBody = await rejected.Content.ReadFromJsonAsync<JsonDocument>();
+            Assert.Equal(
+                "El cobro supera el saldo pendiente de la persona.",
+                rejectionBody!.RootElement.GetProperty("detail").GetString()
+            );
+        }
+        else
+        {
+            Assert.Equal(HttpStatusCode.Conflict, rejected.StatusCode);
+        }
+        using var successBody = await success.Content.ReadFromJsonAsync<JsonDocument>();
+        Assert.Equal("30.00", successBody!.RootElement.GetProperty("appliedAmount").GetString());
         var receivables = await client.GetFromJsonAsync<Receivable[]>(
             $"/api/groups/{group}/receivables?period=2026-10"
         );
-        Assert.Equal("30.00", receivables!.Single(x => x.ParticipantId == guest).CollectedAmount);
+        var guestReceivable = receivables!.Single(x => x.ParticipantId == guest);
+        Assert.Equal("50.00", guestReceivable.Amount);
+        Assert.Equal("30.00", guestReceivable.CollectedAmount);
+        Assert.Equal("20.00", guestReceivable.PendingAmount);
+        var accountBalances = await client.GetFromJsonAsync<AccountBalance[]>("/api/accounts");
+        Assert.Equal("30.00", accountBalances!.Single(x => x.Id == account).CurrentBalance);
     }
 
     [Fact]
@@ -717,7 +720,12 @@ public sealed class SharingIntegrationTests : IDisposable
 
     private sealed record Installment(Guid Id, string Amount);
 
-    private sealed record Receivable(Guid ParticipantId, string Amount, string CollectedAmount);
+    private sealed record Receivable(
+        Guid ParticipantId,
+        string Amount,
+        string CollectedAmount,
+        string PendingAmount
+    );
 
     private sealed record AccountBalance(Guid Id, string CurrentBalance);
 }
