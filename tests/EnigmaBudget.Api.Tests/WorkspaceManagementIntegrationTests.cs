@@ -97,7 +97,8 @@ public sealed class WorkspaceManagementIntegrationTests
 
         var changedRole = await owner.PutAsJsonAsync($"/api/workspaces/{household.Id}/members/{memberId}", new { version = 1, role = "Admin" });
         Assert.Equal(HttpStatusCode.NoContent, changedRole.StatusCode);
-        var transfer = await owner.PostAsJsonAsync($"/api/workspaces/{household.Id}/owner-transfer", new { version = household.Version, userId = memberId });
+        var updatedWorkspace = (await owner.GetFromJsonAsync<WorkspaceDto>($"/api/workspaces/{household.Id}"))!;
+        var transfer = await owner.PostAsJsonAsync($"/api/workspaces/{household.Id}/owner-transfer", new { version = updatedWorkspace.Version, userId = memberId });
         Assert.Equal(HttpStatusCode.NoContent, transfer.StatusCode);
         using var removal = new HttpRequestMessage(HttpMethod.Delete, $"/api/workspaces/{household.Id}/members/{memberId}")
         {
@@ -116,6 +117,43 @@ public sealed class WorkspaceManagementIntegrationTests
         Assert.Equal("Admin", memberships.Single(x => x.UserId != memberId).Role);
         Assert.Equal("Owner", memberships.Single(x => x.UserId == memberId).Role);
         Assert.Equal(memberId, await verified.Workspaces.Where(x => x.Id == household.Id).Select(x => x.OwnerUserId).SingleAsync());
+    }
+
+    [Fact]
+    public async Task Concurrent_role_changes_serialize_through_the_household_version()
+    {
+        using var factory = new ApiFactory();
+        using var owner = factory.IdentityClient("serial-owner");
+        using var firstMember = factory.IdentityClient("serial-member-one");
+        using var secondMember = factory.IdentityClient("serial-member-two");
+        await AddCsrfAsync(owner);
+        await firstMember.GetAsync("/api/auth/session");
+        await secondMember.GetAsync("/api/auth/session");
+        var response = await owner.PostAsJsonAsync("/api/workspaces", new { id = Guid.NewGuid(), kind = "Household", name = "Hogar serial" });
+        var workspace = (await response.Content.ReadFromJsonAsync<WorkspaceDto>())!;
+        Guid firstId;
+        Guid secondId;
+        await using (var db = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>().UseNpgsql(factory.TestConnection).Options))
+        {
+            var firstUser = await db.ApplicationUsers.SingleAsync(x => x.Subject == "serial-member-one");
+            var secondUser = await db.ApplicationUsers.SingleAsync(x => x.Subject == "serial-member-two");
+            firstId = firstUser.Id;
+            secondId = secondUser.Id;
+            db.WorkspaceMemberships.AddRange(
+                new EnigmaBudget.Api.Workspaces.WorkspaceMembership { WorkspaceId = workspace.Id, UserId = firstId, Role = "Member", JoinedAt = DateTimeOffset.UtcNow },
+                new EnigmaBudget.Api.Workspaces.WorkspaceMembership { WorkspaceId = workspace.Id, UserId = secondId, Role = "Member", JoinedAt = DateTimeOffset.UtcNow });
+            await db.SaveChangesAsync();
+        }
+
+        var firstChange = owner.PutAsJsonAsync($"/api/workspaces/{workspace.Id}/members/{firstId}", new { version = 1, role = "Admin" });
+        var secondChange = owner.PutAsJsonAsync($"/api/workspaces/{workspace.Id}/members/{secondId}", new { version = 1, role = "Admin" });
+        var results = await Task.WhenAll(firstChange, secondChange);
+        Assert.All(results, result => Assert.Equal(HttpStatusCode.NoContent, result.StatusCode));
+
+        await using var check = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>().UseNpgsql(factory.TestConnection).Options);
+        var version = await check.Workspaces.Where(x => x.Id == workspace.Id).Select(x => x.Version).SingleAsync();
+        Assert.Equal(workspace.Version + 2, version);
+        Assert.Equal(2, await check.WorkspaceAuditEvents.CountAsync(x => x.WorkspaceId == workspace.Id && x.Action == "membership.role_changed"));
     }
 
     private static async Task AddCsrfAsync(HttpClient client)

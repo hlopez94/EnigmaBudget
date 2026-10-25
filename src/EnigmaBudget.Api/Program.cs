@@ -22,6 +22,7 @@ var googleConfigured = !string.IsNullOrWhiteSpace(googleId) && !string.IsNullOrW
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<WorkspaceProvisioner>();
 builder.Services.AddScoped<WorkspaceAccessService>();
+builder.Services.AddScoped<WorkspaceMutationGate>();
 builder.Services.AddScoped<WorkspaceAuditInterceptor>();
 builder.Services.AddDbContext<AppDbContext>((services, o) => o.UseNpgsql(builder.Configuration.GetConnectionString("Default")).AddInterceptors(services.GetRequiredService<WorkspaceAuditInterceptor>()));
 builder.Services.AddSingleton(TimeProvider.System);

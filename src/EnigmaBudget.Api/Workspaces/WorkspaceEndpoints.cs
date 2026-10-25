@@ -70,17 +70,23 @@ public static class WorkspaceEndpoints
         return row is null ? NotFound() : Results.Ok(ToDto(row.Workspace, row.Role, row.UserId));
     }
 
-    private static async Task<IResult> Update(HttpContext http, AppDbContext db, WorkspaceAccessService access, IAntiforgery csrf, Guid id, UpdateWorkspaceRequest request)
+    private static async Task<IResult> Update(HttpContext http, AppDbContext db, WorkspaceAccessService access, WorkspaceMutationGate gate, IAntiforgery csrf, Guid id, UpdateWorkspaceRequest request)
     {
         if (!await ValidCsrf(http, csrf)) return Results.BadRequest();
-        var (ctx, failure) = await access.ResolveAsync(http.User, id.ToString(), WorkspacePermissions.ManageResources, http.RequestAborted, allowArchivedManagement: true);
+        var (preflight, preflightFailure) = await access.ResolveAsync(http.User, id.ToString(), WorkspacePermissions.ManageResources, http.RequestAborted, allowArchivedManagement: true);
+        if (preflight is null) return AccessFailure(preflightFailure);
+        var (lease, lockFailure) = await gate.AcquireAsync(id, http.RequestAborted);
+        if (lease is null) return AccessFailure(lockFailure);
+        await using var mutation = lease;
+        var (ctx, failure) = await access.ResolveWithinLockedWorkspaceAsync(http.User, mutation.Workspace, WorkspacePermissions.ManageResources, http.RequestAborted, allowArchivedManagement: true);
         if (ctx is null) return AccessFailure(failure);
         var ws = ctx.Workspace;
         if (!ValidName(request.Name)) return Problem(400, "El nombre del espacio no es válido.");
         if (ws.Version != request.Version) return Problem(409, "El espacio cambió. Actualizá la pantalla.");
-        ws.Name = request.Name.Trim(); ws.IsArchived = request.IsArchived; ws.Version++;
+        ws.Name = request.Name.Trim(); ws.IsArchived = request.IsArchived;
         AddAudit(db, ctx, "workspace.updated", "Workspace", ws.Id);
-        try { await db.SaveChangesAsync(http.RequestAborted); } catch (DbUpdateConcurrencyException) { return Problem(409, "El espacio cambió. Actualizá la pantalla."); }
+        mutation.MarkChanged();
+        try { await db.SaveChangesAsync(http.RequestAborted); await mutation.CommitAsync(http.RequestAborted); } catch (DbUpdateConcurrencyException) { return Problem(409, "El espacio cambió. Actualizá la pantalla."); }
         return Results.Ok(ToDto(ws, ctx.Role, ctx.User.Id));
     }
 
@@ -93,10 +99,15 @@ public static class WorkspaceEndpoints
         return Results.Ok(rows);
     }
 
-    private static async Task<IResult> ChangeMember(HttpContext http, AppDbContext db, WorkspaceAccessService access, IAntiforgery csrf, Guid id, Guid userId, ChangeMembershipRequest request)
+    private static async Task<IResult> ChangeMember(HttpContext http, AppDbContext db, WorkspaceAccessService access, WorkspaceMutationGate gate, IAntiforgery csrf, Guid id, Guid userId, ChangeMembershipRequest request)
     {
         if (!await ValidCsrf(http, csrf)) return Results.BadRequest();
-        var (ctx, failure) = await access.ResolveAsync(http.User, id.ToString(), WorkspacePermissions.ManageMembers, http.RequestAborted);
+        var (preflight, preflightFailure) = await access.ResolveAsync(http.User, id.ToString(), WorkspacePermissions.ManageMembers, http.RequestAborted);
+        if (preflight is null) return AccessFailure(preflightFailure);
+        var (lease, lockFailure) = await gate.AcquireAsync(id, http.RequestAborted);
+        if (lease is null) return AccessFailure(lockFailure);
+        await using var mutation = lease;
+        var (ctx, failure) = await access.ResolveWithinLockedWorkspaceAsync(http.User, mutation.Workspace, WorkspacePermissions.ManageMembers, http.RequestAborted);
         if (ctx is null) return AccessFailure(failure);
         var member = await db.WorkspaceMemberships.SingleOrDefaultAsync(x => x.WorkspaceId == id && x.UserId == userId && x.Active, http.RequestAborted);
         if (member is null) return NotFound();
@@ -104,16 +115,22 @@ public static class WorkspaceEndpoints
         if (member.Version != request.Version) return Problem(409, "La membresía cambió. Actualizá la pantalla.");
         AddAudit(db, ctx, "membership.role_changed", "WorkspaceMembership", userId, "{\"role\":\"" + request.Role + "\"}");
         member.Role = request.Role; member.Version++;
-        try { await db.SaveChangesAsync(http.RequestAborted); } catch (DbUpdateConcurrencyException) { return Problem(409, "La membresía cambió. Actualizá la pantalla."); }
+        mutation.MarkChanged();
+        try { await db.SaveChangesAsync(http.RequestAborted); await mutation.CommitAsync(http.RequestAborted); } catch (DbUpdateConcurrencyException) { return Problem(409, "La membresía cambió. Actualizá la pantalla."); }
         return Results.NoContent();
     }
 
-    private static async Task<IResult> RemoveMember(HttpContext http, HttpRequest request, AppDbContext db, WorkspaceAccessService access, IAntiforgery csrf, Guid id, Guid userId)
+    private static async Task<IResult> RemoveMember(HttpContext http, HttpRequest request, AppDbContext db, WorkspaceAccessService access, WorkspaceMutationGate gate, IAntiforgery csrf, Guid id, Guid userId)
     {
         if (!await ValidCsrf(http, csrf)) return Results.BadRequest();
         var body = await request.ReadFromJsonAsync<LeaveWorkspaceRequest>(http.RequestAborted);
         if (body is null) return Results.BadRequest();
-        var (ctx, failure) = await access.ResolveAsync(http.User, id.ToString(), WorkspacePermissions.ManageMembers, http.RequestAborted);
+        var (preflight, preflightFailure) = await access.ResolveAsync(http.User, id.ToString(), WorkspacePermissions.ManageMembers, http.RequestAborted);
+        if (preflight is null) return AccessFailure(preflightFailure);
+        var (lease, lockFailure) = await gate.AcquireAsync(id, http.RequestAborted);
+        if (lease is null) return AccessFailure(lockFailure);
+        await using var mutation = lease;
+        var (ctx, failure) = await access.ResolveWithinLockedWorkspaceAsync(http.User, mutation.Workspace, WorkspacePermissions.ManageMembers, http.RequestAborted);
         if (ctx is null) return AccessFailure(failure);
         var member = await db.WorkspaceMemberships.SingleOrDefaultAsync(x => x.WorkspaceId == id && x.UserId == userId && x.Active, http.RequestAborted);
         if (member is null) return NotFound();
@@ -121,28 +138,41 @@ public static class WorkspaceEndpoints
         if (member.Version != body.Version) return Problem(409, "La membresía cambió. Actualizá la pantalla.");
         AddAudit(db, ctx, "membership.revoked", "WorkspaceMembership", userId);
         member.Active = false; member.Version++;
-        try { await db.SaveChangesAsync(http.RequestAborted); } catch (DbUpdateConcurrencyException) { return Problem(409, "La membresía cambió. Actualizá la pantalla."); }
+        mutation.MarkChanged();
+        try { await db.SaveChangesAsync(http.RequestAborted); await mutation.CommitAsync(http.RequestAborted); } catch (DbUpdateConcurrencyException) { return Problem(409, "La membresía cambió. Actualizá la pantalla."); }
         return Results.NoContent();
     }
 
-    private static async Task<IResult> Leave(HttpContext http, AppDbContext db, IAntiforgery csrf, Guid id, LeaveWorkspaceRequest request)
+    private static async Task<IResult> Leave(HttpContext http, AppDbContext db, WorkspaceAccessService access, WorkspaceMutationGate gate, IAntiforgery csrf, Guid id, LeaveWorkspaceRequest request)
     {
         if (!await ValidCsrf(http, csrf)) return Results.BadRequest();
-        var member = await db.WorkspaceMemberships.Include(x => x.Workspace).SingleOrDefaultAsync(x => x.WorkspaceId == id && x.Active && x.User.Subject == CurrentIdentity.Subject(http.User), http.RequestAborted);
+        var (preflight, preflightFailure) = await access.ResolveAsync(http.User, id.ToString(), WorkspacePermissions.Read, http.RequestAborted, allowArchivedManagement: true);
+        if (preflight is null) return AccessFailure(preflightFailure);
+        var (lease, lockFailure) = await gate.AcquireAsync(id, http.RequestAborted);
+        if (lease is null) return AccessFailure(lockFailure);
+        await using var mutation = lease;
+        var (ctx, failure) = await access.ResolveWithinLockedWorkspaceAsync(http.User, mutation.Workspace, WorkspacePermissions.Read, http.RequestAborted, allowArchivedManagement: true);
+        if (ctx is null) return AccessFailure(failure);
+        var member = await db.WorkspaceMemberships.SingleOrDefaultAsync(x => x.WorkspaceId == id && x.UserId == ctx.User.Id && x.Active, http.RequestAborted);
         if (member is null) return NotFound();
         if (member.Role == "Owner") return Problem(403, "La titularidad debe transferirse antes de salir.");
         if (member.Version != request.Version) return Problem(409, "La membresía cambió. Actualizá la pantalla.");
-        var user = await db.ApplicationUsers.SingleAsync(x => x.Subject == CurrentIdentity.Subject(http.User), http.RequestAborted);
-        db.WorkspaceAuditEvents.Add(new WorkspaceAuditEvent { WorkspaceId = id, ActorUserId = user.Id, Action = "membership.left", ResourceType = "WorkspaceMembership", ResourceId = user.Id.ToString(), OccurredAt = DateTimeOffset.UtcNow });
+        AddAudit(db, ctx, "membership.left", "WorkspaceMembership", ctx.User.Id);
         member.Active = false; member.Version++;
-        try { await db.SaveChangesAsync(http.RequestAborted); } catch (DbUpdateConcurrencyException) { return Problem(409, "La membresía cambió. Actualizá la pantalla."); }
+        mutation.MarkChanged();
+        try { await db.SaveChangesAsync(http.RequestAborted); await mutation.CommitAsync(http.RequestAborted); } catch (DbUpdateConcurrencyException) { return Problem(409, "La membresía cambió. Actualizá la pantalla."); }
         return Results.NoContent();
     }
 
-    private static async Task<IResult> TransferOwner(HttpContext http, AppDbContext db, WorkspaceAccessService access, IAntiforgery csrf, Guid id, OwnerTransferRequest request)
+    private static async Task<IResult> TransferOwner(HttpContext http, AppDbContext db, WorkspaceAccessService access, WorkspaceMutationGate gate, IAntiforgery csrf, Guid id, OwnerTransferRequest request)
     {
         if (!await ValidCsrf(http, csrf)) return Results.BadRequest();
-        var (ctx, failure) = await access.ResolveAsync(http.User, id.ToString(), WorkspacePermissions.ManageMembers, http.RequestAborted);
+        var (preflight, preflightFailure) = await access.ResolveAsync(http.User, id.ToString(), WorkspacePermissions.ManageMembers, http.RequestAborted);
+        if (preflight is null) return AccessFailure(preflightFailure);
+        var (lease, lockFailure) = await gate.AcquireAsync(id, http.RequestAborted);
+        if (lease is null) return AccessFailure(lockFailure);
+        await using var mutation = lease;
+        var (ctx, failure) = await access.ResolveWithinLockedWorkspaceAsync(http.User, mutation.Workspace, WorkspacePermissions.ManageMembers, http.RequestAborted);
         if (ctx is null) return AccessFailure(failure);
         if (ctx.Role != "Owner" || ctx.Workspace.Kind != "Household") return Problem(403, "Solo quien tiene la titularidad de un Hogar puede transferirla.");
         if (ctx.Workspace.Version != request.Version) return Problem(409, "El espacio cambió. Actualizá la pantalla.");
@@ -152,8 +182,9 @@ public static class WorkspaceEndpoints
         AddAudit(db, ctx, "workspace.owner_transferred", "WorkspaceMembership", request.UserId);
         current.Role = "Admin"; current.Version++;
         target.Role = "Owner"; target.Version++;
-        ctx.Workspace.OwnerUserId = target.UserId; ctx.Workspace.Version++;
-        try { await db.SaveChangesAsync(http.RequestAborted); } catch (DbUpdateConcurrencyException) { return Problem(409, "El espacio cambió. Actualizá la pantalla."); }
+        ctx.Workspace.OwnerUserId = target.UserId;
+        mutation.MarkChanged();
+        try { await db.SaveChangesAsync(http.RequestAborted); await mutation.CommitAsync(http.RequestAborted); } catch (DbUpdateConcurrencyException) { return Problem(409, "El espacio cambió. Actualizá la pantalla."); }
         return Results.NoContent();
     }
 
