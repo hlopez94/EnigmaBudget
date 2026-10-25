@@ -1,0 +1,443 @@
+@if (error) {
+  <div class="feedback error" role="alert">{{ error }}</div>
+}
+@if (notice) {
+  <div class="feedback success" role="status">{{ notice }}</div>
+}
+<main class="content">
+  <div class="section-heading">
+    <div>
+      <p class="eyebrow">TARJETAS Y RESÚMENES</p>
+      <h2>Compras y pagos de tarjeta</h2>
+      <p>Una compra crea cuotas; el pago del resumen cancela deuda y no suma otro gasto.</p>
+    </div>
+  </div>
+  <section class="panel">
+    <h3>Agregar tarjeta</h3>
+    <form (ngSubmit)="saveCard()" class="form-grid">
+      <label
+        >Nombre<input
+          name="cardName"
+          [(ngModel)]="cardDraft.name"
+          required
+          maxlength="120"
+          [disabled]="saving" /></label
+      ><label
+        >Banco<input
+          name="cardBank"
+          [(ngModel)]="cardDraft.bankName"
+          required
+          maxlength="120"
+          [disabled]="saving" /></label
+      ><label
+        >Día de cierre (opcional)<input
+          name="closingDay"
+          type="number"
+          min="1"
+          max="31"
+          [(ngModel)]="cardDraft.closingDay"
+          [disabled]="saving" /></label
+      ><label
+        >Día de vencimiento (opcional)<input
+          name="dueDay"
+          type="number"
+          min="1"
+          max="31"
+          [(ngModel)]="cardDraft.dueDay"
+          [disabled]="saving" /></label
+      ><label
+        >Deuda inicial ARS<input
+          name="initialArs"
+          [(ngModel)]="cardDraft.statementDebtArs"
+          inputmode="decimal"
+          [disabled]="saving" /></label
+      ><label
+        >Deuda inicial USD<input
+          name="initialUsd"
+          [(ngModel)]="cardDraft.statementDebtUsd"
+          inputmode="decimal"
+          [disabled]="saving" /></label
+      ><label
+        >Fecha de deuda inicial<input
+          name="cardAsOf"
+          type="date"
+          [(ngModel)]="cardDraft.asOfDate"
+          required
+          [disabled]="saving" /></label
+      ><button class="primary" type="submit" [disabled]="saving">Guardar tarjeta</button>
+    </form>
+  </section>
+  <section class="panel">
+    <div class="panel-title">
+      <h3>Tus tarjetas</h3>
+      <span>{{ cards.length }} registradas</span>
+    </div>
+    @if (cards.length === 0) {
+      <div class="empty">
+        <b>Todavía no hay tarjetas</b>
+        <p>Agregá una tarjeta para cargar compras y revisar resúmenes.</p>
+      </div>
+    }
+    @for (c of cards; track c.id) {
+      <div class="resource-card">
+        <div class="list-row">
+          <div>
+            <b
+              >{{ c.name }}
+              @if (c.isArchived) {
+                <span class="badge">Archivada</span>
+              }</b
+            ><small>{{ c.bankName }} · deuda actual por separado</small>
+          </div>
+          <strong
+            >{{ money(c.debtArs, 'ARS') }} <small>ARS</small><br />{{ money(c.debtUsd, 'USD') }}
+            <small>USD</small></strong
+          >
+        </div>
+        <div class="row-actions">
+          <button
+            type="button"
+            class="text-action"
+            (click)="selectedCardId = c.id; editCard(c); loadStatement(); loadPurchases()"
+          >
+            Administrar</button
+          ><button
+            type="button"
+            class="text-action"
+            (click)="selectedCardId = c.id; loadStatement(); loadPurchases()"
+          >
+            Ver resumen y compras
+          </button>
+        </div>
+      </div>
+    }
+  </section>
+  @if (selectedCard && cardEdit.id === selectedCard.id) {
+    <section class="panel">
+      <div class="panel-title">
+        <div>
+          <p class="eyebrow">{{ selectedCard.name }}</p>
+          <h3>Editar tarjeta</h3>
+        </div>
+      </div>
+      <form (ngSubmit)="saveCardEdit()" class="form-grid">
+        <label
+          >Nombre<input
+            name="editCardName"
+            [(ngModel)]="cardEdit.name"
+            required
+            [disabled]="saving" /></label
+        ><label
+          >Banco<input
+            name="editCardBank"
+            [(ngModel)]="cardEdit.bankName"
+            required
+            [disabled]="saving" /></label
+        ><label
+          >Día de cierre<input
+            name="editClosing"
+            type="number"
+            min="1"
+            max="31"
+            [(ngModel)]="cardEdit.closingDay"
+            [disabled]="saving" /></label
+        ><label
+          >Día de vencimiento<input
+            name="editDue"
+            type="number"
+            min="1"
+            max="31"
+            [(ngModel)]="cardEdit.dueDay"
+            [disabled]="saving" /></label
+        ><label class="check"
+          ><input
+            name="archiveCard"
+            type="checkbox"
+            [(ngModel)]="cardEdit.isArchived"
+            [disabled]="saving"
+          />
+          Tarjeta archivada</label
+        ><button
+          class="secondary"
+          type="submit"
+          [disabled]="saving || cardEdit.id !== selectedCard.id"
+        >
+          Guardar cambios
+        </button>
+      </form>
+    </section>
+    <div class="two-columns">
+      <section class="panel">
+        <h3>Cargar compra</h3>
+        <form (ngSubmit)="savePurchase()" class="form-grid">
+          <label
+            >Descripción<input
+              name="purchaseDescription"
+              [(ngModel)]="purchaseDraft.description"
+              required
+              maxlength="240"
+              [disabled]="saving" /></label
+          ><label
+            >Categoría<input
+              name="purchaseCategory"
+              [(ngModel)]="purchaseDraft.category"
+              maxlength="80"
+              [disabled]="saving" /></label
+          ><label
+            >Fecha<input
+              name="purchaseDate"
+              type="date"
+              [(ngModel)]="purchaseDraft.date"
+              required
+              [disabled]="saving" /></label
+          ><label
+            >Moneda<select
+              name="purchaseCurrency"
+              [(ngModel)]="purchaseDraft.currency"
+              [disabled]="saving"
+            >
+              <option>ARS</option>
+              <option>USD</option>
+            </select></label
+          ><label
+            >Total de compra<input
+              name="purchaseTotal"
+              [(ngModel)]="purchaseDraft.totalAmount"
+              inputmode="decimal"
+              required
+              [disabled]="saving" /></label
+          ><label
+            >Cantidad de cuotas<input
+              name="installmentCount"
+              type="number"
+              min="1"
+              max="120"
+              [(ngModel)]="purchaseDraft.installmentCount"
+              required
+              [disabled]="saving" /></label
+          ><label
+            >Primera cuota (mes)<input
+              name="firstPeriod"
+              type="month"
+              [(ngModel)]="purchaseDraft.firstPeriod"
+              required
+              [disabled]="saving" /></label
+          ><label
+            >Grupo compartido (opcional)<select
+              name="purchaseGroup"
+              [(ngModel)]="purchaseDraft.groupId"
+              [disabled]="saving"
+            >
+              <option value="">Personal</option>
+              @for (g of groups; track g.id) {
+                <option [value]="g.id">{{ g.name }}</option>
+              }
+            </select></label
+          ><button class="primary" type="submit" [disabled]="saving || selectedCard.isArchived">
+            Guardar compra
+          </button>
+        </form>
+        <p class="helper">
+          La compra no modifica el saldo bancario. Revisá el calendario de cada cuota debajo.
+        </p>
+      </section>
+      <section class="panel">
+        <h3>Resumen {{ period }}</h3>
+        @if (statement) {
+          <span class="badge" [class.estimated]="statement.state === 'Estimated'">{{
+            statement.state === 'Estimated'
+              ? 'Estimación; no es un resumen confirmado'
+              : statement.state === 'Draft'
+                ? 'Borrador'
+                : 'Confirmado'
+          }}</span>
+          <p class="statement-total">
+            Pendiente {{ money(statement.pendingAmount, statement.currency) }}
+          </p>
+          <p class="helper">
+            Importe esperado {{ money(statement.expectedAmount, statement.currency) }} · saldo
+            anterior {{ money(statement.carryAmount, statement.currency) }}
+          </p>
+          <form (ngSubmit)="saveStatement()" class="form-grid">
+            <label
+              >Moneda<select
+                name="statementCurrency"
+                [(ngModel)]="statementDraft.currency"
+                (change)="loadStatement()"
+                [disabled]="saving"
+              >
+                <option>ARS</option>
+                <option>USD</option>
+              </select></label
+            ><label
+              >Vencimiento real<input
+                name="dueDate"
+                type="date"
+                [(ngModel)]="statementDraft.dueDate"
+                [disabled]="saving || statement.state === 'Confirmed'" /></label
+            ><label
+              >Total real del resumen<input
+                name="actualTotal"
+                [(ngModel)]="statementDraft.actualTotal"
+                inputmode="decimal"
+                required
+                [disabled]="saving || statement.state === 'Confirmed'"
+            /></label>
+            @for (
+              adjustment of statementDraft.adjustments;
+              track adjustment.id;
+              let index = $index
+            ) {
+              <div class="adjustment-row">
+                <label
+                  >Descripción del cargo o crédito<input
+                    [name]="'adjustmentDescription-' + index"
+                    [(ngModel)]="adjustment.description"
+                    maxlength="240"
+                    [disabled]="saving || statement.state === 'Confirmed'"
+                /></label>
+                <label
+                  >Categoría<input
+                    [name]="'adjustmentCategory-' + index"
+                    [(ngModel)]="adjustment.category"
+                    maxlength="80"
+                    [disabled]="saving || statement.state === 'Confirmed'"
+                /></label>
+                <label
+                  >Importe (+cargo / −crédito)<input
+                    [name]="'adjustmentAmount-' + index"
+                    [(ngModel)]="adjustment.amount"
+                    inputmode="decimal"
+                    [disabled]="saving || statement.state === 'Confirmed'"
+                /></label>
+                <button
+                  type="button"
+                  class="text-action danger-text"
+                  (click)="removeStatementAdjustment(index)"
+                  [disabled]="saving || statement.state === 'Confirmed'"
+                >
+                  Quitar
+                </button>
+              </div>
+            }
+            <button
+              type="button"
+              class="quiet-button"
+              (click)="addStatementAdjustment()"
+              [disabled]="saving || statement.state === 'Confirmed'"
+            >
+              Agregar cargo o crédito
+            </button>
+            <small class="helper form-hint"
+              >Los ajustes del borrador solo afectan la deuda al confirmar el resumen.</small
+            >
+            <button
+              class="secondary"
+              type="submit"
+              [disabled]="saving || statement.state === 'Confirmed'"
+            >
+              Guardar revisión</button
+            ><button
+              type="button"
+              class="primary"
+              (click)="confirmStatement()"
+              [disabled]="
+                saving || statement.state === 'Confirmed' || statement.state === 'Estimated'
+              "
+            >
+              Confirmar resumen
+            </button>
+          </form>
+          @if (statement.state === 'Confirmed') {
+            <form (ngSubmit)="payStatement()" class="form-grid pay-card">
+              <h4>Registrar pago parcial o total</h4>
+              <p class="helper">
+                El pago de tarjeta no agrega otro gasto. Si la cuenta está en otra moneda, ingresá
+                el importe del banco y la deuda cancelada por separado.
+              </p>
+              <label
+                >Cuenta bancaria<select
+                  name="cardPayAccount"
+                  [(ngModel)]="cardPayment.accountId"
+                  required
+                  [disabled]="saving"
+                >
+                  <option value="" disabled>Elegir cuenta</option>
+                  @for (a of activeAccounts; track a.id) {
+                    <option [value]="a.id">{{ a.name }} · {{ a.currency }}</option>
+                  }
+                </select></label
+              ><label
+                >Fecha de pago<input
+                  name="cardPayDate"
+                  type="date"
+                  [(ngModel)]="cardPayment.date"
+                  required
+                  [disabled]="saving" /></label
+              ><label>Moneda de la deuda<input [value]="statement.currency" readonly /></label
+              ><label
+                >Importe que sale del banco<input
+                  name="cardPayAmount"
+                  [(ngModel)]="cardPayment.amount"
+                  inputmode="decimal"
+                  required
+                  [disabled]="saving" /></label
+              ><label
+                >Importe aplicado a la tarjeta<input
+                  name="cardPayApplied"
+                  [(ngModel)]="cardPayment.appliedAmount"
+                  inputmode="decimal"
+                  placeholder="Igual si no hay cambio"
+                  [disabled]="saving" /></label
+              ><button class="primary" type="submit" [disabled]="saving">Registrar pago</button>
+            </form>
+          }
+          @if (statement.installments.length) {
+            <h4>Cuotas de este resumen</h4>
+            @for (i of statement.installments; track i.id) {
+              <div class="month-cost">
+                <span>{{ i.description }} · cuota {{ i.number }}/{{ i.count }}</span
+                ><b>{{ money(i.amount, i.currency) }}</b>
+              </div>
+            }
+          }
+        } @else {
+          <div class="empty">
+            <p>Elegí una tarjeta para revisar el resumen del período.</p>
+          </div>
+        }
+      </section>
+    </div>
+    <section class="panel">
+      <div class="panel-title">
+        <h3>Calendario completo de cuotas</h3>
+        <button type="button" class="text-action" (click)="loadPurchases()">Actualizar</button>
+      </div>
+      @if (purchases.length === 0) {
+        <div class="empty">
+          <b>No hay compras cargadas</b>
+          <p>Al guardar una compra, acá aparecerán todas sus cuotas y meses.</p>
+        </div>
+      }
+      @for (purchase of purchases; track purchase.id) {
+        <article class="purchase-card">
+          <div class="list-row">
+            <div>
+              <b>{{ purchase['description'] }}</b
+              ><small
+                >{{ purchase['date'] }} · {{ purchase['installmentCount'] }} cuotas · Total
+                {{ money(purchase['totalAmount'], purchase['currency']) }}</small
+              >
+            </div>
+          </div>
+          @for (i of purchase['installments']; track i.id) {
+            <div class="month-cost compact">
+              <span>{{ i.period }} · {{ i.number }}/{{ i.count }}</span
+              ><b>{{ money(i.amount, i.currency) }}</b>
+            </div>
+          }
+        </article>
+      }
+    </section>
+  }
+</main>

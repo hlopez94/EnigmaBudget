@@ -1,0 +1,228 @@
+@if (error) {
+  <div class="feedback error" role="alert">{{ error }}</div>
+}
+@if (notice) {
+  <div class="feedback success" role="status">{{ notice }}</div>
+}
+<main class="content">
+  <div class="section-heading">
+    <div>
+      <p class="eyebrow">MOVIMIENTOS</p>
+      <h2>Ingresos, gastos y transferencias</h2>
+      <p>Un gasto pendiente no cambia el saldo hasta registrar sus pagos.</p>
+    </div>
+  </div>
+  <div class="two-columns">
+    <section class="panel">
+      <h3>Registrar ingreso o gasto</h3>
+      <form (ngSubmit)="saveOperation()" class="form-grid">
+        <label
+          >Tipo<select name="opKind" [(ngModel)]="operationDraft.kind" [disabled]="saving">
+            <option value="Expense">Gasto</option>
+            <option value="Income">Ingreso</option>
+          </select></label
+        ><label
+          >Cuenta<select
+            name="opAccount"
+            [(ngModel)]="operationDraft.accountId"
+            required
+            [disabled]="saving"
+          >
+            <option value="" disabled>Elegir cuenta</option>
+            @for (a of activeAccounts; track a.id) {
+              <option [value]="a.id">{{ a.name }} · {{ a.currency }}</option>
+            }
+          </select></label
+        ><label
+          >Fecha<input
+            name="opDate"
+            type="date"
+            [(ngModel)]="operationDraft.date"
+            required
+            [disabled]="saving" /></label
+        ><label
+          >Descripción<input
+            name="opDescription"
+            [(ngModel)]="operationDraft.description"
+            required
+            maxlength="240"
+            [disabled]="saving" /></label
+        ><label
+          >Categoría<input
+            name="opCategory"
+            [(ngModel)]="operationDraft.category"
+            maxlength="80"
+            [disabled]="saving" /></label
+        ><label
+          >Importe<input
+            name="opAmount"
+            [(ngModel)]="operationDraft.amount"
+            inputmode="decimal"
+            placeholder="0,00"
+            required
+            [disabled]="saving" /></label
+        ><label class="check"
+          ><input
+            name="opPaid"
+            type="checkbox"
+            [(ngModel)]="operationDraft.paid"
+            [disabled]="saving"
+          />
+          Ya está cobrado/pagado</label
+        ><button class="primary" type="submit" [disabled]="saving || !activeAccounts.length">
+          Guardar movimiento
+        </button>
+      </form>
+    </section>
+    <section class="panel">
+      <h3>Transferir entre cuentas</h3>
+      <p class="helper">
+        La transferencia no cuenta como gasto. Para monedas distintas, informá los dos importes
+        reales.
+      </p>
+      <form (ngSubmit)="transfer()" class="form-grid">
+        <label
+          >Desde<select
+            name="fromAccount"
+            [(ngModel)]="transferDraft.fromAccountId"
+            required
+            [disabled]="saving"
+          >
+            <option value="" disabled>Cuenta de origen</option>
+            @for (a of activeAccounts; track a.id) {
+              <option [value]="a.id">{{ a.name }} · {{ a.currency }}</option>
+            }
+          </select></label
+        ><label
+          >Hacia<select
+            name="toAccount"
+            [(ngModel)]="transferDraft.toAccountId"
+            required
+            [disabled]="saving"
+          >
+            <option value="" disabled>Cuenta de destino</option>
+            @for (a of activeAccounts; track a.id) {
+              <option [value]="a.id">{{ a.name }} · {{ a.currency }}</option>
+            }
+          </select></label
+        ><label
+          >Fecha<input
+            name="transferDate"
+            type="date"
+            [(ngModel)]="transferDraft.date"
+            required
+            [disabled]="saving" /></label
+        ><label
+          >Importe origen<input
+            name="transferAmount"
+            [(ngModel)]="transferDraft.amount"
+            inputmode="decimal"
+            required
+            [disabled]="saving" /></label
+        ><label
+          >Importe destino (si cambia moneda)<input
+            name="transferDestination"
+            [(ngModel)]="transferDraft.destinationAmount"
+            inputmode="decimal"
+            [disabled]="saving" /></label
+        ><button class="secondary" type="submit" [disabled]="saving">
+          Registrar transferencia
+        </button>
+      </form>
+    </section>
+  </div>
+  <section class="panel">
+    <div class="panel-title">
+      <div>
+        <p class="eyebrow">{{ period }}</p>
+        <h3>Historial de movimientos</h3>
+      </div>
+      <label class="filter-label"
+        >Filtrar por cuenta<select name="historyAccount" [(ngModel)]="historyFilterAccount">
+          <option value="">Todas las cuentas</option>
+          @for (a of accounts; track a.id) {
+            <option [value]="a.id">{{ a.name }}</option>
+          }
+        </select></label
+      >
+    </div>
+    @if (filteredOperations().length === 0) {
+      <div class="empty">
+        <b>No hay movimientos en este período</b>
+        <p>Los movimientos guardados aparecerán acá.</p>
+      </div>
+    }
+    @for (op of filteredOperations(); track op.id) {
+      <article class="operation-row">
+        <div class="operation-info">
+          <b>{{ op.description }}</b
+          ><small
+            >{{ op.date }} · {{ op.category || 'Sin categoría' }} ·
+            {{ accountName(op.accountId) }} ·
+            {{
+              op.status === 'Settled'
+                ? 'Pagado/cobrado'
+                : op.status === 'Partial'
+                  ? 'Pago parcial'
+                  : op.status === 'Voided'
+                    ? 'Anulado'
+                    : 'Pendiente'
+            }}</small
+          >
+        </div>
+        <strong [class.negative]="op.kind === 'Expense'"
+          >{{ op.kind === 'Expense' ? '−' : '+' }}{{ money(op.amount, op.currency) }}</strong
+        >
+        <div class="row-actions">
+          @if (op.status === 'Pending' || op.status === 'Partial') {
+            <button
+              type="button"
+              class="text-action"
+              (click)="payment.operationId = op.id; payment.accountId = op.accountId"
+            >
+              Registrar pago/cobro
+            </button>
+          }
+          @if (op.status !== 'Voided') {
+            <button type="button" class="text-action danger-text" (click)="voidOperation(op)">
+              Anular
+            </button>
+          }
+        </div>
+        @if (payment.operationId === op.id) {
+          <form class="inline-payment" (ngSubmit)="payOperation(op)">
+            <label
+              >Importe pendiente {{ money(op.pendingAmount, op.currency)
+              }}<input
+                name="partialAmount"
+                [(ngModel)]="payment.amount"
+                inputmode="decimal"
+                required
+                [disabled]="saving" /></label
+            ><label
+              >Cuenta<select
+                name="payAccount"
+                [(ngModel)]="payment.accountId"
+                required
+                [disabled]="saving"
+              >
+                @for (a of activeAccounts; track a.id) {
+                  @if (a.currency === op.currency) {
+                    <option [value]="a.id">{{ a.name }}</option>
+                  }
+                }
+              </select></label
+            ><label
+              >Fecha<input
+                name="paymentDate"
+                type="date"
+                [(ngModel)]="payment.date"
+                required
+                [disabled]="saving" /></label
+            ><button class="primary" type="submit" [disabled]="saving">Aplicar pago</button>
+          </form>
+        }
+      </article>
+    }
+  </section>
+</main>

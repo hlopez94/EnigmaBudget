@@ -1,0 +1,240 @@
+@if (error) {
+  <div class="feedback error" role="alert">{{ error }}</div>
+}
+@if (notice) {
+  <div class="feedback success" role="status">{{ notice }}</div>
+}
+<main class="content">
+  <div class="section-heading">
+    <div>
+      <p class="eyebrow">COMPRAS COMPARTIDAS</p>
+      <h2>Repartos y cobros mensuales</h2>
+      <p>Cada mes conserva su propio acuerdo; una previsión no se puede cobrar.</p>
+    </div>
+  </div>
+  <div class="two-columns">
+    <section class="panel">
+      <h3>Crear grupo manual</h3>
+      <p class="helper">
+        El primer nombre es tu parte. Los demás participantes no necesitan una cuenta.
+      </p>
+      <form (ngSubmit)="createGroup()" class="form-grid">
+        <label
+          >Nombre del grupo<input
+            name="groupName"
+            [(ngModel)]="groupDraft.name"
+            required
+            maxlength="120"
+            [disabled]="saving" /></label
+        ><label
+          >Tu nombre<input
+            name="selfName"
+            [(ngModel)]="groupDraft.selfName"
+            required
+            maxlength="120"
+            [disabled]="saving" /></label
+        ><label
+          >Otros participantes (uno por línea)<textarea
+            name="otherNames"
+            [(ngModel)]="groupDraft.others"
+            rows="4"
+            [disabled]="saving"
+          ></textarea></label
+        ><button class="primary" type="submit" [disabled]="saving">Crear grupo</button>
+      </form>
+    </section>
+    <section class="panel">
+      <h3>Regla de {{ period }}</h3>
+      <label
+        >Grupo<select
+          name="ruleGroup"
+          [(ngModel)]="selectedGroupId"
+          (change)="selectGroup()"
+          [disabled]="saving"
+        >
+          <option value="" disabled>Elegir grupo</option>
+          @for (g of groups; track g.id) {
+            <option [value]="g.id">{{ g.name }}</option>
+          }
+        </select></label
+      >
+      @if (selectedGroup) {
+        <p class="helper">La regla de este mes es independiente de otros meses.</p>
+        <form (ngSubmit)="saveRule()" class="form-grid">
+          <label
+            >Modo<select
+              name="ruleMode"
+              [(ngModel)]="ruleMode"
+              [disabled]="saving || !!selectedGroup.rule?.confirmed"
+            >
+              <option value="Equal">Partes iguales</option>
+              <option value="Percentage">Porcentaje</option>
+              <option value="Income">Según bases declaradas</option>
+            </select></label
+          ><label
+            >Moneda base<select
+              name="ruleCurrency"
+              [(ngModel)]="ruleCurrency"
+              [disabled]="saving || !!selectedGroup.rule?.confirmed"
+            >
+              <option>ARS</option>
+              <option>USD</option>
+            </select></label
+          >
+          @for (person of selectedGroup.participants; track person.id) {
+            <label
+              >{{ person.name }}
+              @if (person.isSelf) {
+                (vos)
+              }
+              <input
+                [name]="'weight-' + person.id"
+                [(ngModel)]="ruleWeights[person.id]"
+                [ngModelOptions]="{ standalone: true }"
+                inputmode="decimal"
+                [placeholder]="
+                  ruleMode === 'Equal' ? '1' : ruleMode === 'Percentage' ? '0,00' : 'Base declarada'
+                "
+                [disabled]="saving || !!selectedGroup.rule?.confirmed"
+            /></label>
+          }
+          <button
+            class="secondary"
+            type="submit"
+            [disabled]="saving || !!selectedGroup.rule?.confirmed"
+          >
+            Guardar regla mensual
+          </button>
+        </form>
+        @if (selectedGroup.rule) {
+          <div class="rule-status">
+            @if (selectedGroup.rule.confirmed) {
+              <b>Reparto confirmado e inmutable para {{ period }}.</b>
+            } @else {
+              <span>Regla guardada · versión {{ selectedGroup.rule.version }}</span
+              ><button
+                type="button"
+                class="quiet-button"
+                (click)="confirmRule()"
+                [disabled]="saving"
+              >
+                Confirmar reparto del mes
+              </button>
+            }
+          </div>
+        }
+      }
+    </section>
+  </div>
+  <section class="panel">
+    <div class="panel-title">
+      <div>
+        <p class="eyebrow">PARTICIPACIONES</p>
+        <h3>Partes y cobros · {{ period }}</h3>
+      </div>
+      <button
+        type="button"
+        class="text-action"
+        (click)="loadReceivables()"
+        [disabled]="!selectedGroupId"
+      >
+        Actualizar
+      </button>
+    </div>
+    @if (!groups.length) {
+      <div class="empty">
+        <b>Todavía no hay grupos</b>
+        <p>Creá un grupo para organizar compras y cobros compartidos.</p>
+      </div>
+    } @else if (!groupReceivables.length) {
+      <div class="empty">
+        <b>No hay cuotas compartidas en {{ period }}</b>
+        <p>Las cuotas de compras vinculadas a este grupo aparecerán por mes.</p>
+      </div>
+    }
+    @for (row of groupReceivables; track row.sourceId + '-' + row.participantId) {
+      <article class="operation-row">
+        <div class="operation-info">
+          <b
+            >{{ row.description }} · {{ row.participantName }}
+            @if (row.isSelf) {
+              (tu parte)
+            }</b
+          ><small
+            >{{ row.period }} ·
+            {{
+              row.status === 'MissingRule'
+                ? 'Falta definir reparto'
+                : row.status === 'Estimated'
+                  ? 'Estimación futura · no cobrable'
+                  : row.status === 'OwnShare'
+                    ? 'Parte propia'
+                    : row.status === 'Collected'
+                      ? 'Cobrado'
+                      : row.status === 'Partial'
+                        ? 'Cobro parcial'
+                        : 'Pendiente'
+            }}
+            @if (row.isEstimated) {
+              · Proyección, no cobrable
+            }
+          </small>
+        </div>
+        <strong>{{ row.amount === null ? '—' : money(row.amount, row.currency) }}</strong>
+        @if (
+          !row.isSelf &&
+          !row.isEstimated &&
+          row.amount !== null &&
+          (row.status === 'Pending' || row.status === 'Partial')
+        ) {
+          <div class="row-actions">
+            <span>Pendiente {{ money(row.pendingAmount ?? '0', row.currency) }}</span
+            ><button type="button" class="text-action" (click)="chooseReceivable(row)">
+              Cobrar parte
+            </button>
+          </div>
+        }
+        @if (
+          collection.sourceId === row.sourceId && collection.participantId === row.participantId
+        ) {
+          <form class="inline-payment" (ngSubmit)="collect(row)">
+            <label
+              >Cuenta de ingreso<select
+                name="collectionAccount"
+                [(ngModel)]="collection.accountId"
+                required
+                [disabled]="saving"
+              >
+                <option value="" disabled>Elegir cuenta</option>
+                @for (a of activeAccounts; track a.id) {
+                  <option [value]="a.id">{{ a.name }} · {{ a.currency }}</option>
+                }
+              </select></label
+            ><label
+              >Importe recibido<input
+                name="collectionAmount"
+                [(ngModel)]="collection.amount"
+                inputmode="decimal"
+                required
+                [disabled]="saving" /></label
+            ><label
+              >Deuda que cancela<input
+                name="appliedCollection"
+                [(ngModel)]="collection.appliedAmount"
+                inputmode="decimal"
+                required
+                [disabled]="saving" /></label
+            ><label
+              >Fecha<input
+                name="collectionDate"
+                type="date"
+                [(ngModel)]="collection.date"
+                required
+                [disabled]="saving" /></label
+            ><button type="submit" class="primary" [disabled]="saving">Registrar cobro</button>
+          </form>
+        }
+      </article>
+    }
+  </section>
+</main>

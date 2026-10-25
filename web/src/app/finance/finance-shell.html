@@ -1,0 +1,252 @@
+<div class="workspace">
+  <header class="workspace-heading">
+    <div>
+      <p class="eyebrow">FINANZAS PERSONALES</p>
+      <h1>Hola, {{ name }}.</h1>
+      <p>Registrá lo que pasó y revisá compromisos por mes.</p>
+    </div>
+    <div class="header-actions">
+      <label class="period-picker"
+        >Período
+        <input
+          aria-label="Período a consultar"
+          type="month"
+          [(ngModel)]="period"
+          name="period"
+          (change)="changePeriod()"
+          [disabled]="busy" /></label
+      ><p-button
+        label="Actualizar"
+        severity="secondary"
+        [text]="true"
+        (onClick)="refresh()"
+        [disabled]="busy"
+      />
+    </div>
+  </header>
+  <nav class="navigation" aria-label="Secciones de finanzas">
+    <button type="button" [class.active]="section === 'home'" (click)="navigate('home')">
+      Inicio
+    </button>
+    <button
+      type="button"
+      [class.active]="section === 'operations'"
+      (click)="navigate('operations')"
+    >
+      Movimientos
+    </button>
+    <button type="button" [class.active]="section === 'accounts'" (click)="navigate('accounts')">
+      Cuentas
+    </button>
+    <button type="button" [class.active]="section === 'cards'" (click)="navigate('cards')">
+      Tarjetas y resúmenes
+    </button>
+    <button type="button" [class.active]="section === 'sharing'" (click)="navigate('sharing')">
+      Compartidos
+    </button>
+  </nav>
+  @if (setupIncomplete) {
+    <aside class="setup-hint">
+      <div>
+        <b>Podés completar la configuración inicial cuando quieras.</b>
+        <p>Ya podés registrar cuentas y movimientos desde estas secciones.</p>
+      </div>
+      <button type="button" class="quiet-button" (click)="setupRequested.emit()">
+        Abrir configuración
+      </button>
+    </aside>
+  }
+  @if (error) {
+    <div class="feedback error" role="alert">
+      <span>{{ error }}</span
+      ><button type="button" (click)="refresh()">Actualizar datos</button>
+    </div>
+  }
+  @if (notice) {
+    <div class="feedback success" role="status">{{ notice }}</div>
+  }
+  @if (busy && !overview) {
+    <div class="loading" aria-live="polite">Actualizando el espacio…</div>
+  }
+  @if (busy && overview) {
+    <div class="loading" aria-live="polite">Actualizando el espacio…</div>
+  }
+  @if (overview) {
+    @if (section === 'home') {
+      <main class="content">
+        <div class="overview-intro">
+          <div>
+            <p class="eyebrow">VISTA DEL PERÍODO · {{ period }}</p>
+            <h2>Tu panorama financiero</h2>
+          </div>
+          <span class="period-caption">Los saldos bancarios y de tarjeta son actuales.</span>
+        </div>
+        <p class="ready-note">
+          <b>Tu base ya está lista.</b> Elegí una acción para continuar con tus finanzas.
+        </p>
+        <section class="summary-grid" aria-label="Resumen separado por moneda y obligación">
+          <article class="summary-card cash balance-card ars">
+            <span>Saldo en cuentas · ARS</span
+            ><strong>{{ money(overview.totals.balanceArs, 'ARS') }}</strong
+            ><small>Dinero registrado en bancos</small>
+          </article>
+          <article class="summary-card cash balance-card usd">
+            <span>Saldo en cuentas · USD</span
+            ><strong>{{ money(overview.totals.balanceUsd, 'USD') }}</strong
+            ><small>Se mantiene separado de pesos</small>
+          </article>
+          <article class="summary-card debt">
+            <span>Deuda de tarjetas · ARS</span
+            ><strong>{{ money(overview.totals.cardDebtArs, 'ARS') }}</strong
+            ><small>Crédito a favor: {{ money(overview.totals.cardCreditArs, 'ARS') }}</small>
+          </article>
+          <article class="summary-card debt">
+            <span>Deuda de tarjetas · USD</span
+            ><strong>{{ money(overview.totals.cardDebtUsd, 'USD') }}</strong
+            ><small>Crédito a favor: {{ money(overview.totals.cardCreditUsd, 'USD') }}</small>
+          </article>
+        </section>
+        <div class="overview-columns dashboard-columns">
+          <section class="panel dash-panel">
+            <div class="panel-title">
+              <div>
+                <p class="eyebrow">DINERO REAL</p>
+                <h3>Cuentas bancarias</h3>
+              </div>
+              <button type="button" class="text-action" (click)="navigate('accounts')">
+                Administrar
+              </button>
+            </div>
+            @if (activeAccounts.length === 0) {
+              <div class="empty">
+                <b>Empezá por agregar una cuenta</b>
+                <p>Vas a poder registrar ingresos, gastos y pagos desde esa cuenta.</p>
+                <button type="button" (click)="navigate('accounts')">Agregar cuenta</button>
+              </div>
+            }
+            @for (account of activeAccounts; track account.id) {
+              <div class="list-row">
+                <div>
+                  <b>{{ account.name }}</b
+                  ><small>{{ account.bankName }} · {{ account.currency }}</small>
+                </div>
+                <strong>{{ money(account.currentBalance, account.currency) }}</strong>
+              </div>
+            }
+          </section>
+          <section class="panel dash-panel">
+            <div class="panel-title">
+              <div>
+                <p class="eyebrow">COMPROMISOS DE {{ period }}</p>
+                <h3>Tarjetas y cuotas del mes</h3>
+              </div>
+              <button type="button" class="text-action" (click)="navigate('cards')">
+                Ver tarjetas
+              </button>
+            </div>
+            @if (cards.length === 0) {
+              <div class="empty">
+                <b>No hay tarjetas configuradas</b>
+                <p>Agregá una tarjeta para revisar deuda y compromisos.</p>
+                <button type="button" (click)="navigate('cards')">Agregar tarjeta</button>
+              </div>
+            }
+            @for (card of cards; track card.id) {
+              <div class="list-row">
+                <div>
+                  <b>{{ card.name }}</b
+                  ><small>{{ card.bankName }} · deuda actual</small>
+                </div>
+                <strong
+                  >{{ money(card.debtArs, 'ARS') }} <small>ARS</small><br />{{
+                    money(card.debtUsd, 'USD')
+                  }}
+                  <small>USD</small></strong
+                >
+              </div>
+            }
+            <div class="month-cost">
+              <span>Cuotas de tarjeta · ARS</span
+              ><b>{{ money(overview.budget.cardInstallmentsArs, 'ARS') }}</b>
+            </div>
+            <div class="month-cost">
+              <span>Cuotas de tarjeta · USD</span
+              ><b>{{ money(overview.budget.cardInstallmentsUsd, 'USD') }}</b>
+            </div>
+            <div class="month-cost">
+              <span>Gastos en efectivo · ARS</span
+              ><b>{{ money(overview.budget.cashExpensesArs, 'ARS') }}</b>
+            </div>
+            <div class="month-cost">
+              <span>Cargos confirmados · ARS</span
+              ><b>{{ money(overview.budget.cardChargesArs, 'ARS') }}</b>
+            </div>
+            <div class="month-cost">
+              <span>Cargos confirmados · USD</span
+              ><b>{{ money(overview.budget.cardChargesUsd, 'USD') }}</b>
+            </div>
+          </section>
+        </div>
+        <section class="panel quick-panel">
+          <div>
+            <p class="eyebrow">ACCESOS DIRECTOS</p>
+            <h3>¿Qué querés hacer?</h3>
+          </div>
+          <div class="quick-actions">
+            <button type="button" (click)="navigate('operations')">＋ Registrar movimiento</button
+            ><button type="button" (click)="navigate('cards')">＋ Cargar compra</button
+            ><button type="button" (click)="navigate('sharing')">Ver cobros compartidos</button>
+          </div>
+        </section>
+      </main>
+    }
+    @defer (when section === 'accounts') {
+      <app-accounts
+        [hidden]="section !== 'accounts'"
+        [overview]="overview!"
+        [period]="period"
+        [refreshOverview]="refreshOverview"
+      />
+    } @placeholder {
+      <div class="loading" [hidden]="section !== 'accounts'" aria-live="polite">
+        Abriendo cuentas…
+      </div>
+    }
+    @defer (when section === 'operations') {
+      <app-operations
+        [hidden]="section !== 'operations'"
+        [overview]="overview!"
+        [period]="period"
+        [refreshOverview]="refreshOverview"
+      />
+    } @placeholder {
+      <div class="loading" [hidden]="section !== 'operations'" aria-live="polite">
+        Abriendo movimientos…
+      </div>
+    }
+    @defer (when section === 'cards') {
+      <app-cards
+        [hidden]="section !== 'cards'"
+        [overview]="overview!"
+        [period]="period"
+        [refreshOverview]="refreshOverview"
+      />
+    } @placeholder {
+      <div class="loading" [hidden]="section !== 'cards'" aria-live="polite">
+        Abriendo tarjetas…
+      </div>
+    }
+    @defer (when section === 'sharing') {
+      <app-sharing
+        [hidden]="section !== 'sharing'"
+        [overview]="overview!"
+        [period]="period"
+        [refreshOverview]="refreshOverview"
+      />
+    } @placeholder {
+      <div class="loading" [hidden]="section !== 'sharing'" aria-live="polite">
+        Abriendo compartidos…
+      </div>
+    }
+  }
+</div>
