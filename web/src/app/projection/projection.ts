@@ -37,7 +37,13 @@ export class FinanceProjection extends FinanceActions implements OnChanges {
   protected override resetForContextChange(): void {
     this.data = null; this.rates = null; this.scenarios = []; this.savedRateSelections = []; this.confirmedData = null; this.selectedScenarioId = ''; this.selectedRateId = '';
     this.through = addMonths(financeToday(), 12); this.certainty = 'Confirmed'; this.selectedDate = financeToday(); this.detailFilter = 'date'; this.assumptions = [];
-    this.assumptionDraft = this.emptyAssumption(); this.scenarioName = ''; this.dialog = ''; this.loading = false; this.lastRequestId = '';
+    this.assumptionDraft = this.emptyAssumption(); this.scenarioName = ''; this.dialog = ''; this.loading = false; this.lastRequestId = ''; this.rateRequestId = '';
+  }
+  protected override permissionsChanged(): void {
+    if ((this.workspaceArchived || !this.allowed('recordFinance')) && (this.dialog === 'scenario' || this.dialog === 'deleteScenario')) {
+      this.dialog = '';
+      this.scenarioName = '';
+    }
   }
   private emptyAssumption() { return { kind: 'Income' as ProjectionAssumption['kind'], sourceKey: '', date: financeToday(), currency: 'ARS' as 'ARS' | 'USD', amount: '', description: '' }; }
   get canSave(): boolean { return this.allowed('recordFinance'); }
@@ -62,7 +68,7 @@ export class FinanceProjection extends FinanceActions implements OnChanges {
         if (!this.isCurrentContext(context)) return;
         this.rates = rates; this.savedRateSelections = goals.flatMap(goal => goal.rateChoice?.snapshotId ? [{ snapshotId: goal.rateChoice.snapshotId, goalName: goal.name }] : []);
       }
-      else { const [confirmed, scenarios] = await Promise.all([this.api.projection(this.through, 'Confirmed'), this.api.projectionScenarios()]); if (!this.isCurrentContext(context)) return; this.confirmedData = confirmed; this.scenarios = scenarios; this.data = confirmed; this.selectedDate = confirmed.asOf; }
+        else { const [confirmed, scenarios] = await Promise.all([this.api.projection(this.through, 'Confirmed'), this.api.projectionScenarios()]); if (!this.isCurrentContext(context)) return; this.confirmedData = confirmed; this.scenarios = scenarios; if (this.certainty === 'Confirmed') { this.data = confirmed; this.selectedDate = confirmed.asOf; } }
     } catch (error) { if (this.isCurrentContext(context)) this.showLoadError(error); }
     finally { if (this.isCurrentContext(context)) { this.loading = false; this.changeDetector.markForCheck(); } }
   }
@@ -116,12 +122,16 @@ export class FinanceProjection extends FinanceActions implements OnChanges {
     const requestId = scenario ? this.requestId(`scenario-update:${scenario.id}`, updateKey) : this.requestId('scenario-create', createKey);
     const payload = scenario ? { id: scenario.id, requestId, version: scenario.version, name: this.scenarioName.trim(), assumptions: this.assumptions } : { id: requestId, name: this.scenarioName.trim(), assumptions: this.assumptions };
     this.lastRequestId = requestId;
-    let savedId = '';
-    if (!(await this.runMutation(async () => { const result = await this.api.saveProjectionScenario(payload as never); savedId = result.id; return result; }, 'Escenario guardado.'))) return;
+    const resultHolder: { scenario?: ProjectionScenario } = {};
+    if (!(await this.runMutation(async () => { const result = await this.api.saveProjectionScenario(payload as never); resultHolder.scenario = result; return result; }, 'Escenario guardado.'))) return;
     if (scenario) this.releaseRequestId(`scenario-update:${scenario.id}`, updateKey);
     else this.releaseRequestId('scenario-create', createKey);
-    this.scenarioName = ''; this.dialog = ''; await this.load();
-    if (savedId) { this.selectedScenarioId = savedId; const saved = this.scenarios.find(x => x.id === savedId); if (saved) this.assumptions = saved.assumptions.map(x => ({ ...x })); }
+    const savedScenario = resultHolder.scenario;
+    if (!savedScenario) return;
+    this.scenarioName = ''; this.dialog = '';
+    this.scenarios = [...this.scenarios.filter(x => x.id !== savedScenario!.id), savedScenario].sort((a, b) => a.name.localeCompare(b.name));
+    this.selectedScenarioId = savedScenario.id; this.assumptions = savedScenario.assumptions.map(x => ({ ...x })); this.certainty = 'Estimated';
+    await this.loadProjection();
   }
   openSaveScenario(): void { if (!this.canSave || this.saving) return; this.scenarioName = this.selectedScenario?.name ?? ''; this.dialog = 'scenario'; }
   openDeleteScenario(): void { if (this.canSave && !this.saving && this.selectedScenario) this.dialog = 'deleteScenario'; }
@@ -136,7 +146,9 @@ export class FinanceProjection extends FinanceActions implements OnChanges {
     if (!this.allowed('manageResources')) return;
     if (!this.rateRequestId) this.rateRequestId = financeId();
     const context = this.captureContext();
-    await this.runMutation(() => this.api.refreshExchangeRates({ id: this.rateRequestId }), 'Cotizaciones actualizadas.', async () => { const rates = await this.api.exchangeRates(); if (this.isCurrentContext(context)) this.rates = rates; });
+    const requestId = this.rateRequestId;
+    const refreshed = await this.runMutation(() => this.api.refreshExchangeRates({ id: requestId }), 'Cotizaciones actualizadas.', async () => { const rates = await this.api.exchangeRates(); if (this.isCurrentContext(context)) this.rates = rates; });
+    if (refreshed && this.isCurrentContext(context)) this.rateRequestId = '';
   }
   dateBalance(currency: CurrencyProjection): string { return currency.dailyBalances.find(x => x.date === this.selectedDate)?.freeBalance ?? currency.freeBalance; }
   dateCash(currency: CurrencyProjection): string { return currency.dailyBalances.find(x => x.date === this.selectedDate)?.cashBalance ?? currency.cashBalance; }

@@ -77,4 +77,53 @@ describe('projection and exchange views', () => {
     expect(screen.latestRates.map(x => x.id)).toEqual(['new', 'old']);
     expect(screen.savedRateGoals(screen.rates.snapshots[0])).toBe('Viaje');
   });
+
+  it('reuses a failed quote-refresh ID for retry, releases it after success, and uses a new ID next time', async () => {
+    const api = {
+      refreshExchangeRates: vi.fn().mockRejectedValueOnce(new Error('Proveedor temporalmente inaccesible')).mockResolvedValueOnce({}),
+      exchangeRates: vi.fn().mockResolvedValue({ status: 'Disponible', stale: false, error: null, snapshots: [] }),
+    };
+    const screen = new FinanceProjection(api as unknown as ApiService, { markForCheck: vi.fn() } as never);
+    screen.workspaceId = 'space'; screen.permissions = { read: true, readGroups: false, recordFinance: true, manageResources: true, correctHistory: false, manageMembers: false, managePrivacy: false };
+    await screen.refreshRates(); await screen.refreshRates(); await screen.refreshRates();
+    const ids = api.refreshExchangeRates.mock.calls.map(call => call[0].id);
+    expect(ids[1]).toBe(ids[0]);
+    expect(ids[2]).not.toBe(ids[1]);
+  });
+
+  it('shows calculated Estimated rows and daily balances after saving, while keeping the Confirmed comparison', async () => {
+    const assumption = { id: 'estimate-input', kind: 'Expense' as const, date: '2026-11-03', currency: 'ARS' as const, amount: '350.00', description: 'Seguro anual', sourceId: null, sourceKind: null, componentId: null };
+    const confirmed = { workspaceId: 'w', workspaceName: 'Casa', asOf: '2026-10-25', currencies: [currency('ARS')], rows: [], alerts: [] };
+    const estimated = { workspaceId: 'w', workspaceName: 'Casa', asOf: '2026-10-25', currencies: [{ ...currency('ARS'), freeBalance: '21000.75', dailyBalances: [{ date: '2026-11-03', cashBalance: '25000.75', availableCash: '24000.75', restrictedCash: '0.00', reservedNominal: '1000.00', freeBalance: '21000.75' }] }], rows: [{ sourceKind: 'Expense', sourceId: 'estimate-input', componentId: null, date: '2026-11-03', dateCertainty: 'Exact', currency: 'ARS' as const, amount: '350.00', direction: 'Outgoing', certainty: 'Estimated', accountId: null, description: 'Seguro anual', summaryId: null, warnings: [] }], alerts: [] };
+    const api = {
+      saveProjectionScenario: vi.fn().mockResolvedValue({ id: 'scenario-saved', name: 'Con seguro', version: 1, assumptions: [assumption] }),
+      projection: vi.fn().mockResolvedValue(confirmed), projectionScenarios: vi.fn().mockResolvedValue([{ id: 'scenario-saved', name: 'Con seguro', version: 1, assumptions: [assumption] }]),
+      calculateProjection: vi.fn().mockResolvedValue(estimated),
+    };
+    const screen = new FinanceProjection(api as unknown as ApiService, { markForCheck: vi.fn() } as never);
+    screen.workspaceId = 'w'; screen.permissions = { read: true, readGroups: false, recordFinance: true, manageResources: false, correctHistory: false, manageMembers: false, managePrivacy: false };
+    screen.confirmedData = confirmed; screen.data = confirmed;
+    screen.certainty = 'Estimated'; screen.assumptions = [assumption]; screen.scenarioName = 'Con seguro';
+    await screen.saveScenario();
+    expect(screen.certainty).toBe('Estimated');
+    expect(screen.data?.rows).toEqual(estimated.rows);
+    expect(screen.dateBalance(screen.currencies[0])).toBe('21000.75');
+    expect(screen.confirmedData?.currencies[0].freeBalance).toBe('23000.75');
+    expect(api.calculateProjection).toHaveBeenCalledWith(expect.objectContaining({ savedScenarioId: null, assumptions: [assumption] }));
+  });
+
+  it('closes and clears a forbidden scenario persistence draft on permission loss or archive without discarding Reader assumptions', async () => {
+    const api = { saveProjectionScenario: vi.fn() };
+    const screen = new FinanceProjection(api as unknown as ApiService, { markForCheck: vi.fn() } as never);
+    screen.permissions = { read: true, readGroups: false, recordFinance: true, manageResources: false, correctHistory: false, manageMembers: false, managePrivacy: false };
+    screen.assumptions = [{ id: 'local', kind: 'Income', date: '2026-11-01', currency: 'ARS', amount: '800.00', description: 'Ingreso temporal', sourceId: null }];
+    screen.scenarioName = 'Privado'; screen.dialog = 'scenario';
+    screen.permissions = { ...screen.permissions!, recordFinance: false };
+    expect(screen.dialog).toBe(''); expect(screen.scenarioName).toBe(''); expect(screen.assumptions).toHaveLength(1);
+    await screen.saveScenario(); expect(api.saveProjectionScenario).not.toHaveBeenCalled();
+    screen.permissions = { ...screen.permissions!, recordFinance: true }; screen.scenarioName = 'Archivado'; screen.dialog = 'scenario'; screen.workspaceArchived = true;
+    expect(screen.dialog).toBe(''); expect(screen.scenarioName).toBe(''); expect(screen.assumptions).toHaveLength(1);
+    expect(screen.canSave).toBe(false);
+    await screen.saveScenario(); expect(api.saveProjectionScenario).not.toHaveBeenCalled();
+  });
 });
