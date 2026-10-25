@@ -73,5 +73,7 @@ public sealed class ProjectionAssumption
     public decimal? Amount { get; set; }
     public required string Description { get; set; }
     public Guid? SourceId { get; set; }
+    public string? SourceKind { get; set; }
+    public string? ComponentId { get; set; }
     public int Version { get; set; } = 1;
 }

@@ -380,6 +380,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         model.Entity<ProjectionAssumption>().Property(x => x.Currency).HasMaxLength(3);
         model.Entity<ProjectionAssumption>().Property(x => x.Amount).HasPrecision(18, 2);
         model.Entity<ProjectionAssumption>().Property(x => x.Description).HasMaxLength(500);
+        model.Entity<ProjectionAssumption>().Property(x => x.SourceKind).HasMaxLength(64);
+        model.Entity<ProjectionAssumption>().Property(x => x.ComponentId).HasMaxLength(160);
         model.Entity<ProjectionAssumption>().Property(x => x.Version).IsConcurrencyToken().HasDefaultValue(1);
         model.Entity<ProjectionAssumption>().HasOne<Workspace>().WithMany().HasForeignKey(x => x.WorkspaceId).OnDelete(DeleteBehavior.Cascade);
         model.Entity<ProjectionAssumption>().HasOne<ProjectionScenario>().WithMany().HasForeignKey(x => new { x.WorkspaceId, x.ScenarioId }).HasPrincipalKey(x => new { x.WorkspaceId, x.Id }).OnDelete(DeleteBehavior.Cascade);

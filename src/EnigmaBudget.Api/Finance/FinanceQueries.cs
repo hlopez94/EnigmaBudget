@@ -176,10 +176,15 @@ public static partial class FinanceEndpoints
                     rule = await RuleDto(db, ws.Id, group.Id, period),
                 }
             );
-            // Use the same query contract for a group's projected and collectible shares.
-            var shares = await GetReceivables(http, db, group.Id, period);
-            if (shares is IValueHttpResult<List<object>> value && value.Value is not null)
-                receivableRows.AddRange(value.Value);
+            var shares = await ReceivableProjectionQuery.GetForPeriodAsync(db, ws.Id, group.Id, period, http.RequestAborted);
+            receivableRows.AddRange(shares.Select(x => (object)new
+            {
+                id = x.Id, groupId = x.GroupId, sourceId = x.SourceId, purchaseId = x.PurchaseId, period = x.Period,
+                description = x.Description, currency = x.Currency, participantId = x.ParticipantId, participantName = x.ParticipantName,
+                isSelf = x.IsSelf, amount = x.Amount is null ? null : F(x.Amount.Value), collectedAmount = F(x.CollectedAmount),
+                pendingAmount = x.PendingAmount is null ? null : F(x.PendingAmount.Value), isEstimated = x.IsEstimated,
+                ruleVersion = x.RuleVersion, monthConfirmed = x.MonthConfirmed, status = x.Status,
+            }));
         }
         var overview = new Dictionary<string, object?>
             {

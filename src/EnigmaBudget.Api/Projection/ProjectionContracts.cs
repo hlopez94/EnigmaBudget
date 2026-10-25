@@ -17,3 +17,12 @@ public sealed record ProjectionRowDto(string SourceKind, Guid SourceId, string? 
 
 public sealed record ProjectionAlertDto(string Code, string Severity, string Currency, string Message,
     string? Date, Guid? SourceId);
+
+public sealed record ProjectionAssumptionInput(Guid Id, string Kind, string? Date, string? Currency,
+    string? Amount, string Description, Guid? SourceId, string? SourceKind = null, string? ComponentId = null);
+public sealed record ProjectionCalculateRequest(string Through, string Scenario, Guid? SavedScenarioId,
+    IReadOnlyList<ProjectionAssumptionInput> Assumptions);
+public sealed record ProjectionScenarioCreate(Guid Id, string Name, IReadOnlyList<ProjectionAssumptionInput> Assumptions);
+public sealed record ProjectionScenarioSave(Guid RequestId, int Version, string Name, IReadOnlyList<ProjectionAssumptionInput> Assumptions);
+public sealed record ProjectionScenarioDelete(Guid RequestId, int Version);
+public sealed record ProjectionScenarioDto(Guid Id, string Name, int Version, IReadOnlyList<ProjectionAssumptionInput> Assumptions);

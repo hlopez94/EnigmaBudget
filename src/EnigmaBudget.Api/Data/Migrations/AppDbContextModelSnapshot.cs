@@ -1013,6 +1013,14 @@ namespace EnigmaBudget.Api.Data.Migrations
                     b.Property<Guid?>("SourceId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("SourceKind")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("ComponentId")
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)");
+
                     b.Property<int>("Version")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAdd()

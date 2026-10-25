@@ -122,7 +122,10 @@ public static class CardObligationCalculator
                 {
                     if (item.Remaining == 0m) break;
                     var credit = creditLots[i];
-                    if (credit.Amount <= 0m || string.CompareOrdinal(credit.Source.Period, item.Period) > 0) continue;
+                    if (credit.Amount <= 0m) continue;
+                    var creditEffectiveDate = credit.Source.OrderDate < asOf ? asOf : credit.Source.OrderDate;
+                    var obligationEffectiveDate = item.OrderDate < asOf ? asOf : item.OrderDate;
+                    if (creditEffectiveDate > obligationEffectiveDate) continue;
                     var applied = Math.Min(item.Remaining, credit.Amount);
                     item.Remaining -= applied;
                     item.Applied += applied;

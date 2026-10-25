@@ -36,13 +36,13 @@ public sealed class ProjectionIntegrationTests : IDisposable
     }
 
     [Fact]
-    public async Task estimated_or_saved_scenario_is_not_reported_as_confirmed_projection()
+    public async Task estimated_or_saved_scenario_is_only_available_through_calculation()
     {
         using var client = await _factory.AuthenticatedClientAsync();
         var through = Today().AddDays(2).ToString("yyyy-MM-dd");
-        Assert.Equal(HttpStatusCode.NotImplemented,
+        Assert.Equal(HttpStatusCode.BadRequest,
             (await client.GetAsync($"/api/projection?through={through}&scenario=Estimated")).StatusCode);
-        Assert.Equal(HttpStatusCode.NotImplemented,
+        Assert.Equal(HttpStatusCode.BadRequest,
             (await client.GetAsync($"/api/projection?through={through}&scenario=Confirmed&scenarioId={Guid.NewGuid()}")).StatusCode);
     }
 
@@ -99,6 +99,41 @@ public sealed class ProjectionIntegrationTests : IDisposable
         var usdSeries = Assert.Single(currencies, x => x.GetProperty("currency").GetString() == "USD");
         Assert.Equal("-200.00", arsSeries.GetProperty("dailyBalances").EnumerateArray().Last().GetProperty("freeBalance").GetString());
         Assert.Equal("-50.00", usdSeries.GetProperty("dailyBalances").EnumerateArray().Last().GetProperty("freeBalance").GetString());
+    }
+
+    [Fact]
+    public async Task undated_card_credit_remains_non_cash_and_has_unknown_date_warning()
+    {
+        using var client = await _factory.AuthenticatedClientAsync();
+        var cardId = Guid.NewGuid();
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/api/cards", new
+        {
+            id = cardId, name = "Crédito sin fecha", bankName = "Banco", closingDay = (int?)null, dueDay = (int?)null,
+            statementDebtArs = "0.00", statementDebtUsd = "0.00", asOfDate = "2026-10-01",
+        })).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/api/purchases", new
+        {
+            id = Guid.NewGuid(), cardId, date = "2026-10-02", description = "Consumo", category = "Varios",
+            currency = "ARS", totalAmount = "50.00", installmentCount = 1, firstPeriod = "2026-11", groupId = (Guid?)null,
+        })).StatusCode);
+        var statement = await client.PutAsJsonAsync($"/api/cards/{cardId}/statement", new
+        {
+            id = Guid.NewGuid(), period = "2026-11", currency = "ARS", version = 0, dueDate = (string?)null,
+            actualTotal = "0.00", adjustments = new[] { new { id = Guid.NewGuid(), description = "Crédito", category = "Ajuste", amount = "-100.00" } },
+        });
+        Assert.Equal(HttpStatusCode.OK, statement.StatusCode);
+        var saved = await statement.Content.ReadFromJsonAsync<SavedStatement>();
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync($"/api/cards/{cardId}/statement/confirm", new { id = saved!.Id, version = saved.Version })).StatusCode);
+
+        using var response = await client.GetAsync("/api/projection?through=2026-11-30&scenario=Confirmed");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var credit = Assert.Single(doc.RootElement.GetProperty("rows").EnumerateArray(), x => x.GetProperty("sourceKind").GetString() == "CardCredit");
+        Assert.Null(credit.GetProperty("date").GetString());
+        Assert.Equal("Information", credit.GetProperty("direction").GetString());
+        Assert.Contains(credit.GetProperty("warnings").EnumerateArray(), x => x.GetString()!.Contains("no tiene una fecha"));
+        Assert.Contains(doc.RootElement.GetProperty("alerts").EnumerateArray(), x => x.GetProperty("code").GetString() == "UnknownDueDate");
+        Assert.All(doc.RootElement.GetProperty("currencies").EnumerateArray(), x => Assert.Equal("0.00", x.GetProperty("cashBalance").GetString()));
     }
 
     [Fact]
@@ -176,6 +211,49 @@ public sealed class ProjectionIntegrationTests : IDisposable
         Assert.Equal("300.00", daily["2026-10-26"].GetProperty("freeBalance").GetString());
         Assert.Equal("300.00", daily["2026-11-21"].GetProperty("freeBalance").GetString());
         Assert.Equal("250.00", daily["2026-12-20"].GetProperty("freeBalance").GetString());
+    }
+
+    [Fact]
+    public async Task effective_confirmed_later_credit_offsets_older_due_obligation_once()
+    {
+        using var factory = new ApiFactory(timeProvider: new FixedTimeProvider(DateTimeOffset.Parse("2026-11-25T15:00:00Z")));
+        using var client = await factory.AuthenticatedClientAsync();
+        var cardId = Guid.NewGuid();
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/api/cards", new
+        {
+            id = cardId, name = "Crédito vigente", bankName = "Banco", closingDay = 10, dueDay = 20,
+            statementDebtArs = "0.00", statementDebtUsd = "0.00", asOfDate = "2026-10-01",
+        })).StatusCode);
+        var purchase = await client.PostAsJsonAsync("/api/purchases", new
+        {
+            id = Guid.NewGuid(), cardId, date = "2026-10-02", description = "Deuda de octubre", category = "Varios",
+            currency = "ARS", totalAmount = "200.00", installmentCount = 1, firstPeriod = "2026-10", groupId = (Guid?)null,
+        });
+        Assert.Equal(HttpStatusCode.OK, purchase.StatusCode);
+        using var purchaseDoc = JsonDocument.Parse(await purchase.Content.ReadAsStringAsync());
+        var installmentId = purchaseDoc.RootElement.GetProperty("installments")[0].GetProperty("id").GetGuid();
+        async Task Confirm(string period, string dueDate, string total, object[] adjustments)
+        {
+            var draft = await client.PutAsJsonAsync($"/api/cards/{cardId}/statement", new
+            {
+                id = Guid.NewGuid(), period, currency = "ARS", version = 0, dueDate, actualTotal = total, adjustments,
+            });
+            Assert.Equal(HttpStatusCode.OK, draft.StatusCode);
+            var saved = await draft.Content.ReadFromJsonAsync<SavedStatement>();
+            Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync($"/api/cards/{cardId}/statement/confirm", new { id = saved!.Id, version = saved.Version })).StatusCode);
+        }
+        await Confirm("2026-10", "2026-10-20", "200.00", []);
+        await Confirm("2026-11", "2026-11-20", "150.00", [new { id = Guid.NewGuid(), description = "Crédito ya vigente", category = "Ajuste", amount = "-50.00" }]);
+
+        using var response = await client.GetAsync("/api/projection?through=2026-11-30&scenario=Confirmed");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var rows = doc.RootElement.GetProperty("rows").EnumerateArray().Where(x => x.GetProperty("sourceKind").GetString() is "CardObligation" or "CardCredit").ToArray();
+        Assert.Equal("150.00", Assert.Single(rows, x => x.GetProperty("sourceKind").GetString() == "CardObligation" && x.GetProperty("sourceId").GetGuid() == installmentId).GetProperty("amount").GetString());
+        Assert.DoesNotContain(rows, x => x.GetProperty("sourceKind").GetString() == "CardCredit");
+        var ars = Assert.Single(doc.RootElement.GetProperty("currencies").EnumerateArray(), x => x.GetProperty("currency").GetString() == "ARS");
+        Assert.Equal("-150.00", ars.GetProperty("dailyBalances").EnumerateArray().Last().GetProperty("cashBalance").GetString());
+        Assert.Equal("150.00", Assert.Single(await client.GetFromJsonAsync<CardDebtSummary[]>("/api/cards") ?? [], x => x.Id == cardId).DebtArs);
     }
 
     [Fact]

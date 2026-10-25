@@ -6,6 +6,11 @@ public sealed class WorkspaceAuthorizationTests
 {
     [Theory]
     [InlineData("GET", "/api/savings/goals", WorkspacePermissions.Read)]
+    [InlineData("POST", "/api/projection/calculate", WorkspacePermissions.Read)]
+    [InlineData("GET", "/api/projection/scenarios", WorkspacePermissions.Read)]
+    [InlineData("POST", "/api/projection/scenarios", WorkspacePermissions.RecordFinance)]
+    [InlineData("PUT", "/api/projection/scenarios/123", WorkspacePermissions.RecordFinance)]
+    [InlineData("DELETE", "/api/projection/scenarios/123", WorkspacePermissions.RecordFinance)]
     [InlineData("POST", "/api/savings/goals", WorkspacePermissions.ManageResources)]
     [InlineData("PUT", "/api/savings/goals/123", WorkspacePermissions.ManageResources)]
     [InlineData("POST", "/api/savings/goals/123/close", WorkspacePermissions.ManageResources)]

@@ -286,105 +286,15 @@ public static partial class FinanceEndpoints
             return Results.NotFound();
         if (!MoneyRules.IsPeriod(period ?? ""))
             return Problem(400, "Período inválido.");
-        var installments = await db
-            .Installments.Where(x =>
-                x.WorkspaceId == ws.Id && x.GroupId == groupId && x.Period == period
-            )
-            .ToArrayAsync();
-        var people = await db
-            .Participants.Where(x => x.WorkspaceId == ws.Id && x.GroupId == groupId)
-            .ToArrayAsync();
-        var rows = new List<object>();
-        foreach (var installment in installments)
+        var rows = await ReceivableProjectionQuery.GetForPeriodAsync(db, ws.Id, groupId, period!, http.RequestAborted);
+        return Results.Ok(rows.Select(x => new
         {
-            var rule = await db.MonthlyRules.SingleOrDefaultAsync(x =>
-                x.WorkspaceId == ws.Id && x.GroupId == groupId && x.Period == period
-            );
-            var used = rule;
-            var estimated = false;
-            if (used is null)
-            {
-                used = await db
-                    .MonthlyRules.Where(x =>
-                        x.WorkspaceId == ws.Id
-                        && x.GroupId == groupId
-                        && string.Compare(x.Period, period) < 0
-                    )
-                    .OrderByDescending(x => x.Period)
-                    .FirstOrDefaultAsync();
-                estimated = used is not null;
-            }
-            if (used is null)
-            {
-                foreach (var person in people)
-                    rows.Add(
-                        new
-                        {
-                            id = installment.Id,
-                            groupId,
-                            sourceId = installment.Id,
-                            purchaseId = installment.PurchaseId,
-                            period,
-                            description = installment.Description,
-                            currency = installment.Currency,
-                            participantId = person.Id,
-                            participantName = person.Name,
-                            isSelf = person.IsSelf,
-                            amount = (string?)null,
-                            collectedAmount = "0.00",
-                            pendingAmount = (string?)null,
-                            isEstimated = false,
-                            ruleVersion = (int?)null,
-                            monthConfirmed = false,
-                            status = "MissingRule",
-                        }
-                    );
-                continue;
-            }
-            var weights = await db
-                .RuleWeights.Where(x => x.WorkspaceId == ws.Id && x.RuleId == used.Id)
-                .ToArrayAsync();
-            var allocations = MoneyRules.Allocate(installment.Amount, people, weights, used.Mode);
-            var collections = await db
-                .Collections.Where(x => x.WorkspaceId == ws.Id && x.InstallmentId == installment.Id)
-                .ToArrayAsync();
-            foreach (var person in people)
-            {
-                var amt = allocations[person.Id];
-                var collected = collections
-                    .Where(x => x.ParticipantId == person.Id)
-                    .Sum(x => x.AppliedAmount);
-                rows.Add(
-                    new
-                    {
-                        id = installment.Id,
-                        groupId,
-                        sourceId = installment.Id,
-                        purchaseId = installment.PurchaseId,
-                        period,
-                        description = installment.Description,
-                        currency = installment.Currency,
-                        participantId = person.Id,
-                        participantName = person.Name,
-                        isSelf = person.IsSelf,
-                        amount = F(amt),
-                        collectedAmount = F(collected),
-                        pendingAmount = person.IsSelf
-                            ? (string?)null
-                            : F(Math.Max(0, amt - collected)),
-                        isEstimated = estimated,
-                        ruleVersion = used.Version,
-                        monthConfirmed = rule?.Confirmed ?? false,
-                        status = person.IsSelf ? "OwnShare"
-                        : estimated ? "Estimated"
-                        : collected >= amt ? "Collected"
-                        : collected > 0 ? "Partial"
-                        : "Pending",
-                    }
-                );
-            }
-        }
-        return Results.Ok(rows);
+            id = x.Id, groupId = x.GroupId, sourceId = x.SourceId, purchaseId = x.PurchaseId, period = x.Period,
+            description = x.Description, currency = x.Currency, participantId = x.ParticipantId, participantName = x.ParticipantName,
+            isSelf = x.IsSelf, amount = x.Amount is null ? null : F(x.Amount.Value), collectedAmount = F(x.CollectedAmount),
+            pendingAmount = x.PendingAmount is null ? null : F(x.PendingAmount.Value), isEstimated = x.IsEstimated,
+            ruleVersion = x.RuleVersion, monthConfirmed = x.MonthConfirmed, status = x.Status,
+        }));
     }
 
     private static async Task<IResult> Collect(
