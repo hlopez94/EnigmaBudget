@@ -6,13 +6,13 @@ Estado inicial auditado el 25/10/2026: rama `codex/rebuild-net10-angular22`, bas
 
 | Área | Estado observado | Evidencia necesaria para completar |
 |---|---|---|
-| Experiencia móvil | Primera entrega verificada en Chromium contra ASP.NET y PostgreSQL reales: flujo financiero a 390×844; resumen y acción principal sobre las listas; navegación inferior; borrador, Escape/foco, rechazo real de guardado y controles de diálogos; distribución a 360×800; escritorio a 1280×900. Evidencia: `.superpowers/sdd/2026-10-25-mobile/task-2-report.md` y capturas locales `work/task2-*.png`. | Continuar la revisión móvil de los módulos existentes al avanzar el alcance completo; mantener las comprobaciones de 360/390 px y escritorio en cada circuito relevante |
+| Experiencia móvil | Primera entrega verificada en Chromium contra ASP.NET y PostgreSQL reales: flujo financiero a 390×844; resumen y acción principal sobre las listas; navegación inferior; borrador, Escape/foco, rechazo real de guardado y controles de diálogos; distribución a 360×800; escritorio a 1280×900. Evidencia permanente: `web/e2e/finance-workflow.spec.ts`, commits `c5c3d27`/`1ba024d`, 31 pruebas web y tres recorridos reales; capturas locales `work/task2-*.png`. | Continuar la revisión móvil de los módulos existentes al avanzar el alcance completo; mantener las comprobaciones de 360/390 px y escritorio en cada circuito relevante |
 | Acceso Google | Código configurado, sin credenciales reales verificadas | Inicio/cierre real, revocación y errores seguros, web y Android |
 | Cuentas, aperturas, conciliación | Base operativa existente | Mantener ARS/USD, tipos/alias, mantenimiento, conciliación y trazabilidad completos |
 | Movimientos y pagos | Base manual existente | Fuentes/categorías/comercios, filtros completos, devoluciones y vínculos, histórico y exportación |
 | Tarjetas/cuotas/resúmenes | Circuito manual existente | Cuotas anteriores/restantes, deuda de arranque desglosada sin duplicar, ajustes de calendario y correcciones históricas |
 | Cobros mensuales compartidos | Grupos manuales con compras de tarjeta existentes | Conservar regla por mes, ampliar a efectivo/terceros/múltiples pagadores, invitados y liquidación |
-| Fechas financieras | Corte de aperturas todavía UTC | Reloj común Argentina, pruebas antes/después de medianoche y fechas límite |
+| Fechas financieras | Implementado: BusinessClock Argentina, cortes actuales y validaciones reales coherentes | 41 pruebas API aprobadas, incluidas tres regresiones de medianoche, aperturas/asientos futuros y cuotas comprometidas; publicación local actualizada |
 | Categorías y presupuestos | Pendiente | CRUD, límites por período, ejecución y explicación por origen |
 | Servicios/recurrencias | Pendiente | Generación idempotente por período, aumentos con vigencia, pausa, cuentas/tarjetas y desglose de obra social |
 | Devoluciones/reclamos | Pendiente | Créditos esperados/acreditados y reversión vinculada, sin doble consumo ni cancelación implícita de cuotas |
