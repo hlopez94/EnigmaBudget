@@ -9,6 +9,64 @@ import { FinanceOperations } from './operations';
 import { FinanceSharing } from './sharing';
 
 describe('finance workspace regressions', () => {
+  it('reaches accounts from Más without changing the selected period or section drafts', async () => {
+    const shell = new (await import('./finance-shell')).FinanceShell(
+      { financeOverview: vi.fn() } as unknown as ApiService,
+      { markForCheck: vi.fn() } as unknown as import('@angular/core').ChangeDetectorRef,
+    );
+    shell.period = '2026-11';
+    shell.navigate('more');
+    expect(shell.section).toBe('more');
+    shell.navigateMore('accounts');
+    expect(shell.section).toBe('accounts');
+    expect(shell.period).toBe('2026-11');
+  });
+
+  it('opens and dismisses the account creation action without clearing its draft', () => {
+    const accounts = new FinanceAccounts(
+      {} as ApiService,
+      { markForCheck: vi.fn() } as unknown as import('@angular/core').ChangeDetectorRef,
+    );
+    accounts.accountDraft.name = 'Caja del viaje';
+    accounts.openForm('create');
+    expect(accounts.activeForm).toBe('create');
+    accounts.closeForm();
+    expect(accounts.activeForm).toBe('');
+    expect(accounts.accountDraft.name).toBe('Caja del viaje');
+  });
+
+  it('keeps an account action open while a save is in progress', () => {
+    const accounts = new FinanceAccounts(
+      {} as ApiService,
+      { markForCheck: vi.fn() } as unknown as import('@angular/core').ChangeDetectorRef,
+    );
+    accounts.openForm('create');
+    accounts.saving = true;
+    accounts.closeForm();
+    expect(accounts.activeForm).toBe('create');
+  });
+
+  it('opens card edit, statement review, and payment actions on demand', () => {
+    const cards = new FinanceCards(
+      {} as ApiService,
+      { markForCheck: vi.fn() } as unknown as import('@angular/core').ChangeDetectorRef,
+    );
+    cards.editCard({
+      id: 'card-1',
+      name: 'Visa',
+      bankName: 'Banco',
+      closingDay: 10,
+      dueDay: 20,
+      isArchived: false,
+      version: 1,
+    } as never);
+    expect(cards.activeForm).toBe('edit');
+    cards.openForm('statement');
+    expect(cards.activeForm).toBe('statement');
+    cards.openForm('payment');
+    expect(cards.activeForm).toBe('payment');
+  });
+
   it('opens usable finance actions for an authenticated user before onboarding is complete', async () => {
     const api = {
       session: vi.fn().mockResolvedValue({

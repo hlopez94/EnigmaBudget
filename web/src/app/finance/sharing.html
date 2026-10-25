@@ -4,45 +4,52 @@
 @if (notice) {
   <div class="feedback success" role="status">{{ notice }}</div>
 }
-<main class="content">
+<main class="content sharing-workspace">
   <div class="section-heading">
     <div>
       <p class="eyebrow">COMPRAS COMPARTIDAS</p>
       <h2>Repartos y cobros mensuales</h2>
       <p>Cada mes conserva su propio acuerdo; una previsión no se puede cobrar.</p>
     </div>
+    <button type="button" class="primary" (click)="openForm()">＋ Crear grupo</button>
   </div>
   <div class="two-columns">
-    <section class="panel">
-      <h3>Crear grupo manual</h3>
-      <p class="helper">
-        El primer nombre es tu parte. Los demás participantes no necesitan una cuenta.
-      </p>
-      <form (ngSubmit)="createGroup()" class="form-grid">
-        <label
-          >Nombre del grupo<input
-            name="groupName"
-            [(ngModel)]="groupDraft.name"
-            required
-            maxlength="120"
-            [disabled]="saving" /></label
-        ><label
-          >Tu nombre<input
-            name="selfName"
-            [(ngModel)]="groupDraft.selfName"
-            required
-            maxlength="120"
-            [disabled]="saving" /></label
-        ><label
-          >Otros participantes (uno por línea)<textarea
-            name="otherNames"
-            [(ngModel)]="groupDraft.others"
-            rows="4"
-            [disabled]="saving"
-          ></textarea></label
-        ><button class="primary" type="submit" [disabled]="saving">Crear grupo</button>
-      </form>
-    </section>
+    <app-action-dialog
+      title="Crear grupo compartido"
+      [open]="activeForm === 'group'"
+      (closed)="closeForm()"
+      [dismissible]="!saving"
+      ><section class="panel">
+        <h3>Crear grupo manual</h3>
+        <p class="helper">
+          El primer nombre es tu parte. Los demás participantes no necesitan una cuenta.
+        </p>
+        <form (ngSubmit)="createGroup()" class="form-grid">
+          <label
+            >Nombre del grupo<input
+              name="groupName"
+              [(ngModel)]="groupDraft.name"
+              required
+              maxlength="120"
+              [disabled]="saving" /></label
+          ><label
+            >Tu nombre<input
+              name="selfName"
+              [(ngModel)]="groupDraft.selfName"
+              required
+              maxlength="120"
+              [disabled]="saving" /></label
+          ><label
+            >Otros participantes (uno por línea)<textarea
+              name="otherNames"
+              [(ngModel)]="groupDraft.others"
+              rows="4"
+              [disabled]="saving"
+            ></textarea></label
+          ><button class="primary" type="submit" [disabled]="saving">Crear grupo</button>
+        </form>
+      </section></app-action-dialog
+    >
     <section class="panel">
       <h3>Regla de {{ period }}</h3>
       <label
@@ -126,7 +133,7 @@
       }
     </section>
   </div>
-  <section class="panel">
+  <section class="panel receivables-panel">
     <div class="panel-title">
       <div>
         <p class="eyebrow">PARTICIPACIONES</p>
@@ -145,6 +152,7 @@
       <div class="empty">
         <b>Todavía no hay grupos</b>
         <p>Creá un grupo para organizar compras y cobros compartidos.</p>
+        <button type="button" (click)="openForm()">Crear grupo</button>
       </div>
     } @else if (!groupReceivables.length) {
       <div class="empty">

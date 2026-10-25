@@ -4,15 +4,17 @@ import { FinanceOverview, Operation } from '../core/api.models';
 import { ApiService } from '../core/api.service';
 import { toMinorUnits } from '../onboarding/draft';
 import { FinanceActions, financeToday, RefreshFinanceOverview } from './finance-actions';
+import { ActionDialog } from './ui/action-dialog';
 
 @Component({
   selector: 'app-operations',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, ActionDialog],
   templateUrl: './operations.html',
   styleUrl: './finance-shell.css',
 })
 export class FinanceOperations extends FinanceActions {
+  activeForm: '' | 'operation' | 'transfer' = '';
   @Input({ required: true }) overview!: FinanceOverview;
   @Input() period = '';
   @Input({ required: true }) refreshOverview!: RefreshFinanceOverview;
@@ -54,6 +56,12 @@ export class FinanceOperations extends FinanceActions {
   get operations() {
     return this.overview?.operations ?? [];
   }
+  openForm(form: 'operation' | 'transfer'): void {
+    this.activeForm = form;
+  }
+  closeForm(): void {
+    if (!this.saving) this.activeForm = '';
+  }
 
   filteredOperations(): Operation[] {
     return this.operations.filter(
@@ -87,6 +95,7 @@ export class FinanceOperations extends FinanceActions {
       amount: '',
       paid: true,
     };
+    this.activeForm = '';
     await this.refreshOverview();
   }
 
@@ -180,6 +189,7 @@ export class FinanceOperations extends FinanceActions {
       amount: '',
       destinationAmount: '',
     };
+    this.activeForm = '';
     await this.refreshOverview();
   }
 }

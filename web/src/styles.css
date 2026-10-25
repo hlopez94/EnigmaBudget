@@ -1,2 +1,287 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700&display=swap');
-:root{font-family:'DM Sans',Arial,sans-serif;color:#202b23;background:#f7f8f5;font-synthesis:none;text-rendering:optimizeLegibility;--ink:#202b23;--muted:#657169;--line:#e5e9e2;--green:#3e6a4b;--green-soft:#cfdccc}*{box-sizing:border-box}body{margin:0;min-width:320px}button,input,select{font:inherit}.panel{background:#fff;border:1px solid var(--line);border-radius:17px;box-shadow:0 18px 55px rgba(33,52,38,.055)}.eyebrow{text-transform:uppercase;letter-spacing:.12em;font-size:10px;font-weight:700;color:#5d6b61;margin:0}.p-button{font-family:'DM Sans',sans-serif}.p-inputtext,.p-select{border-radius:9px!important;font-size:13px!important;min-height:42px}.p-inputtext{padding:10px 12px!important}.p-select-label{font-size:12px!important;padding-top:11px!important;padding-bottom:11px!important}.p-button-label{font-size:12px;font-weight:600}.p-button:not(.p-button-text){background:#3e6a4b;border-color:#3e6a4b;color:#fff}.p-button:not(.p-button-text).p-button-outlined,.p-button:not(.p-button-text).p-button-outlined .p-button-label{color:#fff}.p-button:not(.p-button-text):hover,.p-button:not(.p-button-text).p-button-outlined:hover{background:#31583d;border-color:#31583d;color:#fff}.p-message{font-size:12px!important;margin-bottom:18px}
+:root {
+  font-family: 'DM Sans', Arial, sans-serif;
+  color: #202b23;
+  background: #f7f8f5;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  --ink: #202b23;
+  --muted: #657169;
+  --line: #e5e9e2;
+  --green: #3e6a4b;
+  --green-soft: #cfdccc;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  min-width: 320px;
+}
+button,
+input,
+select {
+  font: inherit;
+}
+.panel {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 17px;
+  box-shadow: 0 18px 55px rgba(33, 52, 38, 0.055);
+}
+.eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 10px;
+  font-weight: 700;
+  color: #5d6b61;
+  margin: 0;
+}
+.p-button {
+  font-family: 'DM Sans', sans-serif;
+}
+.p-inputtext,
+.p-select {
+  border-radius: 9px !important;
+  font-size: 13px !important;
+  min-height: 42px;
+}
+.p-inputtext {
+  padding: 10px 12px !important;
+}
+.p-select-label {
+  font-size: 12px !important;
+  padding-top: 11px !important;
+  padding-bottom: 11px !important;
+}
+.p-button-label {
+  font-size: 12px;
+  font-weight: 600;
+}
+.p-button:not(.p-button-text) {
+  background: #3e6a4b;
+  border-color: #3e6a4b;
+  color: #fff;
+}
+.p-button:not(.p-button-text).p-button-outlined,
+.p-button:not(.p-button-text).p-button-outlined .p-button-label {
+  color: #fff;
+}
+.p-button:not(.p-button-text):hover,
+.p-button:not(.p-button-text).p-button-outlined:hover {
+  background: #31583d;
+  border-color: #31583d;
+  color: #fff;
+}
+.p-message {
+  font-size: 12px !important;
+  margin-bottom: 18px;
+}
+
+.workspace .mobile-navigation {
+  display: none;
+}
+.workspace .more-link {
+  display: flex;
+  width: 100%;
+  min-height: 62px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 4px;
+  background: white;
+  border: 0;
+  border-bottom: 1px solid #e8ece6;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.workspace .more-link b,
+.workspace .more-link small {
+  display: block;
+}
+.workspace .more-link small {
+  margin-top: 4px;
+  color: #6b756b;
+  font-size: 12px;
+}
+.workspace .more-link > span:last-child {
+  font-size: 23px;
+  color: #416c49;
+}
+.workspace .more-screen h2 {
+  font-size: 20px;
+}
+.accounts-workspace > .two-columns,
+.operations-workspace > .two-columns,
+.sharing-workspace > .two-columns {
+  display: contents;
+}
+.accounts-workspace > .legacy-accounts-list {
+  display: none;
+}
+.accounts-list {
+  order: -1;
+}
+.accounts-list .panel-title {
+  align-items: center;
+}
+.accounts-list .primary {
+  min-height: 44px;
+}
+.operation-history,
+.receivables-panel {
+  order: -1;
+}
+.accounts-workspace > .section-heading,
+.operations-workspace > .section-heading,
+.sharing-workspace > .section-heading {
+  order: -2;
+}
+@media (max-width: 767px) {
+  .workspace {
+    width: calc(100% - 24px);
+    margin: 12px auto calc(94px + env(safe-area-inset-bottom));
+  }
+  .workspace .workspace-heading {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+  .workspace .workspace-heading > div:first-child {
+    min-width: 0;
+  }
+  .workspace .workspace-heading h1 {
+    font-size: 22px;
+    letter-spacing: -0.03em;
+    margin: 0;
+  }
+  .workspace .workspace-heading .eyebrow {
+    margin: 0 0 2px;
+    font-size: 9px;
+  }
+  .workspace .workspace-heading p:last-child {
+    display: none;
+  }
+  .workspace .header-actions {
+    width: auto;
+    gap: 4px;
+  }
+  .workspace .header-actions .period-picker {
+    display: flex;
+    font-size: 0;
+  }
+  .workspace .period-picker input {
+    min-height: 42px;
+    max-width: 145px;
+  }
+  .workspace .navigation {
+    display: none;
+  }
+  .workspace .mobile-navigation {
+    position: fixed;
+    z-index: 100;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: 5px 4px calc(5px + env(safe-area-inset-bottom));
+    border-top: 1px solid #dfe6dd;
+    background: #fffffff2;
+    backdrop-filter: blur(14px);
+  }
+  .workspace .mobile-navigation button {
+    display: grid;
+    place-items: center;
+    align-content: center;
+    gap: 1px;
+    min-height: 52px;
+    border: 0;
+    border-radius: 9px;
+    background: transparent;
+    color: #687369;
+    font: inherit;
+    cursor: pointer;
+  }
+  .workspace .mobile-navigation button span {
+    font-size: 21px;
+    line-height: 24px;
+  }
+  .workspace .mobile-navigation button small {
+    font-size: 10px;
+  }
+  .workspace .mobile-navigation button.active {
+    color: #245a34;
+    background: #edf4eb;
+    font-weight: 650;
+  }
+  .workspace .header-actions p-button {
+    display: none;
+  }
+  .workspace .setup-hint {
+    padding: 11px;
+  }
+  .workspace .summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .workspace .overview-intro {
+    gap: 4px;
+  }
+  .workspace .overview-intro h2 {
+    font-size: 20px;
+  }
+  .workspace .ready-note {
+    margin: 0;
+  }
+  .workspace .quick-panel {
+    display: block;
+  }
+  .workspace .quick-actions {
+    margin-top: 12px;
+  }
+  .workspace .form-grid input,
+  .workspace .form-grid select,
+  .workspace .form-grid textarea,
+  .workspace .panel > label select,
+  .workspace .filter-label select,
+  .workspace .period-picker input {
+    min-height: 44px;
+    font-size: 16px;
+  }
+  .workspace .more-link {
+    min-height: 68px;
+  }
+  .workspace .list-row strong,
+  .workspace .operation-row > strong {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    text-align: right;
+  }
+  .shell .topbar {
+    min-height: 52px;
+  }
+  .shell .footer {
+    display: none;
+  }
+  .finance-action-dialog .p-dialog-content {
+    max-height: calc(100dvh - 132px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .finance-action-dialog input:not([type='checkbox']),
+  .finance-action-dialog select,
+  .finance-action-dialog textarea,
+  .workspace .inline-payment input,
+  .workspace .inline-payment select {
+    font-size: 16px;
+    min-height: 44px;
+  }
+  .finance-action-dialog button,
+  .workspace .inline-payment button {
+    min-height: 44px;
+  }
+}

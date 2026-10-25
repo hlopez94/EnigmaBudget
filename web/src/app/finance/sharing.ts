@@ -4,15 +4,17 @@ import { FinanceOverview, Group, Receivable } from '../core/api.models';
 import { ApiService } from '../core/api.service';
 import { toMinorUnits } from '../onboarding/draft';
 import { FinanceActions, financeToday, RefreshFinanceOverview } from './finance-actions';
+import { ActionDialog } from './ui/action-dialog';
 
 @Component({
   selector: 'app-sharing',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, ActionDialog],
   templateUrl: './sharing.html',
   styleUrl: './finance-shell.css',
 })
 export class FinanceSharing extends FinanceActions implements OnChanges {
+  activeForm: '' | 'group' = '';
   @Input({ required: true }) overview!: FinanceOverview;
   @Input() period = '';
   @Input({ required: true }) refreshOverview!: RefreshFinanceOverview;
@@ -56,6 +58,12 @@ export class FinanceSharing extends FinanceActions implements OnChanges {
     );
     const account = this.accounts.find((item) => item.id === this.collection.accountId);
     return !!row && !!account && account.currency !== row.currency;
+  }
+  openForm(): void {
+    this.activeForm = 'group';
+  }
+  closeForm(): void {
+    if (!this.saving) this.activeForm = '';
   }
 
   ngOnChanges(): void {
@@ -114,6 +122,7 @@ export class FinanceSharing extends FinanceActions implements OnChanges {
     this.releaseRequestId('group', payload);
     participantPayloads.forEach((participant) => this.releaseRequestId('participant', participant));
     this.groupDraft = { name: '', selfName: 'Yo', others: '' };
+    this.activeForm = '';
     await this.refreshOverview();
   }
 

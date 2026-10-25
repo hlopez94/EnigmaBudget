@@ -17,7 +17,7 @@ import { FinanceCards } from './cards';
 import { FinanceOperations } from './operations';
 import { FinanceSharing } from './sharing';
 
-export type FinanceSection = 'home' | 'operations' | 'accounts' | 'cards' | 'sharing';
+export type FinanceSection = 'home' | 'operations' | 'accounts' | 'cards' | 'sharing' | 'more';
 
 const today = (): string => {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -53,6 +53,7 @@ export class FinanceShell implements OnInit {
 
   period = today().slice(0, 7);
   section: FinanceSection = 'home';
+  moreTarget: 'accounts' | 'setup' = 'accounts';
   overview: FinanceOverview | null = null;
   busy = false;
   error = '';
@@ -98,6 +99,12 @@ export class FinanceShell implements OnInit {
     this.error = '';
     this.notice = '';
     this.changeDetector.markForCheck();
+  }
+
+  navigateMore(target: 'accounts' | 'setup'): void {
+    this.moreTarget = target;
+    if (target === 'accounts') this.navigate('accounts');
+    else this.setupRequested.emit();
   }
 
   money(amount: string, currency: 'ARS' | 'USD'): string {

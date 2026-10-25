@@ -3,15 +3,17 @@ import { FormsModule } from '@angular/forms';
 import { Account, FinanceOverview } from '../core/api.models';
 import { ApiService } from '../core/api.service';
 import { FinanceActions, financeToday, RefreshFinanceOverview } from './finance-actions';
+import { ActionDialog } from './ui/action-dialog';
 
 @Component({
   selector: 'app-accounts',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, ActionDialog],
   templateUrl: './accounts.html',
   styleUrl: './finance-shell.css',
 })
 export class FinanceAccounts extends FinanceActions {
+  activeForm: '' | 'create' | 'adjust' | 'edit' = '';
   @Input({ required: true }) overview!: FinanceOverview;
   @Input() period = '';
   @Input({ required: true }) refreshOverview!: RefreshFinanceOverview;
@@ -40,6 +42,13 @@ export class FinanceAccounts extends FinanceActions {
     return this.accounts.find((account) => account.id === this.selectedAccountId);
   }
 
+  openForm(form: 'create' | 'adjust' | 'edit'): void {
+    this.activeForm = form;
+  }
+  closeForm(): void {
+    if (!this.saving) this.activeForm = '';
+  }
+
   async saveAccount(): Promise<void> {
     const payload = {
       ...this.accountDraft,
@@ -58,6 +67,7 @@ export class FinanceAccounts extends FinanceActions {
       openingBalance: '0',
       openingDate: financeToday(),
     };
+    this.activeForm = '';
     await this.refreshOverview();
   }
 
@@ -87,6 +97,7 @@ export class FinanceAccounts extends FinanceActions {
     )
       return;
     this.accountEdit = { id: '', name: '', bankName: '', isArchived: false, version: 0 };
+    this.activeForm = '';
     await this.refreshOverview();
   }
 
@@ -110,6 +121,7 @@ export class FinanceAccounts extends FinanceActions {
       return;
     this.releaseRequestId(`account-adjustment:${account.id}`, payload);
     this.accountAdjustment = { date: financeToday(), observedBalance: '', reason: '' };
+    this.activeForm = '';
     await this.refreshOverview();
   }
 }

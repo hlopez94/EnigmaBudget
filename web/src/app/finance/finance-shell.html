@@ -1,9 +1,22 @@
 <div class="workspace">
   <header class="workspace-heading">
     <div>
-      <p class="eyebrow">FINANZAS PERSONALES</p>
-      <h1>Hola, {{ name }}.</h1>
-      <p>Registrá lo que pasó y revisá compromisos por mes.</p>
+      <p class="eyebrow">ENIGMABUDGET · {{ name }}</p>
+      <h1>
+        {{
+          section === 'home'
+            ? 'Inicio'
+            : section === 'operations'
+              ? 'Movimientos'
+              : section === 'accounts'
+                ? 'Cuentas'
+                : section === 'cards'
+                  ? 'Tarjetas'
+                  : section === 'sharing'
+                    ? 'Compartidos'
+                    : 'Más'
+        }}
+      </h1>
     </div>
     <div class="header-actions">
       <label class="period-picker"
@@ -45,6 +58,31 @@
       Compartidos
     </button>
   </nav>
+  <nav class="mobile-navigation" aria-label="Navegación principal">
+    <button type="button" [class.active]="section === 'home'" (click)="navigate('home')">
+      <span aria-hidden="true">⌂</span><small>Inicio</small>
+    </button>
+    <button
+      type="button"
+      [class.active]="section === 'operations'"
+      (click)="navigate('operations')"
+    >
+      <span aria-hidden="true">↕</span><small>Movimientos</small>
+    </button>
+    <button type="button" [class.active]="section === 'cards'" (click)="navigate('cards')">
+      <span aria-hidden="true">▣</span><small>Tarjetas</small>
+    </button>
+    <button type="button" [class.active]="section === 'sharing'" (click)="navigate('sharing')">
+      <span aria-hidden="true">◎</span><small>Compartidos</small>
+    </button>
+    <button
+      type="button"
+      [class.active]="section === 'more' || section === 'accounts'"
+      (click)="navigate('more')"
+    >
+      <span aria-hidden="true">•••</span><small>Más</small>
+    </button>
+  </nav>
   @if (setupIncomplete) {
     <aside class="setup-hint">
       <div>
@@ -72,6 +110,27 @@
     <div class="loading" aria-live="polite">Actualizando el espacio…</div>
   }
   @if (overview) {
+    @if (section === 'more') {
+      <main class="content more-screen">
+        <section class="panel">
+          <h2>Administrar espacio</h2>
+          <button type="button" class="more-link" (click)="navigateMore('accounts')">
+            <span><b>Cuentas</b><small>Ver saldos, conciliar o agregar una cuenta</small></span
+            ><span aria-hidden="true">›</span>
+          </button>
+          @if (setupIncomplete) {
+            <button type="button" class="more-link" (click)="navigateMore('setup')">
+              <span><b>Configuración inicial</b><small>Continuar donde lo dejaste</small></span
+              ><span aria-hidden="true">›</span>
+            </button>
+          }
+          <button type="button" class="more-link" (click)="refresh()" [disabled]="busy">
+            <span><b>Actualizar datos</b><small>Sincronizar el resumen</small></span
+            ><span aria-hidden="true">↻</span>
+          </button>
+        </section>
+      </main>
+    }
     @if (section === 'home') {
       <main class="content">
         <div class="overview-intro">

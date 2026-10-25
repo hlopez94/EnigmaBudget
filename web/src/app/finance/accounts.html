@@ -4,7 +4,43 @@
 @if (notice) {
   <div class="feedback success" role="status">{{ notice }}</div>
 }
-<main class="content">
+<main class="content accounts-workspace">
+  <section class="panel accounts-list">
+    <div class="panel-title">
+      <h3>Tus cuentas</h3>
+      <button type="button" class="primary" (click)="openForm('create')">＋ Agregar cuenta</button>
+    </div>
+    @if (accounts.length === 0) {
+      <div class="empty">
+        <b>Todavía no hay cuentas</b>
+        <p>Agregá una para empezar a registrar ingresos, gastos y pagos.</p>
+        <button type="button" (click)="openForm('create')">Agregar cuenta</button>
+      </div>
+    }
+    @for (a of accounts; track a.id) {
+      <div class="resource-card">
+        <div class="list-row">
+          <div>
+            <b
+              >{{ a.name }}
+              @if (a.isArchived) {
+                <span class="badge">Archivada</span>
+              }</b
+            ><small>{{ a.bankName }} · {{ a.currency }} · Apertura {{ a.openingDate }}</small>
+          </div>
+          <strong>{{ money(a.currentBalance, a.currency) }}</strong>
+        </div>
+        <button type="button" class="text-action" (click)="editAccount(a); openForm('edit')">
+          Editar nombre o archivo
+        </button>
+      </div>
+    }
+    @if (activeAccounts.length) {
+      <button type="button" class="text-action" (click)="openForm('adjust')">
+        Conciliar un saldo
+      </button>
+    }
+  </section>
   <div class="section-heading">
     <div>
       <p class="eyebrow">CUENTAS</p>
@@ -13,99 +49,111 @@
     </div>
   </div>
   <div class="two-columns">
-    <section class="panel">
-      <h3>Agregar cuenta</h3>
-      <form (ngSubmit)="saveAccount()" class="form-grid">
-        <label
-          >Nombre de la cuenta<input
-            name="accountName"
-            [(ngModel)]="accountDraft.name"
-            required
-            maxlength="120"
-            [disabled]="saving" /></label
-        ><label
-          >Banco o billetera<input
-            name="accountBank"
-            [(ngModel)]="accountDraft.bankName"
-            required
-            maxlength="120"
-            [disabled]="saving"
-        /></label>
-        <label
-          >Moneda<select
-            name="accountCurrency"
-            [(ngModel)]="accountDraft.currency"
-            [disabled]="saving"
-          >
-            <option>ARS</option>
-            <option>USD</option>
-          </select></label
-        ><label
-          >Saldo de apertura<input
-            name="openingBalance"
-            [(ngModel)]="accountDraft.openingBalance"
-            inputmode="decimal"
-            placeholder="0,00"
-            required
-            [disabled]="saving" /></label
-        ><label
-          >Fecha del saldo<input
-            name="openingDate"
-            type="date"
-            [(ngModel)]="accountDraft.openingDate"
-            required
-            [disabled]="saving" /></label
-        ><button class="primary" type="submit" [disabled]="saving">
-          {{ saving ? 'Guardando…' : 'Guardar cuenta' }}
-        </button>
-      </form>
-    </section>
-    <section class="panel">
-      <h3>Conciliar un saldo</h3>
-      <p class="helper">
-        Ingresá el saldo que muestra el banco en una fecha para registrar solo la diferencia.
-      </p>
-      <form (ngSubmit)="adjustAccount()" class="form-grid">
-        <label
-          >Cuenta<select
-            name="adjustAccount"
-            [(ngModel)]="selectedAccountId"
-            required
-            [disabled]="saving"
-          >
-            <option value="" disabled>Elegir cuenta</option>
-            @for (a of activeAccounts; track a.id) {
-              <option [value]="a.id">{{ a.name }} · {{ a.currency }}</option>
-            }
-          </select></label
-        ><label
-          >Fecha<input
-            name="adjustDate"
-            type="date"
-            [(ngModel)]="accountAdjustment.date"
-            required
-            [disabled]="saving" /></label
-        ><label
-          >Saldo observado<input
-            name="observedBalance"
-            [(ngModel)]="accountAdjustment.observedBalance"
-            inputmode="decimal"
-            required
-            [disabled]="saving" /></label
-        ><label
-          >Motivo<input
-            name="adjustReason"
-            [(ngModel)]="accountAdjustment.reason"
-            maxlength="240"
-            required
-            [disabled]="saving" /></label
-        ><button class="secondary" type="submit" [disabled]="saving || !selectedAccountId">
-          Registrar ajuste
-        </button>
-      </form>
-    </section>
+    <app-action-dialog
+      title="Agregar cuenta"
+      [open]="activeForm === 'create'"
+      (closed)="closeForm()"
+      [dismissible]="!saving"
+    >
+      <section class="panel">
+        <form (ngSubmit)="saveAccount()" class="form-grid">
+          <label
+            >Nombre de la cuenta<input
+              name="accountName"
+              [(ngModel)]="accountDraft.name"
+              required
+              maxlength="120"
+              [disabled]="saving" /></label
+          ><label
+            >Banco o billetera<input
+              name="accountBank"
+              [(ngModel)]="accountDraft.bankName"
+              required
+              maxlength="120"
+              [disabled]="saving"
+          /></label>
+          <label
+            >Moneda<select
+              name="accountCurrency"
+              [(ngModel)]="accountDraft.currency"
+              [disabled]="saving"
+            >
+              <option>ARS</option>
+              <option>USD</option>
+            </select></label
+          ><label
+            >Saldo de apertura<input
+              name="openingBalance"
+              [(ngModel)]="accountDraft.openingBalance"
+              inputmode="decimal"
+              placeholder="0,00"
+              required
+              [disabled]="saving" /></label
+          ><label
+            >Fecha del saldo<input
+              name="openingDate"
+              type="date"
+              [(ngModel)]="accountDraft.openingDate"
+              required
+              [disabled]="saving" /></label
+          ><button class="primary" type="submit" [disabled]="saving">
+            {{ saving ? 'Guardando…' : 'Guardar cuenta' }}
+          </button>
+        </form>
+      </section>
+    </app-action-dialog>
+    <app-action-dialog
+      title="Conciliar saldo"
+      [open]="activeForm === 'adjust'"
+      (closed)="closeForm()"
+      [dismissible]="!saving"
+    >
+      <section class="panel">
+        <p class="helper">
+          Ingresá el saldo que muestra el banco en una fecha para registrar solo la diferencia.
+        </p>
+        <form (ngSubmit)="adjustAccount()" class="form-grid">
+          <label
+            >Cuenta<select
+              name="adjustAccount"
+              [(ngModel)]="selectedAccountId"
+              required
+              [disabled]="saving"
+            >
+              <option value="" disabled>Elegir cuenta</option>
+              @for (a of activeAccounts; track a.id) {
+                <option [value]="a.id">{{ a.name }} · {{ a.currency }}</option>
+              }
+            </select></label
+          ><label
+            >Fecha<input
+              name="adjustDate"
+              type="date"
+              [(ngModel)]="accountAdjustment.date"
+              required
+              [disabled]="saving" /></label
+          ><label
+            >Saldo observado<input
+              name="observedBalance"
+              [(ngModel)]="accountAdjustment.observedBalance"
+              inputmode="decimal"
+              required
+              [disabled]="saving" /></label
+          ><label
+            >Motivo<input
+              name="adjustReason"
+              [(ngModel)]="accountAdjustment.reason"
+              maxlength="240"
+              required
+              [disabled]="saving" /></label
+          ><button class="secondary" type="submit" [disabled]="saving || !selectedAccountId">
+            Registrar ajuste
+          </button>
+        </form>
+      </section>
+    </app-action-dialog>
   </div>
-  <section class="panel">
+  <section class="panel legacy-accounts-list">
     <div class="panel-title">
       <h3>Tus cuentas</h3>
       <span>{{ accounts.length }} registradas</span>
@@ -136,32 +184,41 @@
     }
   </section>
   @if (accountEdit.id) {
-    <section class="panel edit-panel">
-      <h3>Editar cuenta</h3>
-      <form (ngSubmit)="saveAccountEdit()" class="form-grid">
-        <label
-          >Nombre<input
-            name="editAccountName"
-            [(ngModel)]="accountEdit.name"
-            required
-            [disabled]="saving" /></label
-        ><label
-          >Banco<input
-            name="editAccountBank"
-            [(ngModel)]="accountEdit.bankName"
-            required
-            [disabled]="saving" /></label
-        ><label class="check"
-          ><input
-            name="archiveAccount"
-            type="checkbox"
-            [(ngModel)]="accountEdit.isArchived"
-            [disabled]="saving"
-          />
-          Cuenta archivada</label
-        ><button class="primary" type="submit" [disabled]="saving">Guardar cambios</button
-        ><button type="button" class="quiet-button" (click)="accountEdit.id = ''">Cancelar</button>
-      </form>
-    </section>
+    <app-action-dialog
+      title="Editar cuenta"
+      [open]="activeForm === 'edit'"
+      (closed)="closeForm()"
+      [dismissible]="!saving"
+    >
+      <section class="panel edit-panel">
+        <h3>Editar cuenta</h3>
+        <form (ngSubmit)="saveAccountEdit()" class="form-grid">
+          <label
+            >Nombre<input
+              name="editAccountName"
+              [(ngModel)]="accountEdit.name"
+              required
+              [disabled]="saving" /></label
+          ><label
+            >Banco<input
+              name="editAccountBank"
+              [(ngModel)]="accountEdit.bankName"
+              required
+              [disabled]="saving" /></label
+          ><label class="check"
+            ><input
+              name="archiveAccount"
+              type="checkbox"
+              [(ngModel)]="accountEdit.isArchived"
+              [disabled]="saving"
+            />
+            Cuenta archivada</label
+          ><button class="primary" type="submit" [disabled]="saving">Guardar cambios</button
+          ><button type="button" class="quiet-button" (click)="accountEdit.id = ''">
+            Cancelar
+          </button>
+        </form>
+      </section>
+    </app-action-dialog>
   }
 </main>

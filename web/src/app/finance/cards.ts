@@ -10,15 +10,17 @@ import {
   financeToday,
   RefreshFinanceOverview,
 } from './finance-actions';
+import { ActionDialog } from './ui/action-dialog';
 
 @Component({
   selector: 'app-cards',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, ActionDialog],
   templateUrl: './cards.html',
   styleUrl: './finance-shell.css',
 })
 export class FinanceCards extends FinanceActions implements OnChanges {
+  activeForm: '' | 'create' | 'purchase' | 'edit' | 'statement' | 'payment' = '';
   @Input({ required: true }) overview!: FinanceOverview;
   @Input() period = financePeriod();
   @Input({ required: true }) refreshOverview!: RefreshFinanceOverview;
@@ -89,6 +91,12 @@ export class FinanceCards extends FinanceActions implements OnChanges {
   get selectedCard() {
     return this.cards.find((card) => card.id === this.selectedCardId);
   }
+  openForm(form: 'create' | 'purchase' | 'statement' | 'payment'): void {
+    this.activeForm = form;
+  }
+  closeForm(): void {
+    if (!this.saving) this.activeForm = '';
+  }
 
   ngOnChanges(): void {
     if (!this.selectedCardId || !this.cards.some((card) => card.id === this.selectedCardId)) {
@@ -121,6 +129,7 @@ export class FinanceCards extends FinanceActions implements OnChanges {
       isArchived: card.isArchived,
       version: card.version,
     };
+    this.activeForm = 'edit';
   }
 
   async loadStatement(): Promise<void> {
@@ -176,6 +185,7 @@ export class FinanceCards extends FinanceActions implements OnChanges {
       statementDebtUsd: '0',
       asOfDate: financeToday(),
     };
+    this.activeForm = '';
     await this.refreshOverview();
   }
 
@@ -197,6 +207,7 @@ export class FinanceCards extends FinanceActions implements OnChanges {
     )
       return;
     this.cardEdit.id = '';
+    this.activeForm = '';
     await this.refreshOverview();
   }
 
@@ -227,6 +238,7 @@ export class FinanceCards extends FinanceActions implements OnChanges {
       firstPeriod: this.period,
       groupId: '',
     };
+    this.activeForm = '';
     await this.refreshOverview();
   }
 
