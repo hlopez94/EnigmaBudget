@@ -119,12 +119,15 @@
       [currentUserId]="currentUserId"
       [googleConfigured]="googleConfigured"
       [pendingInviteToken]="pendingInviteToken"
-      [open]="true"
+      [open]="section === 'spaces'"
+      [contextGeneration]="workspaceGeneration"
       [switchBlocked]="saving"
       (workspaceSelected)="requestWorkspaceChange($event)"
       (workspacesChanged)="workspacesChanged.emit()"
       (pendingInviteHandled)="pendingInviteToken = null"
       (workspaceUpdated)="workspaceUpdated.emit($event)"
+      (busyChange)="managerBusyChanged()"
+      (managerReady)="registerWorkspaceManager($event)"
     />
   } @placeholder {
     @if (section === 'spaces') { <div class="loading" aria-live="polite">Abriendo espacios…</div> }
@@ -362,10 +365,10 @@
     }
   }
   @if (requestedWorkspaceId) {
-    <app-action-dialog [title]="requestedWorkspaceId === 'setup' ? 'Abrir configuración inicial' : 'Cambiar de espacio'" [open]="true" (closed)="cancelWorkspaceChange()" [dismissible]="!saving">
+    <app-action-dialog [title]="requestedWorkspaceId === 'setup' ? 'Abrir configuración inicial' : requestedWorkspaceId.startsWith('@section:') ? 'Cambiar de sección' : 'Cambiar de espacio'" [open]="true" (closed)="cancelWorkspaceChange()" [dismissible]="!saving">
       <section class="panel switch-confirmation">
         <h3>Descartar los cambios pendientes</h3>
-        <p>Hay información ingresada en un formulario de este espacio. Si confirmás, se borrarán esos borradores y {{ requestedWorkspaceId === 'setup' ? 'se abrirá la configuración' : 'se abrirá el espacio elegido' }}.</p>
+        <p>Hay información ingresada en un formulario de este espacio. Si confirmás, se borrarán esos borradores y {{ requestedWorkspaceId === 'setup' ? 'se abrirá la configuración' : requestedWorkspaceId.startsWith('@section:') ? 'se abrirá la sección elegida' : 'se abrirá el espacio elegido' }}.</p>
         <div class="confirm-actions"><button type="button" class="secondary" (click)="cancelWorkspaceChange()">Seguir acá</button><button type="button" class="primary" (click)="confirmWorkspaceChange()" [disabled]="saving">{{ requestedWorkspaceId === 'setup' ? 'Descartar y abrir configuración' : 'Descartar y cambiar' }}</button></div>
       </section>
     </app-action-dialog>

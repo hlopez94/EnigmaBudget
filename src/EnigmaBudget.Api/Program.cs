@@ -84,12 +84,14 @@ app.MapFallback(async context =>
     context.Response.ContentType = "text/html; charset=utf-8";
     await context.Response.SendFileAsync(indexPath);
 });
-app.MapGet("/api/auth/session", async (HttpContext http, IAntiforgery antiforgery, WorkspaceProvisioner provisioner) =>
+app.MapGet("/api/auth/session", async (HttpContext http, IAntiforgery antiforgery, WorkspaceProvisioner provisioner, Microsoft.Extensions.Options.IOptions<DevelopmentIdentityOptions> identityOptions) =>
 {
     var tokens = antiforgery.GetAndStoreTokens(http);
     var authenticated = http.User.Identity?.IsAuthenticated == true;
     if (authenticated) await provisioner.EnsurePersonalAsync(http.User, http.RequestAborted);
-    return Results.Ok(new { authenticated, displayName = authenticated ? http.User.Identity!.Name : null, googleConfigured, developmentLoginEnabled = app.Environment.IsDevelopment() && builder.Configuration.GetValue<bool>("Authentication:DevelopmentLoginEnabled"), csrfToken = tokens.RequestToken });
+    var developmentLoginEnabled = app.Environment.IsDevelopment() && builder.Configuration.GetValue<bool>("Authentication:DevelopmentLoginEnabled");
+    var developmentUsers = developmentLoginEnabled ? identityOptions.Value.Users.Select(user => new { key = user.Key, displayName = user.DisplayName }).ToArray() : [];
+    return Results.Ok(new { authenticated, displayName = authenticated ? http.User.Identity!.Name : null, googleConfigured, developmentLoginEnabled, developmentUsers, csrfToken = tokens.RequestToken });
 });
 app.MapGet("/api/auth/google", (HttpContext http) => googleConfigured ? Results.Challenge(new AuthenticationProperties { RedirectUri = "/" }, [GoogleDefaults.AuthenticationScheme]) : Results.StatusCode(503));
 if (app.Environment.IsDevelopment()) app.MapPost("/api/auth/development", async (HttpContext http, IAntiforgery antiforgery, Microsoft.Extensions.Options.IOptions<DevelopmentIdentityOptions> identityOptions) =>
@@ -120,6 +122,7 @@ api.MapPut("/onboarding", async (HttpContext http, AppDbContext db, WorkspacePro
     if (!await Csrf(http, csrf)) return Results.BadRequest();
     if (!ValidDraftShape(request)) return Problem(400, "El borrador excede los límites permitidos o contiene identificadores repetidos.");
     var workspace = await provisioner.EnsurePersonalAsync(http.User, http.RequestAborted);
+    if (workspace.IsArchived) return Problem(403, "El espacio Personal está archivado y no admite cambios.");
     var draft = await db.Drafts.FindAsync(workspace.Id);
     if (draft is { Completed: true }) return Problem(409, "La configuración inicial ya está confirmada.");
     if ((draft?.Version ?? 0) != request.Version) return Problem(409, "El borrador cambió. Actualizá la pantalla antes de guardar.");
@@ -135,6 +138,7 @@ api.MapPost("/onboarding/complete", async (HttpContext http, AppDbContext db, Wo
     var draft = await db.Drafts.FindAsync(workspace.Id);
     if (draft is null) return Problem(409, "Guardá el borrador antes de confirmar.");
     if (draft.Completed) return Results.Ok(State(draft));
+    if (workspace.IsArchived) return Problem(403, "El espacio Personal está archivado y no admite cambios.");
     if (draft.Version != request.Version) return Problem(409, "El borrador cambió. Actualizá la pantalla antes de confirmar.");
     var accounts = Deserialize<AccountInput>(draft.AccountsJson); var cards = Deserialize<CardInput>(draft.CardsJson);
     var validation = ValidateForCompletion(accounts, cards);

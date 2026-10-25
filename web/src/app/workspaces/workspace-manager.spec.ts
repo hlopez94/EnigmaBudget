@@ -54,4 +54,52 @@ describe('workspace management permissions', () => {
     expect(api.leaveWorkspace).toHaveBeenCalledWith('household', 3);
     vi.unstubAllGlobals();
   });
+
+  it('keeps the invite request ID when the same request must be retried after a failed response', async () => {
+    const household = {
+      ...readerPersonal, id: 'household', name: 'Casa', kind: 'Household' as const, role: 'Owner' as const,
+      permissions: { ...readerPersonal.permissions, manageMembers: true },
+    };
+    const invitation = { id: 'invitation', email: 'member@example.test', role: 'Member' as const, status: 'Pending' as const, expiresAt: '2026-10-30T00:00:00Z', version: 1, shareUrl: '/#invite=token' };
+    const api = { createInvitation: vi.fn().mockRejectedValueOnce(new Error('network result unknown')).mockResolvedValueOnce(invitation) };
+    const manager = new WorkspaceManager(api as unknown as ApiService, { markForCheck: vi.fn() } as never);
+    manager.activeWorkspace = household;
+    manager.inviteEmail = 'member@example.test';
+
+    await manager.invite();
+    await manager.invite();
+
+    expect(api.createInvitation).toHaveBeenCalledTimes(2);
+    expect(api.createInvitation.mock.calls[0][1].id).toBe(api.createInvitation.mock.calls[1][1].id);
+    expect(manager.shareUrl).toBe('/#invite=token');
+  });
+
+  it('treats management inputs as drafts and clears them on confirmed context invalidation', () => {
+    const manager = new WorkspaceManager({} as ApiService, { markForCheck: vi.fn() } as never);
+    manager.activeWorkspace = { ...readerPersonal, name: 'Personal propio', role: 'Owner' };
+    manager.editName = 'Nombre nuevo';
+    expect(manager.hasPendingDraft()).toBe(true);
+
+    manager.invalidateContext();
+
+    expect(manager.hasPendingDraft()).toBe(false);
+    expect(manager.editName).toBe('Personal propio');
+  });
+
+  it('preserves drafts when Spaces closes without a confirmed discard', () => {
+    const manager = new WorkspaceManager({} as ApiService, { markForCheck: vi.fn() } as never);
+    manager.activeWorkspace = { ...readerPersonal, name: 'Personal propio', role: 'Owner' };
+    manager.open = true;
+    manager.householdName = 'Borrador de Hogar';
+    manager.inviteEmail = 'person@example.test';
+    manager.editName = 'Nombre nuevo';
+    manager.open = false;
+
+    manager.ngOnChanges({ open: { previousValue: true, currentValue: false } as never });
+
+    expect(manager.hasPendingDraft()).toBe(true);
+    expect(manager.householdName).toBe('Borrador de Hogar');
+    expect(manager.inviteEmail).toBe('person@example.test');
+    expect(manager.editName).toBe('Nombre nuevo');
+  });
 });

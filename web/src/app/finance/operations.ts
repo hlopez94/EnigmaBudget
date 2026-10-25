@@ -67,7 +67,7 @@ export class FinanceOperations extends FinanceActions {
     return this.overview?.operations ?? [];
   }
   override hasPendingDraft(): boolean {
-    return this.operationDraft.description.trim() !== '' || this.operationDraft.category.trim() !== '' || this.operationDraft.amount.trim() !== '' || this.operationDraft.accountId !== '' || this.operationDraft.kind !== 'Expense' || !this.operationDraft.paid || this.payment.amount.trim() !== '' || this.payment.accountId.trim() !== '' || this.transferDraft.fromAccountId !== '' || this.transferDraft.toAccountId !== '' || this.transferDraft.amount.trim() !== '' || this.transferDraft.destinationAmount.trim() !== '';
+    return this.operationDraft.description.trim() !== '' || this.operationDraft.category.trim() !== '' || this.operationDraft.amount.trim() !== '' || this.operationDraft.kind !== 'Expense' || !this.operationDraft.paid || this.payment.amount.trim() !== '' || this.payment.accountId.trim() !== '' || this.transferDraft.fromAccountId !== '' || this.transferDraft.toAccountId !== '' || this.transferDraft.amount.trim() !== '' || this.transferDraft.destinationAmount.trim() !== '';
   }
   openForm(form: 'operation' | 'transfer'): void {
     if (!this.allowed('recordFinance')) return;

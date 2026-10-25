@@ -15,6 +15,13 @@ class TestFinanceOperations extends FinanceOperations {
 }
 
 describe('finance workspace regressions', () => {
+  it('does not treat the remembered account selection as an unsaved operation draft', () => {
+    const operations = new TestFinanceOperations({} as ApiService, { markForCheck: vi.fn() } as never);
+    operations.operationDraft.accountId = 'default-account';
+
+    expect(operations.hasPendingDraft()).toBe(false);
+  });
+
   it('keeps a closed finance draft on the old space when switching is cancelled, then discards it only after confirmation', async () => {
     const shell = new (await import('./finance-shell')).FinanceShell(
       { selectWorkspace: vi.fn() } as unknown as ApiService,
@@ -308,6 +315,7 @@ describe('finance workspace regressions', () => {
         displayName: 'Ana',
         googleConfigured: false,
         developmentLoginEnabled: false,
+        developmentUsers: [],
         csrfToken: 'csrf',
       }),
       me: vi.fn().mockResolvedValue({ id: 'user', displayName: 'Ana', email: null, emailVerified: false, personalWorkspaceId: 'personal' }),

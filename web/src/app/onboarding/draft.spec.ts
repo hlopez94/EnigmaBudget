@@ -122,9 +122,9 @@ describe('onboarding draft rules', () => {
 describe('API session security', () => {
   it('refreshes the session and CSRF token after development sign-in', async () => {
     const request = vi.fn()
-      .mockResolvedValueOnce(new Response(JSON.stringify({ authenticated:false, displayName:null, googleConfigured:false, developmentLoginEnabled:true, csrfToken:'before-login' }), { status:200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ authenticated:false, displayName:null, googleConfigured:false, developmentLoginEnabled:true, developmentUsers:[], csrfToken:'before-login' }), { status:200 }))
       .mockResolvedValueOnce(new Response(null, { status:204 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ authenticated:true, displayName:'Usuario de desarrollo', googleConfigured:false, developmentLoginEnabled:true, csrfToken:'after-login' }), { status:200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ authenticated:true, displayName:'Usuario de desarrollo', googleConfigured:false, developmentLoginEnabled:true, developmentUsers:[], csrfToken:'after-login' }), { status:200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify(state(0)), { status:200 }));
     vi.stubGlobal('fetch', request);
     const api = new ApiService();

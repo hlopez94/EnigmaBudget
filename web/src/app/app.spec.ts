@@ -7,7 +7,7 @@ import { WorkspaceContext } from './core/workspace-context';
 
 describe('application startup', () => {
   it('refreshes the root view after an async session opens the incomplete wizard', async () => {
-    const session: SessionInfo = { authenticated:true, displayName:'Usuario', googleConfigured:false, developmentLoginEnabled:false, csrfToken:'token' };
+    const session: SessionInfo = { authenticated:true, displayName:'Usuario', googleConfigured:false, developmentLoginEnabled:false, developmentUsers:[], csrfToken:'token' };
     const state: OnboardingState = { version:2, completed:false, accounts:[], cards:[] };
     const api = {
       session:vi.fn().mockResolvedValue(session),
@@ -34,7 +34,7 @@ describe('application startup', () => {
       logout: vi.fn().mockResolvedValue(undefined),
       clearWorkspace: vi.fn(),
       capturePendingInvitation: vi.fn().mockReturnValue(null),
-      session: vi.fn().mockResolvedValue({ authenticated: false, displayName: null, googleConfigured: false, developmentLoginEnabled: false, csrfToken: '' }),
+      session: vi.fn().mockResolvedValue({ authenticated: false, displayName: null, googleConfigured: false, developmentLoginEnabled: false, developmentUsers:[], csrfToken: '' }),
     };
     const app = new App(api as unknown as ApiService, { markForCheck: vi.fn() } as never, context);
     app.activeWorkspace = { id: 'personal' } as never;
@@ -48,5 +48,16 @@ describe('application startup', () => {
     expect(app.workspaces).toEqual([]);
     expect(app.pendingInviteToken).toBeNull();
     expect(api.clearWorkspace).toHaveBeenCalled();
+  });
+
+  it('captures a new invitation fragment without requiring a document reload', () => {
+    const api = { capturePendingInvitation: vi.fn().mockReturnValue('new-invite-token') };
+    const markForCheck = vi.fn();
+    const app = new App(api as unknown as ApiService, { markForCheck } as never);
+
+    app.captureInviteLink();
+
+    expect(app.pendingInviteToken).toBe('new-invite-token');
+    expect(markForCheck).toHaveBeenCalled();
   });
 });

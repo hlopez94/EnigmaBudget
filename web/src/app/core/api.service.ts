@@ -74,9 +74,9 @@ export class ApiService {
     this.csrfToken = session.csrfToken;
     return session;
   }
-  async signInDevelopment(): Promise<SessionInfo> {
+  async signInDevelopment(key?: string): Promise<SessionInfo> {
     if (!this.csrfToken) await this.session();
-    await this.mutate<void>('/api/auth/development', { method: 'POST', body: '{}' });
+    await this.mutate<void>('/api/auth/development', { method: 'POST', body: JSON.stringify(key ? { key } : {}) });
     return this.session();
   }
   signInGoogle(): void {

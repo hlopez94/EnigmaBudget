@@ -4,6 +4,7 @@ export interface SessionInfo {
   displayName: string | null;
   googleConfigured: boolean;
   developmentLoginEnabled: boolean;
+  developmentUsers: { key: string; displayName: string }[];
   csrfToken: string;
 }
 export type WorkspaceRole = 'Owner' | 'Admin' | 'Member' | 'Reader';

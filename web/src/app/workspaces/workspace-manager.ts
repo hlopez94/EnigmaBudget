@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, ChangeDetectorRef, Component, EventEmitter, Input, OnChanges, Output, SimpleChanges } from '@angular/core';
+import { ChangeDetectionStrategy, ChangeDetectorRef, Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChanges } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiProblem, ApiService } from '../core/api.service';
@@ -12,7 +12,7 @@ import { InvitationPreview, PersonalSharing, Workspace, WorkspaceInvitation, Wor
   styleUrl: './workspace-manager.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class WorkspaceManager implements OnChanges {
+export class WorkspaceManager implements OnChanges, OnInit {
   @Input() workspaces: Workspace[] = [];
   @Input() activeWorkspace: Workspace | null = null;
   @Input() personalWorkspaceId = '';
@@ -20,11 +20,14 @@ export class WorkspaceManager implements OnChanges {
   @Input() googleConfigured = false;
   @Input() switchBlocked = false;
   @Input() open = false;
+  @Input() contextGeneration = 0;
   @Input() pendingInviteToken: string | null = null;
   @Output() workspaceSelected = new EventEmitter<string>();
   @Output() workspacesChanged = new EventEmitter<void>();
   @Output() pendingInviteHandled = new EventEmitter<void>();
   @Output() workspaceUpdated = new EventEmitter<Workspace>();
+  @Output() busyChange = new EventEmitter<boolean>();
+  @Output() managerReady = new EventEmitter<WorkspaceManager>();
 
   householdName = '';
   memberRows: WorkspaceMember[] = [];
@@ -36,14 +39,24 @@ export class WorkspaceManager implements OnChanges {
   invitePreview: InvitationPreview | null = null;
   editName = '';
   busy = false;
+  loading = false;
   error = '';
   notice = '';
   private generation = 0;
+  private invitationIntent = '';
+  private invitationId = '';
+  private householdIntent = '';
+  private householdId = '';
 
   constructor(private readonly api: ApiService, private readonly cdr: ChangeDetectorRef) {}
 
+  ngOnInit(): void { this.managerReady.emit(this); }
+
   ngOnChanges(changes: SimpleChanges): void {
-    if (changes['activeWorkspace']) {
+    const workspaceChange = changes['activeWorkspace'];
+    if (changes['contextGeneration']) this.invalidateContext();
+    if (workspaceChange && workspaceChange.previousValue?.id !== workspaceChange.currentValue?.id) {
+      this.invalidateContext();
       this.memberRows = [];
       this.invites = [];
       this.sharing = [];
@@ -51,7 +64,23 @@ export class WorkspaceManager implements OnChanges {
       this.invitePreview = null;
       if (this.activeWorkspace) this.editName = this.activeWorkspace.name;
     }
-    if (this.open && (changes['open'] || changes['activeWorkspace'] || changes['pendingInviteToken'])) void this.load();
+    if (changes['open'] && !this.open) this.generation++;
+    if (this.open && (changes['open'] || workspaceChange || changes['pendingInviteToken'])) void this.load();
+  }
+
+  hasPendingDraft(): boolean {
+    return !!(this.householdName.trim() || this.inviteEmail.trim() || (this.activeWorkspace && this.editName.trim() !== this.activeWorkspace.name));
+  }
+
+  invalidateContext(): void {
+    this.generation++;
+    this.householdName = '';
+    this.inviteEmail = '';
+    this.editName = this.activeWorkspace?.name ?? '';
+    this.shareUrl = null;
+    this.error = '';
+    this.notice = '';
+    this.cdr.markForCheck();
   }
 
   get canManageMembers(): boolean { return !!this.activeWorkspace?.permissions.manageMembers && !this.activeWorkspace?.isArchived; }
@@ -78,29 +107,44 @@ export class WorkspaceManager implements OnChanges {
 
   async createHousehold(): Promise<void> {
     if (this.busy || !this.householdName.trim()) return;
-    this.busy = true; this.error = ''; this.notice = ''; this.cdr.markForCheck();
+    const name = this.householdName.trim();
+    const revision = this.generation;
+    if (this.householdIntent !== name) { this.householdIntent = name; this.householdId = crypto.randomUUID(); }
+    this.setBusy(true); this.error = ''; this.notice = '';
+    let createdWorkspace: Workspace | null = null;
     try {
-      const created = await this.api.createWorkspace({ id: crypto.randomUUID(), kind: 'Household', name: this.householdName.trim() });
+      const created = await this.api.createWorkspace({ id: this.householdId, kind: 'Household', name });
+      this.householdIntent = ''; this.householdId = '';
+      if (revision !== this.generation) return;
       this.householdName = '';
       this.workspacesChanged.emit();
-      this.workspaceSelected.emit(created.id);
+      createdWorkspace = created;
+    } catch (error) { if (revision === this.generation) this.showError(error); }
+    finally { this.setBusy(false); }
+    if (createdWorkspace && revision === this.generation) {
+      this.workspaceSelected.emit(createdWorkspace.id);
       this.notice = 'Hogar creado. Esto no activa ni confirma una suscripción.';
-    } catch (error) { this.showError(error); }
-    finally { this.busy = false; this.cdr.markForCheck(); }
+    }
   }
 
   async invite(): Promise<void> {
     const workspace = this.activeWorkspace;
     if (!workspace || !this.canManageMembers || !this.inviteEmail.trim() || this.busy) return;
-    this.busy = true; this.error = ''; this.shareUrl = null; this.notice = ''; this.cdr.markForCheck();
+    const email = this.inviteEmail.trim();
+    const intent = `${workspace.id}\n${email}\n${this.inviteRole}`;
+    const revision = this.generation;
+    if (this.invitationIntent !== intent) { this.invitationIntent = intent; this.invitationId = crypto.randomUUID(); }
+    this.setBusy(true); this.error = ''; this.shareUrl = null; this.notice = '';
     try {
-      const invitation = await this.api.createInvitation(workspace.id, { id: crypto.randomUUID(), email: this.inviteEmail.trim(), role: this.inviteRole });
+      const invitation = await this.api.createInvitation(workspace.id, { id: this.invitationId, email, role: this.inviteRole });
+      this.invitationIntent = ''; this.invitationId = '';
+      if (revision !== this.generation || this.activeWorkspace?.id !== workspace.id) return;
       this.invites = [invitation, ...this.invites.filter(item => item.id !== invitation.id)];
       this.shareUrl = invitation.shareUrl;
       this.inviteEmail = '';
       this.notice = this.shareUrl ? 'Enlace creado. Copialo ahora; si lo perdés, revocá la invitación y creá otra.' : 'La invitación ya existía y el enlace de un solo uso no se puede recuperar. Revocala y creá otra si se perdió.';
-    } catch (error) { this.showError(error); }
-    finally { this.busy = false; this.cdr.markForCheck(); }
+    } catch (error) { if (revision === this.generation) this.showError(error); }
+    finally { this.setBusy(false); }
   }
 
   async copyInvite(): Promise<void> {
@@ -147,7 +191,13 @@ export class WorkspaceManager implements OnChanges {
   async saveWorkspace(): Promise<void> {
     const workspace = this.activeWorkspace;
     if (!workspace?.permissions.manageResources || !this.editName.trim()) return;
-    await this.mutate(async () => { await this.api.updateWorkspace(workspace.id, { version: workspace.version, name: this.editName.trim(), isArchived: workspace.isArchived }); });
+    const name = this.editName.trim();
+    await this.mutate(async () => {
+      const latest = await this.api.workspace(workspace.id);
+      if (latest.id !== this.activeWorkspace?.id) return;
+      this.workspaceUpdated.emit(latest);
+      await this.api.updateWorkspace(workspace.id, { version: latest.version, name, isArchived: latest.isArchived });
+    });
   }
 
   async toggleArchive(): Promise<void> {
@@ -155,7 +205,13 @@ export class WorkspaceManager implements OnChanges {
     if (!workspace?.permissions.manageResources) return;
     const verb = workspace.isArchived ? 'restaurar' : 'archivar';
     if (!window.confirm(`¿${verb} ${workspace.name}? ${workspace.isArchived ? 'Volverá a permitir actividad según sus permisos.' : 'El historial se conservará y las finanzas quedarán en solo lectura.'}`)) return;
-    await this.mutate(async () => { await this.api.updateWorkspace(workspace.id, { version: workspace.version, name: this.editName.trim() || workspace.name, isArchived: !workspace.isArchived }); });
+    const name = this.editName.trim() || workspace.name;
+    await this.mutate(async () => {
+      const latest = await this.api.workspace(workspace.id);
+      if (latest.id !== this.activeWorkspace?.id) return;
+      this.workspaceUpdated.emit(latest);
+      await this.api.updateWorkspace(workspace.id, { version: latest.version, name, isArchived: !latest.isArchived });
+    });
   }
 
   async toggleSharing(item: PersonalSharing): Promise<void> {
@@ -166,21 +222,28 @@ export class WorkspaceManager implements OnChanges {
   async acceptInvite(): Promise<void> {
     if (!this.pendingInviteToken || !this.invitePreview || this.busy) return;
     const token = this.pendingInviteToken;
-    this.busy = true; this.error = ''; this.cdr.markForCheck();
+    const revision = this.generation;
+    this.setBusy(true); this.error = '';
+    let acceptedWorkspace: Workspace | null = null;
     try {
       const workspace = await this.api.acceptInvitation(token);
+      if (revision !== this.generation) return;
       this.api.clearPendingInvitation();
       this.invitePreview = null;
       this.pendingInviteHandled.emit();
       await this.loadSpaces();
-      this.workspaceSelected.emit(workspace.id);
-      this.notice = `Te sumaste a ${workspace.name}. Elegí ese espacio para continuar.`;
-    } catch (error) { this.showError(error); }
-    finally { this.busy = false; this.cdr.markForCheck(); }
+      acceptedWorkspace = workspace;
+    } catch (error) { if (revision === this.generation) this.showError(error); }
+    finally { this.setBusy(false); }
+    if (acceptedWorkspace && revision === this.generation) {
+      this.workspaceSelected.emit(acceptedWorkspace.id);
+      this.notice = `Te sumaste a ${acceptedWorkspace.name}. Elegí ese espacio para continuar.`;
+    }
   }
 
   private async load(): Promise<void> {
     const generation = ++this.generation;
+    this.loading = true;
     this.error = ''; this.notice = '';
     const workspace = this.activeWorkspace;
     try {
@@ -206,19 +269,25 @@ export class WorkspaceManager implements OnChanges {
         if (error instanceof ApiProblem && (error.status === 403 || error.status === 404)) this.workspacesChanged.emit();
         this.showError(error);
       }
+    } finally {
+      if (generation === this.generation) {
+        this.loading = false;
+        this.cdr.markForCheck();
+      }
     }
-    if (generation === this.generation) this.cdr.markForCheck();
   }
 
   private async mutate(action: () => Promise<void>): Promise<void> {
-    this.busy = true; this.error = ''; this.notice = ''; this.cdr.markForCheck();
+    const revision = this.generation;
+    this.setBusy(true); this.error = ''; this.notice = '';
     try {
       await action();
+      if (revision !== this.generation) return;
       await this.loadSpaces();
       this.notice = 'Cambios guardados.';
       await this.load();
-    } catch (error) { this.showError(error); }
-    finally { this.busy = false; this.cdr.markForCheck(); }
+    } catch (error) { if (revision === this.generation) this.showError(error); }
+    finally { this.setBusy(false); }
   }
 
   private async loadSpaces(): Promise<void> { this.workspacesChanged.emit(); }
@@ -228,5 +297,6 @@ export class WorkspaceManager implements OnChanges {
     else if (error instanceof ApiProblem && (error.status === 403 || error.status === 404)) this.error = 'El acceso cambió o el espacio ya no está disponible. Actualizá los espacios y elegí uno disponible.';
     else this.error = error instanceof Error ? error.message : 'No pudimos completar la acción.';
   }
+  private setBusy(value: boolean): void { this.busy = value; this.busyChange.emit(value); this.cdr.markForCheck(); }
   private roleName(role: string): string { return role === 'Owner' ? 'Titular' : role === 'Admin' ? 'Administración' : role === 'Member' ? 'Integrante' : 'Solo lectura'; }
 }

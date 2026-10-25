@@ -72,6 +72,8 @@ export class FinanceShell implements OnInit, OnChanges {
   @ViewChildren(FinanceOperations) operationComponents!: QueryList<FinanceOperations>;
   @ViewChildren(FinanceCards) cardComponents!: QueryList<FinanceCards>;
   @ViewChildren(FinanceSharing) sharingComponents!: QueryList<FinanceSharing>;
+  @ViewChildren(WorkspaceManager) workspaceManagers!: QueryList<WorkspaceManager>;
+  private workspaceManagerInstance: WorkspaceManager | null = null;
 
   period = today().slice(0, 7);
   section: FinanceSection = 'home';
@@ -172,13 +174,16 @@ export class FinanceShell implements OnInit, OnChanges {
   get canReadGroups(): boolean { return !!this.permissions?.readGroups; }
   get canWrite(): boolean { return !!this.permissions?.recordFinance && !this.activeWorkspace?.isArchived; }
   get canManageResources(): boolean { return !!this.permissions?.manageResources && !this.activeWorkspace?.isArchived; }
-  get saving(): boolean { return [...(this.accountComponents?.toArray() ?? []), ...(this.operationComponents?.toArray() ?? []), ...(this.cardComponents?.toArray() ?? []), ...(this.sharingComponents?.toArray() ?? [])].some(component => component.saving); }
-  get hasPendingDraft(): boolean { return [...(this.accountComponents?.toArray() ?? []), ...(this.operationComponents?.toArray() ?? []), ...(this.cardComponents?.toArray() ?? []), ...(this.sharingComponents?.toArray() ?? [])].some(component => component.hasPendingDraft()); }
+  get saving(): boolean { return [...(this.accountComponents?.toArray() ?? []), ...(this.operationComponents?.toArray() ?? []), ...(this.cardComponents?.toArray() ?? []), ...(this.sharingComponents?.toArray() ?? [])].some(component => component.saving) || (this.workspaceManagers?.toArray() ?? []).some(component => component.busy); }
+  get hasPendingDraft(): boolean { return [...(this.accountComponents?.toArray() ?? []), ...(this.operationComponents?.toArray() ?? []), ...(this.cardComponents?.toArray() ?? []), ...(this.sharingComponents?.toArray() ?? [])].some(component => component.hasPendingDraft()) || (this.workspaceManagers?.toArray() ?? []).some(component => component.hasPendingDraft()); }
 
   private invalidateFinanceChildren(): void {
     this.workspaceGeneration++;
     [...(this.accountComponents?.toArray() ?? []), ...(this.operationComponents?.toArray() ?? []), ...(this.cardComponents?.toArray() ?? []), ...(this.sharingComponents?.toArray() ?? [])].forEach(component => component.invalidateContext());
+    this.workspaceManagerInstance?.invalidateContext();
   }
+
+  registerWorkspaceManager(manager: WorkspaceManager): void { this.workspaceManagerInstance = manager; }
 
   private emitWorkspaceSelection(id: string): void {
     this.invalidateFinanceChildren();
@@ -206,6 +211,11 @@ export class FinanceShell implements OnInit, OnChanges {
     const id = this.requestedWorkspaceId;
     this.requestedWorkspaceId = '';
     this.invalidateFinanceChildren();
+    if (id.startsWith('@section:')) {
+      this.section = id.slice('@section:'.length) as FinanceSection;
+      this.changeDetector.markForCheck();
+      return;
+    }
     if (id === 'setup') this.setupRequested.emit();
     else this.workspaceSelected.emit(id);
   }
@@ -234,6 +244,8 @@ export class FinanceShell implements OnInit, OnChanges {
       this.changeDetector.markForCheck();
     } else this.setupRequested.emit();
   }
+
+  managerBusyChanged(): void { this.changeDetector.markForCheck(); }
 
   money(amount: string, currency: 'ARS' | 'USD'): string {
     return formatMoney(amount, currency);

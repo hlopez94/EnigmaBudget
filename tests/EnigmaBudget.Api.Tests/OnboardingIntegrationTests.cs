@@ -13,6 +13,7 @@ using System.Text.Encodings.Web;
 using Npgsql;
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.EntityFrameworkCore;
@@ -137,6 +138,63 @@ public sealed class OnboardingIntegrationTests : IDisposable
     }
 
     [Fact]
+    public async Task Synthetic_development_picker_lists_only_configured_profiles_when_explicitly_enabled()
+    {
+        var config = new Dictionary<string, string?>
+        {
+            ["Authentication:DevelopmentLoginEnabled"] = "true",
+            ["Authentication:DevelopmentUsers:Users:0:Key"] = "alice",
+            ["Authentication:DevelopmentUsers:Users:0:Subject"] = "synthetic-alice-subject",
+            ["Authentication:DevelopmentUsers:Users:0:DisplayName"] = "Ana Prueba",
+            ["Authentication:DevelopmentUsers:Users:0:Email"] = "ana@example.test",
+        };
+        using var factory = new ApiFactory(extraConfiguration: config);
+        using var client = factory.CreateClient();
+        var sessionResponse = await client.GetAsync("/api/auth/session");
+        var sessionText = await sessionResponse.Content.ReadAsStringAsync();
+        using var sessionJson = JsonDocument.Parse(sessionText);
+        Assert.True(sessionJson.RootElement.GetProperty("developmentLoginEnabled").GetBoolean());
+        var developmentUsers = sessionJson.RootElement.GetProperty("developmentUsers");
+        Assert.Equal("alice", developmentUsers[0].GetProperty("key").GetString());
+        Assert.Equal("Ana Prueba", developmentUsers[0].GetProperty("displayName").GetString());
+        Assert.DoesNotContain("synthetic-alice-subject", sessionText, StringComparison.Ordinal);
+        Assert.DoesNotContain("ana@example.test", sessionText, StringComparison.Ordinal);
+
+        var csrf = (await sessionResponse.Content.ReadFromJsonAsync<Session>())!.CsrfToken;
+        var login = new HttpRequestMessage(HttpMethod.Post, "/api/auth/development") { Content = JsonContent.Create(new { key = "alice" }) };
+        login.Headers.Add("X-CSRF-TOKEN", csrf);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.SendAsync(login)).StatusCode);
+        var authenticatedSession = await client.GetFromJsonAsync<JsonElement>("/api/auth/session");
+        Assert.Equal("Ana Prueba", authenticatedSession.GetProperty("displayName").GetString());
+        csrf = authenticatedSession.GetProperty("csrfToken").GetString()!;
+
+        var unknown = new HttpRequestMessage(HttpMethod.Post, "/api/auth/development") { Content = JsonContent.Create(new { key = "not-configured" }) };
+        unknown.Headers.Add("X-CSRF-TOKEN", csrf);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.SendAsync(unknown)).StatusCode);
+
+        using var production = factory.CreateProductionFactory();
+        using var productionClient = production.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false, BaseAddress = new Uri("https://localhost") });
+        var productionSession = await productionClient.GetAsync("/api/auth/session");
+        var productionText = await productionSession.Content.ReadAsStringAsync();
+        Assert.Contains("\"developmentUsers\":[]", productionText, StringComparison.Ordinal);
+        var productionCsrf = (await productionSession.Content.ReadFromJsonAsync<Session>())!.CsrfToken;
+        var productionLogin = new HttpRequestMessage(HttpMethod.Post, "/api/auth/development") { Content = JsonContent.Create(new { key = "alice" }) };
+        productionLogin.Headers.Add("X-CSRF-TOKEN", productionCsrf);
+        Assert.Equal(HttpStatusCode.NotFound, (await productionClient.SendAsync(productionLogin)).StatusCode);
+
+        config["Authentication:DevelopmentLoginEnabled"] = "false";
+        using var disabledFactory = new ApiFactory(extraConfiguration: config);
+        using var disabledClient = disabledFactory.CreateClient();
+        var disabledSession = await disabledClient.GetAsync("/api/auth/session");
+        var disabledText = await disabledSession.Content.ReadAsStringAsync();
+        Assert.Contains("\"developmentUsers\":[]", disabledText, StringComparison.Ordinal);
+        var disabledCsrf = (await disabledSession.Content.ReadFromJsonAsync<Session>())!.CsrfToken;
+        var disabledLogin = new HttpRequestMessage(HttpMethod.Post, "/api/auth/development") { Content = JsonContent.Create(new { key = "alice" }) };
+        disabledLogin.Headers.Add("X-CSRF-TOKEN", disabledCsrf);
+        Assert.Equal(HttpStatusCode.NotFound, (await disabledClient.SendAsync(disabledLogin)).StatusCode);
+    }
+
+    [Fact]
     public async Task Confirmation_is_idempotent_and_preserves_currency_and_amounts()
     {
         using var client = await _factory.AuthenticatedClientAsync();
@@ -157,6 +215,53 @@ public sealed class OnboardingIntegrationTests : IDisposable
         Assert.Equal("987.65", accounts!.Single(x => x.Currency == "USD").OpeningBalance);
         Assert.Equal("12.34", Assert.Single(cards!).StatementDebtArs);
         Assert.Equal("56.78", cards![0].StatementDebtUsd);
+    }
+
+    [Fact]
+    public async Task Archived_personal_cannot_complete_a_saved_onboarding_draft()
+    {
+        using var client = await _factory.AuthenticatedClientAsync();
+        var account = new AccountInput(Guid.NewGuid(), "Apertura archivada", "Banco", "ARS", "250.00", "2026-10-01");
+        var saved = await client.PutAsJsonAsync("/api/onboarding", new SaveRequest(0, [account], []));
+        Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
+        var version = (await saved.Content.ReadFromJsonAsync<State>())!.Version;
+
+        await using (var db = new EnigmaBudget.Api.Data.AppDbContext(new DbContextOptionsBuilder<EnigmaBudget.Api.Data.AppDbContext>().UseNpgsql(_factory.TestConnection).Options))
+        {
+            var workspace = await db.Workspaces.SingleAsync();
+            workspace.IsArchived = true;
+            await db.SaveChangesAsync();
+        }
+
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.PutAsJsonAsync("/api/onboarding", new SaveRequest(version, [], []))).StatusCode);
+        var response = await client.PostAsJsonAsync("/api/onboarding/complete", new { version });
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Empty(await client.GetFromJsonAsync<AccountSummary[]>("/api/accounts") ?? []);
+    }
+
+    [Fact]
+    public async Task Archived_personal_keeps_idempotent_replay_of_an_already_completed_draft()
+    {
+        using var client = await _factory.AuthenticatedClientAsync();
+        var account = new AccountInput(Guid.NewGuid(), "Apertura confirmada", "Banco", "ARS", "250.00", "2026-10-01");
+        var saved = await client.PutAsJsonAsync("/api/onboarding", new SaveRequest(0, [account], []));
+        Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
+        var version = (await saved.Content.ReadFromJsonAsync<State>())!.Version;
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/api/onboarding/complete", new { version })).StatusCode);
+
+        await using (var db = new EnigmaBudget.Api.Data.AppDbContext(new DbContextOptionsBuilder<EnigmaBudget.Api.Data.AppDbContext>().UseNpgsql(_factory.TestConnection).Options))
+        {
+            var workspace = await db.Workspaces.SingleAsync();
+            workspace.IsArchived = true;
+            await db.SaveChangesAsync();
+        }
+
+        var replay = await client.PostAsJsonAsync("/api/onboarding/complete", new { version });
+        Assert.Equal(HttpStatusCode.OK, replay.StatusCode);
+        Assert.True((await replay.Content.ReadFromJsonAsync<State>())!.Completed);
+        var accounts = await client.GetFromJsonAsync<AccountSummary[]>("/api/accounts");
+        Assert.Equal("250.00", Assert.Single(accounts!).OpeningBalance);
     }
 
     [Fact]

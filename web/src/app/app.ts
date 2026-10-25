@@ -1,4 +1,4 @@
-import { ChangeDetectorRef, Component, OnInit, Optional } from '@angular/core';
+import { ChangeDetectorRef, Component, HostListener, OnInit, Optional } from '@angular/core';
 import { OnboardingState, SessionInfo, Workspace } from './core/api.models';
 import { ApiService } from './core/api.service';
 import { WorkspaceContext } from './core/workspace-context';
@@ -35,6 +35,14 @@ export class App implements OnInit {
   async ngOnInit(): Promise<void> {
     this.pendingInviteToken = this.api.capturePendingInvitation();
     await this.load();
+  }
+  @HostListener('window:hashchange')
+  captureInviteLink(): void {
+    const token = this.api.capturePendingInvitation();
+    if (token !== this.pendingInviteToken) {
+      this.pendingInviteToken = token;
+      this.changeDetector.markForCheck();
+    }
   }
   async load(): Promise<void> {
     this.busy = true;
