@@ -20,7 +20,7 @@ Estado inicial auditado el 25/10/2026: rama `codex/rebuild-net10-angular22`, bas
 | Chanchitos/ahorros | Pendiente | Reservas respaldadas por cuentas, aportes/retiros, metas/fecha estimada, sin doble reserva ni gasto ficticio |
 | Proyección/disponibilidad | Pendiente | Calendario único de obligaciones/cobros, escenarios, reservas, saldo mínimo y explicación sin sumar deuda+resumen |
 | DolarAPI | Pendiente | Consulta real, tipo/compra/venta/fecha visibles, caché y errores; sin cambiar importes históricos ni mezclar monedas |
-| Tenants y RBAC | Núcleo de API implementado y revisado: Personal/Hogar, usuarios/membresías, roles, selección autorizada, auditoría y cambios de integrantes coordinados. Migración probada con historial previo; suite completa de 54 pruebas antes del último ajuste y 10 focalizadas después (`73162f6`). Aún sin interfaz ni invitaciones. | Invitaciones con límite atómico de cuatro plazas, privacidad opt-in, selector y gestión visibles, aceptación real con varios usuarios y publicación local |
+| Tenants y RBAC | Núcleo de API implementado y revisado: Personal/Hogar, usuarios/membresías, roles, selección autorizada, auditoría y cambios de integrantes coordinados. Migración probada con historial previo; CI de `17717a1` aprobó 55 pruebas API, 31 web y tres recorridos reales. Aún sin interfaz ni invitaciones. | Invitaciones con límite atómico de cuatro plazas, privacidad opt-in, selector y gestión visibles, aceptación real con varios usuarios y publicación local |
 | Privacidad personal | Aislamiento personal existente; compartir pendiente | Consentimiento opcional revocable; hogar/grupo no concede acceso privado implícito |
 | Hogar/caja común | Pendiente | Aportes, adelantos, presupuesto/reparto mensual, cierre/arrastre y trazabilidad entre cuentas |
 | Grupos independientes | Base manual de tarjeta; colaboración pendiente | Independientes del hogar, beneficiarios y pagadores, deudas por moneda, liquidación y reclamo de historial con confirmación |
@@ -35,7 +35,7 @@ Estado inicial auditado el 25/10/2026: rama `codex/rebuild-net10-angular22`, bas
 ## Orden de ejecución
 
 1. Rediseño móvil de todos los módulos ya operativos y publicación visual local.
-2. Fecha argentina común y migración de tenants/membresías/RBAC conservando identidades, IDs e historial personal.
+2. Fecha argentina común y migración de tenants/membresías/RBAC conservando identidades, IDs e historial personal. Antes de cerrar la base de identidad, comprobar un corte temprano de acceso y retorno de enlaces Android; el empaquetado completo sigue en la etapa final, pero esa compatibilidad no se posterga.
 3. Ahorros/reservas, proyección y DolarAPI; categorías, presupuestos, recurrencias/servicios, devoluciones y préstamos; completar detalles históricos de tarjetas.
 4. Hogar/caja común/privacidad y colaboración de grupos independientes sobre la autorización común.
 5. Archivos privados, exportaciones e importaciones con revisión.
@@ -53,3 +53,7 @@ Angular 22/OptimusUI 2, .NET 10, PostgreSQL, un solo host. Sin Ionic. S3 compati
 - 25/10/2026: el usuario confirma que una suscripción Hogar incluye las funciones personales de sus cuatro integrantes y el espacio familiar compartido. Esto no comparte sus datos personales: el consentimiento de lectura sigue siendo opcional y revocable. El máximo de cuatro incluye al propietario.
 - Los cobros de compras compartidas se calculan cuota por cuota según cada mes, como ya fue confirmado. La deuda completa frente al emisor sigue siendo del titular; esta decisión no está abierta.
 - Se anticipa la autorización común antes de nuevos módulos compartidos para evitar repetir resolutores de propietario y migrar fondos/historial dos veces. Es organización de implementación; no elimina módulos ni cambia el alcance.
+
+## Hallazgo temprano Android
+
+La revisión técnica del 25/10/2026 identificó que la app Angular empaquetada tiene un origen distinto de la API y no hereda la sesión del navegador del sistema. Capacitor mínimo y el host único siguen siendo las restricciones. El siguiente corte deberá probar Google y una operación autenticada en Android, sin usar la opción de recarga remota como solución de producción. Aún no existe código Android, ni prueba real de Google o dispositivo; no se declara ese requisito completado. Referencias primarias: [Google/Credential Manager](https://developer.android.com/identity/sign-in/credential-manager-siwg-implementation), [configuración de Capacitor](https://capacitorjs.com/docs/configuration).
