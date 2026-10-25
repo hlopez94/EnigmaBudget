@@ -223,6 +223,38 @@ test('real Alice, Bob and Reader contexts enforce Household scope, personal cons
   const readerAccepted = waitForApi(reader, 'POST', '/api/invitations/accept');
   await reader.getByRole('button', { name: 'Aceptar invitación' }).click();
   expect((await readerAccepted).status()).toBe(200);
+  const readerWriteAttempt = await reader.evaluate(async ({ householdId, period, date }) => {
+    const workspaceHeaders = { 'X-Workspace-Id': householdId };
+    const beforeFinanceResponse = await fetch(`/api/finance?period=${period}`, { headers: workspaceHeaders });
+    const beforeOperationsResponse = await fetch('/api/operations', { headers: workspaceHeaders });
+    const beforeFinance = await beforeFinanceResponse.json();
+    const beforeOperations = await beforeOperationsResponse.json();
+    const account = beforeFinance.accounts[0];
+    const session = await (await fetch('/api/auth/session')).json();
+    const denied = await fetch('/api/operations', {
+      method: 'POST',
+      headers: { ...workspaceHeaders, 'Content-Type': 'application/json', 'X-CSRF-TOKEN': session.csrfToken },
+      body: JSON.stringify({ id: crypto.randomUUID(), kind: 'Expense', accountId: account.id, date, description: 'Intento de Reader bloqueado', category: 'Prueba', amount: '50.00', paid: false }),
+    });
+    const afterFinance = await (await fetch(`/api/finance?period=${period}`, { headers: workspaceHeaders })).json();
+    const afterOperations = await (await fetch('/api/operations', { headers: workspaceHeaders })).json();
+    return {
+      financeReadStatus: beforeFinanceResponse.status,
+      ledgerReadStatus: beforeOperationsResponse.status,
+      writeStatus: denied.status,
+      beforeBalance: account.currentBalance,
+      afterBalance: afterFinance.accounts.find((item: { id: string }) => item.id === account.id)?.currentBalance,
+      beforeOperations: beforeOperations.length,
+      afterOperations: afterOperations.length,
+      rejectedDescriptionPresent: afterOperations.some((item: { description: string }) => item.description === 'Intento de Reader bloqueado'),
+    };
+  }, { householdId: household.id, period: month, date });
+  expect(readerWriteAttempt.financeReadStatus).toBe(200);
+  expect(readerWriteAttempt.ledgerReadStatus).toBe(200);
+  expect(readerWriteAttempt.writeStatus).toBe(403);
+  expect(readerWriteAttempt.afterBalance).toBe(readerWriteAttempt.beforeBalance);
+  expect(readerWriteAttempt.afterOperations).toBe(readerWriteAttempt.beforeOperations);
+  expect(readerWriteAttempt.rejectedDescriptionPresent).toBe(false);
 
   await alice.getByLabel('Cambiar espacio').first().selectOption({ label: 'Mi espacio Personal' });
   await openSpaces(alice);
@@ -261,6 +293,16 @@ test('real Alice, Bob and Reader contexts enforce Household scope, personal cons
   const stillPrivateAfterRejoin = await reader.evaluate(async (workspaceId) => fetch('/api/finance?period=2026-10', { headers: { 'X-Workspace-Id': workspaceId } }).then(response => response.status), sharedPersonal.workspaceId);
   expect(stillPrivateAfterRejoin).toBe(404);
 
+  await alice.getByLabel('Cambiar espacio').first().selectOption({ label: 'Mi espacio Personal' });
+  await openSpaces(alice);
+  await expect(alice.getByRole('button', { name: 'Compartir con integrantes actuales' })).toBeVisible();
+  const restoredConsent = waitForApi(alice, 'PUT', `/api/personal-sharing/${household.id}`);
+  await alice.getByRole('button', { name: 'Compartir con integrantes actuales' }).click();
+  expect((await restoredConsent).status()).toBe(200);
+  const readerPersonalRestored = await reader.evaluate(async (workspaceId) => fetch('/api/finance?period=2026-10', { headers: { 'X-Workspace-Id': workspaceId } }).then(response => response.status), sharedPersonal.workspaceId);
+  expect(readerPersonalRestored).toBe(200);
+
+  await alice.getByLabel('Cambiar espacio').first().selectOption({ label: 'Casa de Ana · Titular' });
   await openSpaces(alice);
   alice.on('dialog', dialog => dialog.accept());
   const archived = waitForApi(alice, 'PUT', `/api/workspaces/${household.id}`);
@@ -277,6 +319,15 @@ test('real Alice, Bob and Reader contexts enforce Household scope, personal cons
     return response.status;
   }, { householdId: household.id, period: month });
   expect(archivedWrite).toBe(403);
+
+  await alice.getByLabel('Cambiar espacio').first().selectOption({ label: 'Mi espacio Personal' });
+  await openSpaces(alice);
+  await expect(alice.getByRole('button', { name: 'Revocar acceso' })).toBeVisible();
+  const archivedRevocation = waitForApi(alice, 'PUT', `/api/personal-sharing/${household.id}`);
+  await alice.getByRole('button', { name: 'Revocar acceso' }).click();
+  expect((await archivedRevocation).status()).toBe(200);
+  const revokedArchivedReader = await reader.evaluate(async (workspaceId) => fetch('/api/finance?period=2026-10', { headers: { 'X-Workspace-Id': workspaceId } }).then(response => response.status), sharedPersonal.workspaceId);
+  expect(revokedArchivedReader).toBe(404);
 
   await openSpaces(reader);
   await expect(reader.getByRole('button', { name: 'Salir del Hogar' })).toBeVisible();
@@ -303,4 +354,53 @@ test('real Alice, Bob and Reader contexts enforce Household scope, personal cons
 
   await bobContext.close();
   await readerContext.close();
+});
+
+test('mobile workspace header stays readable and in bounds at 360 and 390 px', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await signInAs(page, 'alice');
+  await openMore(page);
+  await expect(page.locator('.more-screen')).toBeVisible();
+  await page.locator('.more-screen').getByRole('button', { name: /Hogares, integrantes y privacidad/ }).click();
+  await expect(page.locator('.create-space')).toBeVisible();
+  const title = page.getByRole('heading', { name: 'Espacios y privacidad' });
+  await expect(title).toBeVisible();
+
+  for (const width of [360, 390]) {
+    await page.setViewportSize({ width, height: 844 });
+    const geometry = await page.locator('.workspace-heading').evaluate((header) => {
+      const box = (element: Element) => {
+        const rect = element.getBoundingClientRect();
+        return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom, width: rect.width, height: rect.height };
+      };
+      const titleBlock = header.querySelector<HTMLElement>(':scope > div:first-child')!;
+      const workspace = header.querySelector<HTMLSelectElement>('.workspace-picker select')!;
+      const period = header.querySelector<HTMLInputElement>('.period-picker input')!;
+      return {
+        viewport: window.innerWidth,
+        documentWidth: document.documentElement.scrollWidth,
+        titleBlock: box(titleBlock),
+        title: box(titleBlock.querySelector('h1')!),
+        workspace: box(workspace),
+        workspaceFont: Number.parseFloat(getComputedStyle(workspace).fontSize),
+        period: box(period),
+      };
+    });
+    expect(geometry.documentWidth, JSON.stringify(geometry)).toBeLessThanOrEqual(width);
+    expect(geometry.titleBlock.width, JSON.stringify(geometry)).toBeGreaterThanOrEqual(width - 48);
+    expect(geometry.title.width, JSON.stringify(geometry)).toBeGreaterThan(0);
+    expect(geometry.titleBlock.bottom, JSON.stringify(geometry)).toBeLessThanOrEqual(geometry.workspace.top);
+    expect(geometry.workspace.bottom, JSON.stringify(geometry)).toBeLessThanOrEqual(geometry.period.top);
+    expect(geometry.workspace.height, JSON.stringify(geometry)).toBeGreaterThanOrEqual(44);
+    expect(geometry.workspace.width, JSON.stringify(geometry)).toBeGreaterThanOrEqual(width - 48);
+    expect(geometry.workspaceFont, JSON.stringify(geometry)).toBeGreaterThanOrEqual(16);
+    expect(geometry.period.height, JSON.stringify(geometry)).toBeGreaterThanOrEqual(44);
+    expect(geometry.period.width, JSON.stringify(geometry)).toBeGreaterThanOrEqual(140);
+    for (const control of [geometry.titleBlock, geometry.workspace, geometry.period]) {
+      expect(control.left, JSON.stringify(geometry)).toBeGreaterThanOrEqual(0);
+      expect(control.right, JSON.stringify(geometry)).toBeLessThanOrEqual(width);
+    }
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: resolve(process.cwd(), '../work/task4-workspaces-mobile-390.png'), fullPage: true });
 });

@@ -47,6 +47,7 @@ export class WorkspaceManager implements OnChanges, OnInit {
   private invitationId = '';
   private householdIntent = '';
   private householdId = '';
+  private editNameBaseline = '';
 
   constructor(private readonly api: ApiService, private readonly cdr: ChangeDetectorRef) {}
 
@@ -62,7 +63,13 @@ export class WorkspaceManager implements OnChanges, OnInit {
       this.sharing = [];
       this.shareUrl = null;
       this.invitePreview = null;
-      if (this.activeWorkspace) this.editName = this.activeWorkspace.name;
+      if (this.activeWorkspace) {
+        this.editName = this.activeWorkspace.name;
+        this.editNameBaseline = this.activeWorkspace.name;
+      }
+    } else if (workspaceChange && this.activeWorkspace && this.editName === this.editNameBaseline) {
+      this.editName = this.activeWorkspace.name;
+      this.editNameBaseline = this.activeWorkspace.name;
     }
     if (changes['open'] && !this.open) this.generation++;
     if (this.open && (changes['open'] || workspaceChange || changes['pendingInviteToken'])) void this.load();
@@ -77,6 +84,7 @@ export class WorkspaceManager implements OnChanges, OnInit {
     this.householdName = '';
     this.inviteEmail = '';
     this.editName = this.activeWorkspace?.name ?? '';
+    this.editNameBaseline = this.activeWorkspace?.name ?? '';
     this.shareUrl = null;
     this.error = '';
     this.notice = '';
@@ -195,8 +203,11 @@ export class WorkspaceManager implements OnChanges, OnInit {
     await this.mutate(async () => {
       const latest = await this.api.workspace(workspace.id);
       if (latest.id !== this.activeWorkspace?.id) return;
-      this.workspaceUpdated.emit(latest);
-      await this.api.updateWorkspace(workspace.id, { version: latest.version, name, isArchived: latest.isArchived });
+      if (latest.name !== this.editNameBaseline) throw new Error('El espacio cambió mientras editabas. No guardamos los cambios; actualizá y revisá el nombre.');
+      const updated = await this.api.updateWorkspace(workspace.id, { version: latest.version, name, isArchived: latest.isArchived });
+      this.editName = updated.name;
+      this.editNameBaseline = updated.name;
+      this.workspaceUpdated.emit(updated);
     });
   }
 
@@ -209,8 +220,11 @@ export class WorkspaceManager implements OnChanges, OnInit {
     await this.mutate(async () => {
       const latest = await this.api.workspace(workspace.id);
       if (latest.id !== this.activeWorkspace?.id) return;
-      this.workspaceUpdated.emit(latest);
-      await this.api.updateWorkspace(workspace.id, { version: latest.version, name, isArchived: !latest.isArchived });
+      if (latest.name !== workspace.name || latest.isArchived !== workspace.isArchived) throw new Error('El espacio cambió mientras confirmabas. No aplicamos el cambio; actualizá y revisá su estado.');
+      const updated = await this.api.updateWorkspace(workspace.id, { version: latest.version, name, isArchived: !workspace.isArchived });
+      this.editName = updated.name;
+      this.editNameBaseline = updated.name;
+      this.workspaceUpdated.emit(updated);
     });
   }
 

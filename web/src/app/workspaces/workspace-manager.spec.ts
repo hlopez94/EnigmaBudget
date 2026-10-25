@@ -102,4 +102,41 @@ describe('workspace management permissions', () => {
     expect(manager.inviteEmail).toBe('person@example.test');
     expect(manager.editName).toBe('Nombre nuevo');
   });
+
+  it('does not overwrite a Household name changed by another administrator', async () => {
+    const household = {
+      ...readerPersonal, id: 'household', name: 'Casa original', kind: 'Household' as const, role: 'Owner' as const,
+      permissions: { ...readerPersonal.permissions, manageResources: true },
+    };
+    const latest = { ...household, name: 'Nombre de otra administradora', version: 2 };
+    const api = { workspace: vi.fn().mockResolvedValue(latest), updateWorkspace: vi.fn().mockResolvedValue(undefined) };
+    const manager = new WorkspaceManager(api as unknown as ApiService, { markForCheck: vi.fn() } as never);
+    manager.activeWorkspace = household;
+    manager.invalidateContext();
+    manager.editName = 'Nombre obsoleto';
+
+    await manager.saveWorkspace();
+
+    expect(api.updateWorkspace).not.toHaveBeenCalled();
+    expect(manager.error).toContain('cambió');
+  });
+
+  it('does not undo an archive change made after the owner confirmation opened', async () => {
+    const household = {
+      ...readerPersonal, id: 'household', name: 'Casa original', kind: 'Household' as const, role: 'Owner' as const,
+      isArchived: false, permissions: { ...readerPersonal.permissions, manageResources: true },
+    };
+    const latest = { ...household, isArchived: true, version: 2 };
+    const api = { workspace: vi.fn().mockResolvedValue(latest), updateWorkspace: vi.fn().mockResolvedValue(undefined) };
+    const manager = new WorkspaceManager(api as unknown as ApiService, { markForCheck: vi.fn() } as never);
+    manager.activeWorkspace = household;
+    manager.invalidateContext();
+    vi.stubGlobal('confirm', () => true);
+
+    await manager.toggleArchive();
+
+    expect(api.updateWorkspace).not.toHaveBeenCalled();
+    expect(manager.error).toContain('cambió');
+    vi.unstubAllGlobals();
+  });
 });
