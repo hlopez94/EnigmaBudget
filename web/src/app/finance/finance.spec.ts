@@ -448,6 +448,49 @@ describe('finance workspace regressions', () => {
     expect(shell.overview?.period).toBe('2026-11');
   });
 
+  it('formats valid ISO months and suppresses empty or malformed captions safely', async () => {
+    const shell = new (await import('./finance-shell')).FinanceShell(
+      {} as ApiService,
+      { markForCheck: vi.fn() } as unknown as import('@angular/core').ChangeDetectorRef,
+    );
+
+    shell.period = '2026-01';
+    expect(shell.periodLabel).toBe('enero 2026');
+    shell.period = '2026-12';
+    expect(shell.periodLabel).toBe('diciembre 2026');
+    shell.period = '0099-01';
+    expect(shell.periodLabel).toBe('enero 0099');
+
+    for (const invalid of ['', '2026-00', '2026-13', '2026/01', 'abc']) {
+      shell.period = invalid;
+      expect(() => shell.periodLabel).not.toThrow();
+      expect(shell.periodLabel).toBe('');
+    }
+  });
+
+  it('rejects invalid periods before requesting finance data and preserves the applied overview', async () => {
+    const api = {
+      workspace: vi.fn().mockResolvedValue({ id: 'personal' }),
+      financeOverview: vi.fn(),
+    };
+    const shell = new (await import('./finance-shell')).FinanceShell(
+      api as unknown as ApiService,
+      { markForCheck: vi.fn() } as unknown as import('@angular/core').ChangeDetectorRef,
+    );
+    const appliedOverview = { period: '2026-10', marker: 'last-good-response' };
+    shell.activeWorkspace = { id: 'personal' } as never;
+    shell.overview = appliedOverview as never;
+
+    for (const invalid of ['', '2026-00', '2026-13', '2026/01', 'abc']) {
+      shell.period = invalid;
+      await shell.changePeriod();
+      expect(shell.error).toMatch(/período válido/i);
+      expect(shell.overview).toBe(appliedOverview);
+      expect(api.workspace).not.toHaveBeenCalled();
+      expect(api.financeOverview).not.toHaveBeenCalled();
+    }
+  });
+
   it('keeps an open account action and reuses its request ID after a failed save', async () => {
     const api = {
       createAccount: vi

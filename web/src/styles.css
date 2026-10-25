@@ -554,7 +554,7 @@ body .finance-action-dialog .form-grid label.check input[type='checkbox'] {
 .shell app-finance-shell .workspace .finance-row-icon.warm{background:#f4eee4;color:#796448}
 .shell app-finance-shell .workspace .finance-row-label{min-width:0}
 .shell app-finance-shell .workspace .finance-row-label b{display:block;font-size:14px;font-weight:600;line-height:1.3;overflow-wrap:anywhere}
-.shell app-finance-shell .workspace .finance-row-label small{display:block;margin-top:3px;color:var(--muted);font-size:12px;line-height:1.35;overflow-wrap:anywhere}
+.shell app-finance-shell .workspace .finance-row-label small{display:block;margin-top:3px;color:#68766e;font-size:12px;line-height:1.35;overflow-wrap:anywhere}
 .shell app-finance-shell .workspace .finance-row>strong,.shell app-finance-shell .workspace .finance-row-values strong{max-width:185px;font-size:14px;font-variant-numeric:tabular-nums;text-align:right;overflow-wrap:anywhere}
 .shell app-finance-shell .workspace .finance-row-values{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:1px 5px;justify-items:end;align-items:baseline;min-width:0}
 .shell app-finance-shell .workspace .finance-row-values small{color:var(--muted);font-size:12px}

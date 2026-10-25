@@ -313,6 +313,44 @@ test('runs real finance, sharing, and card acceptance from empty completed onboa
     overview.accounts.find((account: any) => account.name === 'Cuenta secundaria').currentBalance,
   ).toBe('100.00');
 
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.locator('nav.navigation').getByRole('button', { name: 'Inicio', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Inicio', exact: true })).toBeVisible();
+  const periodInput = page.getByLabel('Período a consultar');
+  const quotaCaption = page.locator('.finance-row-label small').first();
+  const appliedCaption = await quotaCaption.innerText();
+  const financePeriods: string[] = [];
+  await page.route('**/api/finance**', async (route) => {
+    financePeriods.push(new URL(route.request().url()).searchParams.get('period') ?? '');
+    await route.continue();
+  });
+
+  await periodInput.fill('');
+  const periodError = page.getByRole('alert');
+  await expect(periodError).toContainText(/período válido/i);
+  await expect(quotaCaption).toHaveText(appliedCaption);
+  await page.getByRole('button', { name: 'Actualizar', exact: true }).click();
+  await expect(periodError).toContainText(/período válido/i);
+  await page.waitForTimeout(150);
+  expect(financePeriods).toEqual([]);
+
+  const reloadedFinance = page.waitForResponse((response) => {
+    const url = new URL(response.url());
+    return url.pathname === '/api/finance' && url.searchParams.get('period') === month;
+  });
+  await periodInput.fill(month);
+  expect((await reloadedFinance).status()).toBe(200);
+  overview = await (await page.request.get(`/api/finance?period=${month}`)).json();
+  expect(
+    overview.accounts.find((account: any) => account.name === 'Cuenta principal').currentBalance,
+  ).toBe('100800.00');
+  expect(
+    overview.accounts.find((account: any) => account.name === 'Cuenta secundaria').currentBalance,
+  ).toBe('100.00');
+  expect(financePeriods).toEqual([month]);
+  await page.unroute('**/api/finance**');
+  await page.setViewportSize({ width: 390, height: 844 });
+
   await mobileNavigationButton(page, 'Compartidos').click();
   await page.getByRole('button', { name: 'Crear grupo' }).first().click();
   const groupForm = page.locator('form').filter({ has: page.locator('[name="groupName"]') });

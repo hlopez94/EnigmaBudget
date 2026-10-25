@@ -42,6 +42,13 @@ const monthName = new Intl.DateTimeFormat('es-AR', {
   timeZone: 'UTC',
 });
 
+const periodParts = (value: string): { year: number; month: number } | null => {
+  const match = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(value);
+  if (!match) return null;
+  const year = Number(match[1]);
+  return year > 0 ? { year, month: Number(match[2]) } : null;
+};
+
 @Component({
   selector: 'app-finance-shell',
   standalone: true,
@@ -82,9 +89,12 @@ export class FinanceShell implements OnInit, OnChanges {
 
   period = today().slice(0, 7);
   get periodLabel(): string {
-    const [year, month] = this.period.split('-');
-    const date = new Date(Date.UTC(Number(year), Number(month) - 1, 1));
-    return `${monthName.format(date)} ${year}`;
+    const appliedPeriod = this.overview?.period ?? this.period;
+    const parts = periodParts(appliedPeriod);
+    if (!parts) return '';
+    const date = new Date(0);
+    date.setUTCFullYear(parts.year, parts.month - 1, 1);
+    return `${monthName.format(date)} ${appliedPeriod.slice(0, 4)}`;
   }
   section: FinanceSection = 'home';
   moreTarget: 'accounts' | 'setup' = 'accounts';
@@ -143,6 +153,12 @@ export class FinanceShell implements OnInit, OnChanges {
   }
 
   async refresh(): Promise<void> {
+    const requestedPeriod = this.period;
+    if (!periodParts(requestedPeriod)) {
+      this.error = 'Elegí un período válido para consultar tus finanzas.';
+      this.changeDetector.markForCheck();
+      return;
+    }
     const workspaceId = this.activeWorkspace?.id ?? null;
     const generation = this.workspaceGeneration;
     this.busy = true;
@@ -158,7 +174,7 @@ export class FinanceShell implements OnInit, OnChanges {
     try {
       const workspace = await this.api.workspace(workspaceId);
       if (generation !== this.workspaceGeneration || workspaceId !== this.activeWorkspace?.id) return;
-      const overview = await this.api.financeOverview(this.period);
+      const overview = await this.api.financeOverview(requestedPeriod);
       if (generation === this.workspaceGeneration && workspaceId === this.activeWorkspace?.id) {
         if (JSON.stringify(workspace) !== JSON.stringify(this.activeWorkspace)) {
           this.activeWorkspace = workspace;
