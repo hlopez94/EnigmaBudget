@@ -153,6 +153,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<FinanceMerchant> FinanceMerchants => Set<FinanceMerchant>();
     public DbSet<FinanceIncomeSource> FinanceIncomeSources => Set<FinanceIncomeSource>();
     public DbSet<CatalogCommand> CatalogCommands => Set<CatalogCommand>();
+    public DbSet<MonthlyBudget> MonthlyBudgets => Set<MonthlyBudget>();
+    public DbSet<BudgetCommand> BudgetCommands => Set<BudgetCommand>();
     public DbSet<FinancePayment> FinancePayments => Set<FinancePayment>();
     public DbSet<LedgerEntry> LedgerEntries => Set<LedgerEntry>();
     public DbSet<TransferRecord> Transfers => Set<TransferRecord>();
@@ -459,5 +461,23 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         model.Entity<SavingsGoalRateChoiceEntity>().HasOne<ExchangeRateSnapshot>().WithMany().HasForeignKey(x => x.SnapshotId).OnDelete(DeleteBehavior.Restrict);
         model.Entity<ExchangeRateRefreshCommand>().HasKey(x => new { x.WorkspaceId, x.RequestId });
         model.Entity<ExchangeRateRefreshCommand>().HasOne<Workspace>().WithMany().HasForeignKey(x => x.WorkspaceId).OnDelete(DeleteBehavior.Cascade);
+
+        model.Entity<MonthlyBudget>().HasKey(x => x.Id);
+        model.Entity<MonthlyBudget>().HasAlternateKey(x => new { x.WorkspaceId, x.Id });
+        model.Entity<MonthlyBudget>().Property(x => x.Period).HasMaxLength(7);
+        model.Entity<MonthlyBudget>().Property(x => x.Currency).HasMaxLength(3);
+        model.Entity<MonthlyBudget>().Property(x => x.Limit).HasPrecision(18, 2);
+        model.Entity<MonthlyBudget>().Property(x => x.Version).IsConcurrencyToken().HasDefaultValue(1);
+        model.Entity<MonthlyBudget>().HasIndex(x => new { x.WorkspaceId, x.Period, x.CategoryId, x.Currency }).IsUnique();
+        model.Entity<MonthlyBudget>().ToTable(table => table.HasCheckConstraint("CK_MonthlyBudgets_Limit_NonNegative", "\"Limit\" >= 0"));
+        model.Entity<MonthlyBudget>().HasOne<Workspace>().WithMany().HasForeignKey(x => x.WorkspaceId).OnDelete(DeleteBehavior.Cascade);
+        model.Entity<MonthlyBudget>().HasOne<FinanceCategory>().WithMany().HasForeignKey(x => new { x.WorkspaceId, x.CategoryId }).HasPrincipalKey(x => new { x.WorkspaceId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+        model.Entity<BudgetCommand>().HasKey(x => new { x.WorkspaceId, x.RequestId });
+        model.Entity<BudgetCommand>().Property(x => x.CommandKind).HasMaxLength(40);
+        model.Entity<BudgetCommand>().Property(x => x.PayloadHash).HasMaxLength(64);
+        model.Entity<BudgetCommand>().Property(x => x.ResultJson).HasColumnType("jsonb");
+        model.Entity<BudgetCommand>().HasOne<Workspace>().WithMany().HasForeignKey(x => x.WorkspaceId).OnDelete(DeleteBehavior.Cascade);
+        model.Entity<BudgetCommand>().HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.ActorUserId).OnDelete(DeleteBehavior.Restrict);
+        model.Entity<BudgetCommand>().HasOne<MonthlyBudget>().WithMany().HasForeignKey(x => new { x.WorkspaceId, x.TargetBudgetId }).HasPrincipalKey(x => new { x.WorkspaceId, x.Id }).OnDelete(DeleteBehavior.Restrict);
     }
 }

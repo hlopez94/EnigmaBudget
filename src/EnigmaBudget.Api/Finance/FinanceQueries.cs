@@ -197,6 +197,8 @@ public static partial class FinanceEndpoints
                 {
                     cashExpensesArs = F(expenseArs),
                     cashExpensesUsd = F(expenseUsd),
+                    operationExpensesArs = F(expenseArs),
+                    operationExpensesUsd = F(expenseUsd),
                     cardInstallmentsArs = F(
                         installmentRows.Where(x => x.Currency == "ARS").Sum(x => x.Amount)
                     ),

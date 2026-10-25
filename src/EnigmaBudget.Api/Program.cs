@@ -38,6 +38,7 @@ builder.Services.AddScoped<ProjectionService>();
 builder.Services.AddScoped<ProjectionScenarioService>();
 builder.Services.AddScoped<ExchangeRateService>();
 builder.Services.AddScoped<CatalogService>();
+builder.Services.AddScoped<BudgetService>();
 builder.Services.AddSingleton<ExchangeRateRefreshCoordinator>();
 if (builder.Configuration.GetValue("ExchangeRates:AutomaticRefreshEnabled", true))
     builder.Services.AddHostedService<ExchangeRateRefreshHostedService>();
@@ -237,6 +238,7 @@ api.MapPost("/onboarding/complete", async (HttpContext http, AppDbContext db, Wo
     return Results.Ok(State(draft));
 });
 api.MapFinanceEndpoints();
+api.MapBudgetEndpoints();
 api.MapSavingsEndpoints();
 api.MapProjectionEndpoints();
 api.MapExchangeRateEndpoints();
