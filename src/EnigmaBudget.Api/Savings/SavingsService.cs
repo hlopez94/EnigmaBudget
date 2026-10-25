@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Security.Cryptography;
+using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
 using EnigmaBudget.Api.Data;
@@ -110,7 +111,7 @@ public static class SavingsEstimate
     }
 }
 
-public sealed class SavingsService(AppDbContext db, BusinessClock clock, WorkspaceMutationGate mutationGate)
+public sealed class SavingsService(AppDbContext db, BusinessClock clock, WorkspaceMutationGate mutationGate, SavingsAccountBalanceQuery balanceQuery)
 {
     private static readonly CultureInfo Invariant = CultureInfo.InvariantCulture;
 
@@ -120,7 +121,37 @@ public sealed class SavingsService(AppDbContext db, BusinessClock clock, Workspa
             .OrderBy(x => x.Name).ThenBy(x => x.Id).ToArrayAsync(cancellationToken);
         var allocations = await db.SavingsAllocations.AsNoTracking().Where(x => x.WorkspaceId == context.Workspace.Id && goals.Select(g => g.Id).Contains(x.GoalId))
             .OrderBy(x => x.Currency).ThenBy(x => x.Id).ToArrayAsync(cancellationToken);
-        return goals.Select(g => ToDto(g, allocations.Where(a => a.GoalId == g.Id))).ToArray();
+        var balances = await balanceQuery.GetAsync(context.Workspace.Id, cancellationToken);
+        var deficits = balances.Where(x => decimal.Parse(x.BackingDeficit, Invariant) > 0m).Select(x => x.AccountId).ToHashSet();
+        return goals.Select(g => ToDto(g, allocations.Where(a => a.GoalId == g.Id), allocations.Where(a => a.GoalId == g.Id).Any(a => deficits.Contains(a.AccountId)))).ToArray();
+    }
+
+    public async Task<(SavingsGoalDetailsDto? Result, int Status, string? Error)> GetDetailsAsync(WorkspaceRequestContext context, Guid goalId, int historyPage, CancellationToken ct)
+    {
+        const int pageSize = 50;
+        var skipLong = ((long)historyPage - 1L) * pageSize;
+        if (historyPage <= 0 || skipLong > int.MaxValue) return (null, 400, "La página del historial no es válida.");
+        var goal = await db.SavingsGoals.AsNoTracking().SingleOrDefaultAsync(x => x.WorkspaceId == context.Workspace.Id && x.Id == goalId, ct);
+        if (goal is null) return (null, 404, "La meta no existe en este espacio.");
+        var goalAllocations = await db.SavingsAllocations.AsNoTracking().Where(x => x.WorkspaceId == context.Workspace.Id && x.GoalId == goalId).OrderBy(x => x.Id).ToArrayAsync(ct);
+        var ids = goalAllocations.Select(x => x.Id).ToArray();
+        var total = ids.Length == 0 ? 0 : await db.SavingsMovements.AsNoTracking().CountAsync(x => x.WorkspaceId == context.Workspace.Id && ids.Contains(x.AllocationId), ct);
+        SavingsMovementDto[] movements;
+        if (ids.Length == 0) movements = [];
+        else
+        {
+            var movementRows = await (
+                from movement in db.SavingsMovements.AsNoTracking()
+                join actor in db.ApplicationUsers.AsNoTracking() on movement.ActorUserId equals actor.Id
+                where movement.WorkspaceId == context.Workspace.Id && ids.Contains(movement.AllocationId)
+                orderby movement.OccurredAt descending, movement.Id descending
+                select new { Movement = movement, ActorDisplayName = actor.DisplayName ?? "Usuario", IsReversed = movement.Kind == "Apply" && db.SavingsMovements.Any(reverse => reverse.WorkspaceId == context.Workspace.Id && reverse.ReversesMovementId == movement.Id) }
+            ).Skip((int)skipLong).Take(pageSize).ToArrayAsync(ct);
+            movements = movementRows.Select(x => new SavingsMovementDto(x.Movement.Id, x.Movement.AllocationId, x.Movement.Kind, x.Movement.Currency, F(x.Movement.Amount), x.Movement.FinancePaymentId,
+                x.Movement.ReversesMovementId, x.Movement.Reason, x.Movement.ActorUserId, x.ActorDisplayName, x.Movement.OccurredAt.ToString("O"), x.IsReversed)).ToArray();
+        }
+        var allocationDtos = goalAllocations.Select(x => new SavingsAllocationDto(x.Id, x.GoalId, x.AccountId, x.Currency, F(x.ReservedAmount), x.Version)).ToArray();
+        return (new(await ToDtoWithBackingAsync(goal, goalAllocations, ct), allocationDtos, movements, historyPage, pageSize, total, skipLong + movements.Length < total), 200, null);
     }
 
     public async Task<(SavingsGoalDto? Result, int Status, string? Error)> CreateAsync(WorkspaceRequestContext context, SavingsGoalCreate request, CancellationToken cancellationToken)
@@ -147,7 +178,7 @@ public sealed class SavingsService(AppDbContext db, BusinessClock clock, Workspa
             if (replay is not null) return await ReplayAsync(context, replay, "GoalCreate", hash, cancellationToken);
             return (null, 409, "La meta ya existe o hubo un cambio concurrente.");
         }
-        return (ToDto(goal, []), 200, null);
+        return (await ToDtoWithBackingAsync(goal, [], cancellationToken), 200, null);
     }
 
     public async Task<(SavingsGoalDto? Result, int Status, string? Error)> UpdateAsync(WorkspaceRequestContext context, Guid id, SavingsGoalUpdate request, CancellationToken cancellationToken)
@@ -168,10 +199,10 @@ public sealed class SavingsService(AppDbContext db, BusinessClock clock, Workspa
         try { await db.SaveChangesAsync(cancellationToken); }
         catch (DbUpdateException) { return (null, 409, "La meta cambió. Actualizá la pantalla antes de guardar."); }
         var allocations = await db.SavingsAllocations.AsNoTracking().Where(x => x.WorkspaceId == context.Workspace.Id && x.GoalId == id).ToArrayAsync(cancellationToken);
-        return (ToDto(goal, allocations), 200, null);
+        return (await ToDtoWithBackingAsync(goal, allocations, cancellationToken), 200, null);
     }
 
-    public async Task<(SavingsGoalDto? Result, int Status, string? Error)> CloseAsync(WorkspaceRequestContext context, Guid id, SavingsGoalClose request, CancellationToken cancellationToken)
+    public async Task<(SavingsGoalDto? Result, int Status, string? Error)> CloseAsync(WorkspaceRequestContext context, ClaimsPrincipal principal, WorkspaceAccessService access, Guid id, SavingsGoalClose request, CancellationToken cancellationToken)
     {
         if (!ValidId(request.RequestId) || request.Version < 1) return (null, 400, "La solicitud de cierre no es válida.");
         var hash = Hash(new { id, request });
@@ -189,6 +220,8 @@ public sealed class SavingsService(AppDbContext db, BusinessClock clock, Workspa
             var allocationIds = await db.SavingsAllocations.AsNoTracking().Where(a => a.WorkspaceId == context.Workspace.Id && a.GoalId == id)
                 .Select(a => a.Id).OrderBy(x => x).ToArrayAsync(cancellationToken);
             await SavingsMutationLocks.LockAccountsThenAllocationsAsync(db, context.Workspace.Id, accountIds, allocationIds, cancellationToken);
+            var (fresh, permissionFailure) = await access.ResolveWithinLockedWorkspaceAsync(principal, lease.Workspace, WorkspacePermissions.ManageResources, cancellationToken);
+            if (fresh is null) return (null, permissionFailure, "Ya no tenés permiso para cerrar metas en este espacio.");
             var goal = await SavingsMutationLocks.LockGoalAsync(db, context.Workspace.Id, id, cancellationToken);
             if (goal is null) return (null, 404, "La meta no existe en este espacio.");
             var priorCommand = await FindCommandAsync(context.Workspace.Id, request.RequestId, cancellationToken);
@@ -202,14 +235,14 @@ public sealed class SavingsService(AppDbContext db, BusinessClock clock, Workspa
                 if (allocation.ReservedAmount <= 0m) continue;
                 db.SavingsMovements.Add(new SavingsMovement { Id = Guid.NewGuid(), WorkspaceId = context.Workspace.Id, AllocationId = allocation.Id,
                     CommandId = request.RequestId, Kind = "Release", Currency = allocation.Currency, Amount = allocation.ReservedAmount,
-                    ActorUserId = context.User.Id, OccurredAt = now });
+                    ActorUserId = fresh.User.Id, OccurredAt = now });
                 allocation.ReservedAmount = 0m; allocation.Version++;
             }
             goal.State = "Closed"; goal.Version++;
             lease.MarkChanged();
             try { await db.SaveChangesAsync(cancellationToken); await lease.CommitAsync(cancellationToken); }
             catch (DbUpdateException) { return (null, 409, "La meta o sus reservas cambiaron durante el cierre."); }
-            return (ToDto(goal, allocations), 200, null);
+            return (await ToDtoWithBackingAsync(goal, allocations, cancellationToken), 200, null);
         }
     }
 
@@ -219,7 +252,7 @@ public sealed class SavingsService(AppDbContext db, BusinessClock clock, Workspa
         var goal = await db.SavingsGoals.AsNoTracking().SingleOrDefaultAsync(x => x.WorkspaceId == context.Workspace.Id && x.Id == command.ResultResourceId, cancellationToken);
         if (goal is null) return (null, 409, "No se puede repetir la operación porque la meta ya no está disponible.");
         var allocations = await db.SavingsAllocations.AsNoTracking().Where(x => x.WorkspaceId == context.Workspace.Id && x.GoalId == goal.Id).ToArrayAsync(cancellationToken);
-        return (ToDto(goal, allocations), 200, null);
+        return (await ToDtoWithBackingAsync(goal, allocations, cancellationToken), 200, null);
     }
 
     private Task<SavingsCommand?> FindCommandAsync(Guid workspaceId, Guid requestId, CancellationToken cancellationToken) =>
@@ -228,10 +261,13 @@ public sealed class SavingsService(AppDbContext db, BusinessClock clock, Workspa
     private static SavingsCommand Command(Guid workspaceId, Guid requestId, string kind, string hash, Guid result, DateTimeOffset now) =>
         new() { WorkspaceId = workspaceId, RequestId = requestId, CommandKind = kind, PayloadHash = hash, ResultResourceId = result, OccurredAt = now };
 
-    private SavingsGoalDto ToDto(SavingsGoal goal, IEnumerable<SavingsAllocation> source)
+    private SavingsGoalDto ToDto(SavingsGoal goal, IEnumerable<SavingsAllocation> source, bool hasBackingDeficit = false)
     {
         var allocations = source.ToArray();
         var backing = allocations.GroupBy(x => x.Currency).OrderBy(x => x.Key).Select(x => new BackingAmountDto(x.Key, F(x.Sum(a => a.ReservedAmount)))).ToArray();
+        if (hasBackingDeficit)
+            return new(goal.Id, goal.Name, goal.TargetCurrency, F(goal.TargetAmount), D(goal.DesiredDate), goal.State, M(goal.MonthlyContribution), D(goal.NextContributionDate),
+                false, backing, null, null, null, null, null, null, "BackingDeficit", "Una cuenta que respalda esta meta tiene menos efectivo que el total reservado; la estimación queda pendiente hasta corregir el respaldo.", goal.Version);
         var sameCurrency = allocations.Where(x => x.ReservedAmount != 0m).All(x => x.Currency == goal.TargetCurrency);
         if (!sameCurrency)
             return new(goal.Id, goal.Name, goal.TargetCurrency, F(goal.TargetAmount), D(goal.DesiredDate), goal.State, M(goal.MonthlyContribution), D(goal.NextContributionDate),
@@ -242,6 +278,9 @@ public sealed class SavingsService(AppDbContext db, BusinessClock clock, Workspa
             estimate.Reached, backing, null, F(saved), F(estimate.RemainingAmount), M(estimate.RequiredMonthlyContribution), estimate.RequiredContributionCount,
             D(estimate.EstimatedCompletionDate), estimate.EstimateStatus, estimate.Explanation, goal.Version);
     }
+
+    private async Task<SavingsGoalDto> ToDtoWithBackingAsync(SavingsGoal goal, IEnumerable<SavingsAllocation> source, CancellationToken ct) =>
+        ToDto(goal, source, await balanceQuery.GoalHasDeficitAsync(goal.WorkspaceId, goal.Id, ct));
 
     private static bool ValidGoal(string? name, string? currency, string? target, string? desired, string? monthly, string? next) =>
         !string.IsNullOrWhiteSpace(name) && name.Trim().Length <= 120 && currency is "ARS" or "USD" && ParseAmount(target) is > 0m

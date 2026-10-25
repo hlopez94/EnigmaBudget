@@ -5,6 +5,8 @@ using EnigmaBudget.Api.Data;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
+using EnigmaBudget.Api.Savings;
+using EnigmaBudget.Api.Workspaces;
 
 namespace EnigmaBudget.Api.Finance;
 
@@ -259,6 +261,8 @@ public static partial class FinanceEndpoints
         HttpContext http,
         AppDbContext db,
         IAntiforgery csrf,
+        WorkspaceMutationGate mutationGate,
+        WorkspaceAccessService access,
         Guid id,
         OperationVoid r
     )
@@ -268,6 +272,10 @@ public static partial class FinanceEndpoints
         if (string.IsNullOrWhiteSpace(r.Reason) || r.Reason.Length > 240)
             return Problem(400, "Indicá el motivo de la anulación.");
         var ws = await Workspace(db, http);
+        var (lease, gateStatus) = await mutationGate.AcquireAsync(ws.Id, http.RequestAborted);
+        if (lease is null) return Problem(gateStatus, "El espacio no está disponible.");
+        await using (lease)
+        {
         var op = await db.FinanceOperations.SingleOrDefaultAsync(x =>
             x.WorkspaceId == ws.Id && x.Id == id
         );
@@ -279,11 +287,21 @@ public static partial class FinanceEndpoints
                 : Problem(409, "El movimiento ya fue anulado con otros datos.");
         if (op.Version != r.Version)
             return Problem(409, "El movimiento cambió.");
-        var payments = await db
-            .FinancePayments.Where(x => x.WorkspaceId == ws.Id && x.OperationId == id)
-            .ToArrayAsync();
+        var paymentIds = await db.FinancePayments.AsNoTracking().Where(x => x.WorkspaceId == ws.Id && x.OperationId == id).Select(x => x.Id).ToArrayAsync();
+        var allocationRows = await db.SavingsMovements.AsNoTracking().Where(x => x.WorkspaceId == ws.Id && paymentIds.Contains(x.FinancePaymentId!.Value) && x.Kind == "Apply")
+            .Join(db.SavingsAllocations.AsNoTracking(), m => m.AllocationId, a => a.Id, (m, a) => new { a.Id, a.AccountId, a.GoalId }).Distinct().ToArrayAsync();
+        var accountIds = await db.FinancePayments.AsNoTracking().Where(x => x.WorkspaceId == ws.Id && x.OperationId == id).Select(x => x.AccountId).Distinct().ToArrayAsync();
+        accountIds = accountIds.Concat(allocationRows.Select(x => x.AccountId)).Distinct().ToArray();
+        var allocationIds = allocationRows.Select(x => x.Id).Distinct().ToArray();
+        await SavingsMutationLocks.LockAccountsThenAllocationsAsync(db, ws.Id, accountIds, allocationIds, http.RequestAborted);
+        foreach (var goalId in allocationRows.Select(x => x.GoalId).Distinct().OrderBy(x => x))
+            _ = await SavingsMutationLocks.LockGoalAsync(db, ws.Id, goalId, http.RequestAborted);
+        var (fresh, authStatus) = await access.ResolveWithinLockedWorkspaceAsync(http.User, lease.Workspace, WorkspacePermissions.CorrectHistory, http.RequestAborted);
+        if (fresh is null) return Problem(authStatus, "Ya no tenés permiso para anular movimientos en este espacio.");
+        var payments = await db.FinancePayments.FromSqlInterpolated($"SELECT * FROM \"FinancePayments\" WHERE \"WorkspaceId\" = {ws.Id} AND \"OperationId\" = {id} ORDER BY \"Id\" FOR UPDATE").ToArrayAsync(http.RequestAborted);
         foreach (var p in payments)
         {
+            await SavingsAllocationService.ReverseApplicationsForPaymentAsync(db, ws.Id, p, fresh.User.Id, http.RequestAborted);
             var account = await db.Accounts.SingleAsync(x =>
                 x.WorkspaceId == ws.Id && x.Id == p.AccountId
             );
@@ -306,8 +324,11 @@ public static partial class FinanceEndpoints
         op.VoidRequestId = r.Id;
         op.VoidReason = r.Reason.Trim();
         op.Version++;
-        await db.SaveChangesAsync();
+        lease.MarkChanged();
+        await db.SaveChangesAsync(http.RequestAborted);
+        await lease.CommitAsync(http.RequestAborted);
         return Results.Ok(await Operation(db, op));
+        }
     }
 
     private static async Task<IResult> Transfer(

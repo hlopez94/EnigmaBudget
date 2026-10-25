@@ -36,6 +36,7 @@ public sealed class SavingsMovement
     public decimal Amount { get; init; }
     public Guid? FinancePaymentId { get; init; }
     public Guid? ReversesMovementId { get; init; }
+    public string? Reason { get; init; }
     public Guid ActorUserId { get; init; }
     public DateTimeOffset OccurredAt { get; init; }
     public int Version { get; init; } = 1;

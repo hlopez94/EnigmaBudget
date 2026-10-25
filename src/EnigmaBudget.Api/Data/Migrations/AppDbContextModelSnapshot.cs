@@ -38,6 +38,9 @@ namespace EnigmaBudget.Api.Data.Migrations
                         .HasMaxLength(3)
                         .HasColumnType("character varying(3)");
 
+                    b.Property<DateOnly?>("FundsAvailableFrom")
+                        .HasColumnType("date");
+
                     b.Property<bool>("IsArchived")
                         .HasColumnType("boolean");
 
@@ -1109,6 +1112,10 @@ namespace EnigmaBudget.Api.Data.Migrations
                     b.Property<DateTimeOffset>("OccurredAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("Reason")
+                        .HasMaxLength(240)
+                        .HasColumnType("character varying(240)");
+
                     b.Property<Guid?>("ReversesMovementId")
                         .HasColumnType("uuid");
 
@@ -1138,6 +1145,8 @@ namespace EnigmaBudget.Api.Data.Migrations
                     b.ToTable("SavingsMovements", t =>
                         {
                             t.HasCheckConstraint("CK_SavingsMovements_Amount_Positive", "\"Amount\" > 0");
+
+                            t.HasCheckConstraint("CK_SavingsMovements_Kind_Allowed", "\"Kind\" IN ('Allocate','Release','Apply','Reversal')");
                         });
                 });
 

@@ -56,3 +56,15 @@ public sealed record SavingsAllocationDto(
     string ReservedAmount,
     int Version
 );
+
+public sealed record SavingsAllocationRequest(Guid Id, Guid GoalId, Guid AccountId, string Amount);
+public sealed record SavingsReleaseRequest(Guid Id, string Amount);
+public sealed record SavingsApplicationRequest(Guid Id, Guid AllocationId, Guid FinancePaymentId, string Amount);
+public sealed record SavingsApplicationReverse(Guid RequestId, string Reason, bool Confirm);
+public sealed record SavingsLiquidityUpdate(Guid RequestId, int Version, string? FundsAvailableFrom);
+public sealed record SavingsAccountBalanceDto(Guid AccountId, string Currency, string CashBalance, string AvailableCash,
+    string RestrictedCash, string TotalReserved, string BackingDeficit, string FreeBalance, bool IsArchived, string? FundsAvailableFrom);
+public sealed record SavingsGoalDetailsDto(SavingsGoalDto Goal, IReadOnlyList<SavingsAllocationDto> Allocations, IReadOnlyList<SavingsMovementDto> Movements,
+    int HistoryPage, int HistoryPageSize, int TotalMovements, bool HasMore);
+public sealed record SavingsMovementDto(Guid Id, Guid AllocationId, string Kind, string Currency, string Amount, Guid? FinancePaymentId,
+    Guid? ReversesMovementId, string? Reason, Guid ActorUserId, string ActorDisplayName, string OccurredAt, bool IsReversed);

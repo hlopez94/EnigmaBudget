@@ -177,8 +177,10 @@ public sealed class SavingsGoalIntegrationTests
     {
         using var first = await _factory.AuthenticatedClientAsync("savings-user-a");
         using var second = await _factory.AuthenticatedClientAsync("savings-user-b");
-        Assert.Equal(HttpStatusCode.OK, (await first.PostAsJsonAsync("/api/savings/goals", Create(Guid.NewGuid()))).StatusCode);
+        var goalId = Guid.NewGuid();
+        Assert.Equal(HttpStatusCode.OK, (await first.PostAsJsonAsync("/api/savings/goals", Create(goalId))).StatusCode);
         Assert.Empty(await second.GetFromJsonAsync<GoalDto[]>("/api/savings/goals") ?? []);
+        Assert.Equal(HttpStatusCode.NotFound, (await second.GetAsync($"/api/savings/goals/{goalId}/details")).StatusCode);
     }
 
     [Fact]
@@ -291,8 +293,12 @@ public sealed class SavingsGoalIntegrationTests
         var personal = Assert.Single(await owner.GetFromJsonAsync<JsonElement[]>("/api/workspaces") ?? []);
         var personalId = personal.GetProperty("id").GetGuid();
         owner.DefaultRequestHeaders.Add("X-Workspace-Id", personalId.ToString());
-        var goal = await owner.PostAsJsonAsync("/api/savings/goals", Create(Guid.NewGuid()));
+        var goalId = Guid.NewGuid();
+        var goal = await owner.PostAsJsonAsync("/api/savings/goals", Create(goalId));
         Assert.Equal(HttpStatusCode.OK, goal.StatusCode);
+        var accountId = Guid.NewGuid();
+        Assert.Equal(HttpStatusCode.OK, (await owner.PostAsJsonAsync("/api/accounts", new { id = accountId, name = "Caja", bankName = "Banco", currency = "ARS", openingBalance = "100.00", openingDate = "2026-10-01" })).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await owner.PostAsJsonAsync("/api/savings/allocations", new { id = Guid.NewGuid(), goalId, accountId, amount = "50.00" })).StatusCode);
 
         var householdResponse = await owner.PostAsJsonAsync("/api/workspaces", new { id = Guid.NewGuid(), kind = "Household", name = "Hogar" });
         Assert.Equal(HttpStatusCode.Created, householdResponse.StatusCode);
@@ -316,7 +322,16 @@ public sealed class SavingsGoalIntegrationTests
         var raw = document.RootElement.GetRawText();
         Assert.DoesNotContain("group", raw, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("participant", raw, StringComparison.OrdinalIgnoreCase);
+        var detailsResponse = await reader.GetAsync($"/api/savings/goals/{goalId}/details");
+        Assert.Equal(HttpStatusCode.OK, detailsResponse.StatusCode);
+        using var detailsDocument = JsonDocument.Parse(await detailsResponse.Content.ReadAsStringAsync());
+        var details = detailsDocument.RootElement;
+        Assert.Equal(accountId, details.GetProperty("allocations")[0].GetProperty("accountId").GetGuid());
+        Assert.Equal("50.00", details.GetProperty("movements")[0].GetProperty("amount").GetString());
+        Assert.True(details.GetProperty("movements")[0].GetProperty("actorDisplayName").ValueKind == JsonValueKind.String);
+        Assert.Equal(HttpStatusCode.BadRequest, (await reader.GetAsync($"/api/savings/goals/{goalId}/details?historyPage=0")).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await reader.PostAsJsonAsync("/api/savings/goals", Create(Guid.NewGuid()))).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await reader.PostAsJsonAsync("/api/savings/allocations", new { id = Guid.NewGuid(), goalId, accountId, amount = "1.00" })).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await reader.GetAsync("/api/groups")).StatusCode);
     }
 
@@ -325,7 +340,7 @@ public sealed class SavingsGoalIntegrationTests
         await using var db = Db();
         var goal = await db.SavingsGoals.SingleAsync(x => x.Id == goalId);
         var accountId = Guid.NewGuid();
-        db.Accounts.Add(new BankAccount { Id = accountId, WorkspaceId = goal.WorkspaceId, Name = "Caja de prueba", BankName = "Banco de prueba", Currency = currency, OpeningBalance = 0m, OpeningDate = new DateOnly(2026, 10, 1) });
+        db.Accounts.Add(new BankAccount { Id = accountId, WorkspaceId = goal.WorkspaceId, Name = "Caja de prueba", BankName = "Banco de prueba", Currency = currency, OpeningBalance = decimal.Parse(amount, CultureInfo.InvariantCulture), OpeningDate = new DateOnly(2026, 10, 1) });
         db.SavingsAllocations.Add(new SavingsAllocation { Id = Guid.NewGuid(), WorkspaceId = goal.WorkspaceId, GoalId = goalId, AccountId = accountId, Currency = currency, ReservedAmount = decimal.Parse(amount, CultureInfo.InvariantCulture) });
         await db.SaveChangesAsync();
     }

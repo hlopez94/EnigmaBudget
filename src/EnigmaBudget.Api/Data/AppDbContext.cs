@@ -41,6 +41,7 @@ public sealed class BankAccount
     public string Currency { get; set; } = "";
     public decimal OpeningBalance { get; set; }
     public DateOnly OpeningDate { get; set; }
+    public DateOnly? FundsAvailableFrom { get; set; }
     public bool IsArchived { get; set; }
     public int Version { get; set; } = 1;
 }
@@ -351,9 +352,10 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         model.Entity<SavingsMovement>().Property(x => x.Currency).HasMaxLength(3);
         model.Entity<SavingsMovement>().Property(x => x.Amount).HasPrecision(18, 2);
         model.Entity<SavingsMovement>().Property(x => x.Version).HasDefaultValue(1);
+        model.Entity<SavingsMovement>().Property(x => x.Reason).HasMaxLength(240);
         model.Entity<SavingsMovement>().HasIndex(x => new { x.WorkspaceId, x.CommandId, x.AllocationId, x.Kind }).IsUnique().HasFilter("\"Kind\" <> 'Reversal'");
         model.Entity<SavingsMovement>().HasIndex(x => new { x.WorkspaceId, x.ReversesMovementId }).IsUnique();
-        model.Entity<SavingsMovement>().ToTable(table => table.HasCheckConstraint("CK_SavingsMovements_Amount_Positive", "\"Amount\" > 0"));
+        model.Entity<SavingsMovement>().ToTable(table => { table.HasCheckConstraint("CK_SavingsMovements_Amount_Positive", "\"Amount\" > 0"); table.HasCheckConstraint("CK_SavingsMovements_Kind_Allowed", "\"Kind\" IN ('Allocate','Release','Apply','Reversal')"); });
         model.Entity<SavingsMovement>().HasOne<Workspace>().WithMany().HasForeignKey(x => x.WorkspaceId).OnDelete(DeleteBehavior.Cascade);
         model.Entity<SavingsMovement>().HasOne<SavingsAllocation>().WithMany().HasForeignKey(x => new { x.WorkspaceId, x.AllocationId }).HasPrincipalKey(x => new { x.WorkspaceId, x.Id }).OnDelete(DeleteBehavior.Restrict);
         model.Entity<SavingsMovement>().HasOne<SavingsCommand>().WithMany().HasForeignKey(x => new { x.WorkspaceId, x.CommandId }).HasPrincipalKey(x => new { x.WorkspaceId, x.RequestId }).OnDelete(DeleteBehavior.Restrict);

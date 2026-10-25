@@ -30,6 +30,8 @@ builder.Services.AddScoped<WorkspaceAuditInterceptor>();
 builder.Services.AddScoped<InvitationService>();
 builder.Services.AddScoped<PrivacyGrantService>();
 builder.Services.AddScoped<SavingsService>();
+builder.Services.AddScoped<SavingsAccountBalanceQuery>();
+builder.Services.AddScoped<SavingsAllocationService>();
 builder.Services.AddScoped<NativeSessionService>();
 builder.Services.AddSingleton<IGoogleIdTokenValidator, GoogleNativeIdTokenValidator>();
 builder.Services.AddOptions<NativeAuthConfiguration>().Bind(builder.Configuration.GetSection(NativeAuthConfiguration.SectionName))
