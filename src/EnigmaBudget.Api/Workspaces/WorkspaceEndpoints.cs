@@ -239,5 +239,5 @@ public static class WorkspaceEndpoints
         foreach (var grant in grants) { grant.Enabled = false; grant.Version++; }
         db.PersonalReadGrantAudience.RemoveRange(db.PersonalReadGrantAudience.Where(x => x.PersonalWorkspaceId == personalId && x.HouseholdWorkspaceId == householdId));
     }
-    private static async Task<bool> ValidCsrf(HttpContext http, IAntiforgery csrf) { try { await csrf.ValidateRequestAsync(http); return true; } catch (AntiforgeryValidationException) { return false; } }
+    private static Task<bool> ValidCsrf(HttpContext http, IAntiforgery csrf) => NativeAuthCsrf.ValidateRequestAsync(http, csrf);
 }

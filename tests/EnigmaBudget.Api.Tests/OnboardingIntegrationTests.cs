@@ -18,6 +18,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using EnigmaBudget.Api.Identity;
 using EnigmaBudget.Api.Data;
 
 namespace EnigmaBudget.Api.Tests;
@@ -389,14 +390,16 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
     private readonly string _environment;
     private readonly TimeProvider? _timeProvider;
     private readonly IReadOnlyDictionary<string, string?>? _extraConfiguration;
+    public QueuedGoogleValidator GoogleValidator { get; }
     public SaveChangesBarrierInterceptor SaveBarrier { get; } = new();
     internal string TestConnection => _connection;
-    public ApiFactory(bool relaxSecureCookiesForTests = true, string environment = "Development", TimeProvider? timeProvider = null, IReadOnlyDictionary<string, string?>? extraConfiguration = null)
+    public ApiFactory(bool relaxSecureCookiesForTests = true, string environment = "Development", TimeProvider? timeProvider = null, IReadOnlyDictionary<string, string?>? extraConfiguration = null, QueuedGoogleValidator? googleValidator = null)
     {
         _relaxSecureCookiesForTests = relaxSecureCookiesForTests;
         _environment = environment;
         _timeProvider = timeProvider;
         _extraConfiguration = extraConfiguration;
+        GoogleValidator = googleValidator ?? new QueuedGoogleValidator();
         var testConnection = Environment.GetEnvironmentVariable("ENIGMABUDGET_TEST_CONNECTION");
         if (string.IsNullOrWhiteSpace(testConnection)) throw new InvalidOperationException("Set ENIGMABUDGET_TEST_CONNECTION to an isolated PostgreSQL test database.");
         var b = new NpgsqlConnectionStringBuilder(testConnection);
@@ -415,7 +418,9 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
             }
             services.AddSingleton(SaveBarrier);
             services.AddDbContext<AppDbContext>((serviceProvider, options) => options.AddInterceptors(serviceProvider.GetRequiredService<SaveChangesBarrierInterceptor>()));
-            services.AddAuthentication(o => { o.DefaultAuthenticateScheme = "TestOrCookie"; o.DefaultChallengeScheme = "TestOrCookie"; }).AddPolicyScheme("TestOrCookie", "Test identity or cookie", o => o.ForwardDefaultSelector = context => context.Request.Headers.ContainsKey("X-Test-Identity") ? "TestIdentity" : CookieAuthenticationDefaults.AuthenticationScheme).AddScheme<AuthenticationSchemeOptions, TestIdentityHandler>("TestIdentity", _ => { });
+            services.AddAuthentication(o => { o.DefaultScheme = "TestOrCookie"; o.DefaultAuthenticateScheme = "TestOrCookie"; o.DefaultChallengeScheme = "TestOrCookie"; }).AddPolicyScheme("TestOrCookie", "Test identity or cookie", o => o.ForwardDefaultSelector = context => context.Request.Headers.ContainsKey("Authorization") ? NativeBearerHandler.SchemeName : context.Request.Headers.ContainsKey("X-Test-Identity") ? "TestIdentity" : CookieAuthenticationDefaults.AuthenticationScheme).AddScheme<AuthenticationSchemeOptions, TestIdentityHandler>("TestIdentity", _ => { });
+            services.RemoveAll<IGoogleIdTokenValidator>();
+            services.AddSingleton<IGoogleIdTokenValidator>(GoogleValidator);
             if (_relaxSecureCookiesForTests)
             {
                 services.Configure<AntiforgeryOptions>(o => o.Cookie.SecurePolicy = CookieSecurePolicy.None);
@@ -470,7 +475,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
         return await db.Workspaces.CountAsync(x => x.OwnerSubject == owner);
     }
     private sealed record SessionDto(string CsrfToken);
-    protected override void Dispose(bool disposing) { base.Dispose(disposing); if (disposing) { _productionFactory?.Dispose(); using var c = new NpgsqlConnection(Environment.GetEnvironmentVariable("ENIGMABUDGET_TEST_CONNECTION")!); c.Open(); using var cmd = c.CreateCommand(); cmd.CommandText = $"DROP SCHEMA IF EXISTS \"{_schema}\" CASCADE"; cmd.ExecuteNonQuery(); } }
+    protected override void Dispose(bool disposing) { base.Dispose(disposing); if (disposing) { _productionFactory?.Dispose(); using var c = new NpgsqlConnection(Environment.GetEnvironmentVariable("ENIGMABUDGET_TEST_CONNECTION")!); c.Open(); using var cmd = c.CreateCommand(); cmd.CommandText = $"DROP SCHEMA IF EXISTS \"{_schema}\" CASCADE"; cmd.ExecuteNonQuery(); using var isolated = new NpgsqlConnection(_connection); NpgsqlConnection.ClearPool(isolated); } }
 }
 
 public sealed class SaveChangesBarrierInterceptor : SaveChangesInterceptor

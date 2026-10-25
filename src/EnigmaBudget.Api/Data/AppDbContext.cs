@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using EnigmaBudget.Api.Workspaces;
+using EnigmaBudget.Api.Identity;
 
 namespace EnigmaBudget.Api.Data;
 
@@ -151,6 +152,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<CardStatement> CardStatements => Set<CardStatement>();
     public DbSet<StatementAdjustment> StatementAdjustments => Set<StatementAdjustment>();
     public DbSet<CardPaymentRecord> CardPayments => Set<CardPaymentRecord>();
+    public DbSet<NativeAuthChallenge> NativeAuthChallenges => Set<NativeAuthChallenge>();
+    public DbSet<NativeSession> NativeSessions => Set<NativeSession>();
+    public DbSet<NativeRefreshToken> NativeRefreshTokens => Set<NativeRefreshToken>();
 
     protected override void OnModelCreating(ModelBuilder model)
     {
@@ -165,6 +169,18 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         model.Entity<ApplicationUser>().Property(x => x.Subject).HasMaxLength(512);
         model.Entity<ApplicationUser>().Property(x => x.DisplayName).HasMaxLength(256);
         model.Entity<ApplicationUser>().Property(x => x.Email).HasMaxLength(320);
+        model.Entity<NativeAuthChallenge>().Property(x => x.NonceDigest).HasMaxLength(32);
+        model.Entity<NativeAuthChallenge>().Property(x => x.Platform).HasMaxLength(20);
+        model.Entity<NativeSession>().Property(x => x.Subject).HasMaxLength(512);
+        model.Entity<NativeSession>().Property(x => x.DisplayName).HasMaxLength(256);
+        model.Entity<NativeSession>().Property(x => x.DeviceName).HasMaxLength(120);
+        model.Entity<NativeSession>().Property(x => x.AccessTokenDigest).HasMaxLength(32);
+        model.Entity<NativeSession>().HasIndex(x => x.AccessTokenDigest).IsUnique();
+        model.Entity<NativeSession>().HasIndex(x => new { x.UserId, x.RevokedAt });
+        model.Entity<NativeRefreshToken>().Property(x => x.TokenDigest).HasMaxLength(32);
+        model.Entity<NativeRefreshToken>().HasIndex(x => x.TokenDigest).IsUnique();
+        model.Entity<NativeRefreshToken>().HasIndex(x => x.SessionId);
+        model.Entity<NativeRefreshToken>().HasOne(x => x.Session).WithMany(x => x.RefreshTokens).HasForeignKey(x => x.SessionId).OnDelete(DeleteBehavior.Cascade);
         model.Entity<WorkspaceMembership>().HasKey(x => new { x.WorkspaceId, x.UserId });
         model.Entity<WorkspaceMembership>().HasIndex(x => new { x.UserId, x.Active });
         model.Entity<WorkspaceMembership>().Property(x => x.Role).HasMaxLength(20);

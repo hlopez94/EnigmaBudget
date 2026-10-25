@@ -218,7 +218,7 @@ public static class InvitationPrivacyEndpoints
         email = principal.FindFirstValue(ClaimTypes.Email) ?? "";
         return string.Equals(principal.FindFirstValue("email_verified"), "true", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(email);
     }
-    private static async Task<bool> ValidCsrf(HttpContext http, IAntiforgery csrf) { try { await csrf.ValidateRequestAsync(http); return true; } catch (AntiforgeryValidationException) { return false; } }
+    private static Task<bool> ValidCsrf(HttpContext http, IAntiforgery csrf) => NativeAuthCsrf.ValidateRequestAsync(http, csrf);
     private static IResult AccessFailure(int status) => Results.Problem(statusCode: status, title: "No se pudo completar la solicitud", detail: status == 404 ? "El espacio no existe o no está disponible." : "No tenés permiso para realizar esta acción en el espacio.");
     private static IResult NotFound() => Results.Problem(statusCode: 404, title: "No se pudo completar la solicitud", detail: "El recurso no existe o no está disponible.");
     private static IResult Problem(int status, string detail) => Results.Problem(statusCode: status, title: "No se pudo completar la solicitud", detail: detail);

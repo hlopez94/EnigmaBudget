@@ -12,8 +12,10 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 var googleId = builder.Configuration["Authentication:Google:ClientId"];
@@ -26,6 +28,11 @@ builder.Services.AddScoped<WorkspaceMutationGate>();
 builder.Services.AddScoped<WorkspaceAuditInterceptor>();
 builder.Services.AddScoped<InvitationService>();
 builder.Services.AddScoped<PrivacyGrantService>();
+builder.Services.AddScoped<NativeSessionService>();
+builder.Services.AddSingleton<IGoogleIdTokenValidator, GoogleNativeIdTokenValidator>();
+builder.Services.AddOptions<NativeAuthConfiguration>().Bind(builder.Configuration.GetSection(NativeAuthConfiguration.SectionName))
+    .Validate(o => o.ChallengeLifetime > TimeSpan.Zero && o.AccessLifetime > TimeSpan.Zero && o.AbsoluteSessionLifetime > TimeSpan.Zero,
+        "Native authentication lifetimes must be positive.").ValidateOnStart();
 var developmentIdentityOptions = builder.Services.AddOptions<DevelopmentIdentityOptions>()
     .Bind(builder.Configuration.GetSection(DevelopmentIdentityOptions.SectionName));
 if (appDevelopmentLoginEnabled(builder))
@@ -35,14 +42,32 @@ builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<BusinessClock>();
 builder.Services.AddOptions<StorageOptions>().Bind(builder.Configuration.GetSection(StorageOptions.SectionName)).Validate(StorageOptions.IsValid, "S3 storage configuration must include a bucket and region, and use a valid HTTP(S) endpoint when configured.").ValidateOnStart();
 builder.Services.AddAntiforgery(o => { o.HeaderName = "X-CSRF-TOKEN"; o.Cookie.Name = "EnigmaBudget.Csrf"; o.Cookie.HttpOnly = true; o.Cookie.SecurePolicy = appDevelopmentLoginEnabled(builder) ? CookieSecurePolicy.SameAsRequest : CookieSecurePolicy.Always; o.Cookie.SameSite = SameSiteMode.Strict; });
-var auth = builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme).AddCookie(o =>
+const string CookieOrNativeScheme = "CookieOrNative";
+var auth = builder.Services.AddAuthentication(o =>
+{
+    o.DefaultScheme = CookieOrNativeScheme;
+    o.DefaultAuthenticateScheme = CookieOrNativeScheme;
+    o.DefaultChallengeScheme = CookieOrNativeScheme;
+})
+    .AddPolicyScheme(CookieOrNativeScheme, CookieOrNativeScheme, o => o.ForwardDefaultSelector = context =>
+        context.Request.Headers.ContainsKey("Authorization") ? NativeBearerHandler.SchemeName : CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(o =>
 {
     o.Cookie.Name = "EnigmaBudget.Auth"; o.Cookie.HttpOnly = true; o.Cookie.SecurePolicy = appDevelopmentLoginEnabled(builder) ? CookieSecurePolicy.SameAsRequest : CookieSecurePolicy.Always; o.Cookie.SameSite = SameSiteMode.Lax;
     o.Events.OnRedirectToLogin = context => { context.Response.StatusCode = StatusCodes.Status401Unauthorized; return Task.CompletedTask; };
     o.Events.OnRedirectToAccessDenied = context => { context.Response.StatusCode = StatusCodes.Status403Forbidden; return Task.CompletedTask; };
-});
+})
+    .AddScheme<AuthenticationSchemeOptions, NativeBearerHandler>(NativeBearerHandler.SchemeName, _ => { });
 if (googleConfigured) auth.AddGoogle(GoogleDefaults.AuthenticationScheme, o => { o.ClientId = googleId!; o.ClientSecret = googleSecret!; o.SignInScheme = CookieAuthenticationDefaults.AuthenticationScheme; o.CallbackPath = "/signin-google"; o.Events.OnCreatingTicket = context => { var sub = context.Principal?.FindFirstValue(ClaimTypes.NameIdentifier); if (string.IsNullOrWhiteSpace(sub)) throw new InvalidOperationException("Google subject missing"); if (context.Principal?.Identity is ClaimsIdentity identity) GoogleIdentityClaims.EnrichFromTrustedProfile(context.User, identity); return Task.CompletedTask; }; });
 builder.Services.AddAuthorization();
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    AddNativeRatePolicy(options, NativeAuthRateLimits.Challenge, 10);
+    AddNativeRatePolicy(options, NativeAuthRateLimits.Exchange, 5);
+    AddNativeRatePolicy(options, NativeAuthRateLimits.Development, 5);
+    AddNativeRatePolicy(options, NativeAuthRateLimits.Refresh, 30);
+});
 builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase);
 
 var app = builder.Build();
@@ -54,6 +79,49 @@ foreach (var proxy in builder.Configuration.GetSection("ReverseProxy:KnownProxie
     forwardedHeaders.KnownProxies.Add(address);
 }
 app.UseForwardedHeaders(forwardedHeaders);
+app.Use(async (context, next) =>
+{
+    if (!HttpMethods.IsPost(context.Request.Method)
+        || !context.Request.Path.StartsWithSegments("/api/auth/native", StringComparison.OrdinalIgnoreCase))
+    {
+        await next();
+        return;
+    }
+
+    if (!context.Request.IsHttps)
+    {
+        context.Response.StatusCode = StatusCodes.Status426UpgradeRequired;
+        return;
+    }
+
+    const int maximumBodyBytes = 16 * 1024;
+    if (context.Request.ContentLength > maximumBodyBytes)
+    {
+        context.Response.StatusCode = StatusCodes.Status413PayloadTooLarge;
+        return;
+    }
+
+    var source = context.Request.Body;
+    using var copy = new MemoryStream(maximumBodyBytes);
+    var buffer = new byte[4096];
+    var total = 0;
+    while (true)
+    {
+        var read = await source.ReadAsync(buffer.AsMemory(0, Math.Min(buffer.Length, maximumBodyBytes + 1 - total)), context.RequestAborted);
+        if (read == 0) break;
+        total += read;
+        if (total > maximumBodyBytes)
+        {
+            context.Response.StatusCode = StatusCodes.Status413PayloadTooLarge;
+            return;
+        }
+        await copy.WriteAsync(buffer.AsMemory(0, read), context.RequestAborted);
+    }
+    copy.Position = 0;
+    context.Request.Body = copy;
+    try { await next(); }
+    finally { context.Request.Body = source; }
+});
 app.UseDefaultFiles();
 app.UseStaticFiles();
 app.Use(async (context, next) =>
@@ -65,6 +133,7 @@ app.Use(async (context, next) =>
     }
     await next();
 });
+app.UseRateLimiter();
 app.UseAuthentication(); app.UseAuthorization();
 app.MapGet("/api/health", () => Results.Ok(new { status = "ok" }));
 app.MapFallback(async context =>
@@ -114,6 +183,7 @@ if (app.Environment.IsDevelopment()) app.MapPost("/api/auth/development", async 
     return Results.NoContent();
 });
 app.MapPost("/api/auth/logout", async (HttpContext http, IAntiforgery antiforgery) => { try { await antiforgery.ValidateRequestAsync(http); } catch (AntiforgeryValidationException) { return Results.BadRequest(); } await http.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme); return Results.NoContent(); });
+app.MapNativeAuthEndpoints();
 
 var api = app.MapGroup("/api").RequireAuthorization();
 api.MapGet("/onboarding", async (HttpContext http, AppDbContext db, WorkspaceProvisioner provisioner) => Results.Ok(await GetState(db, provisioner, http.User)));
@@ -161,7 +231,7 @@ static async Task<OnboardingState> GetState(AppDbContext db, WorkspaceProvisione
 }
 static OnboardingState State(OnboardingDraft d) => new(d.Version, d.Completed, Deserialize<AccountInput>(d.AccountsJson), Deserialize<CardInput>(d.CardsJson));
 static T[] Deserialize<T>(string json) => JsonSerializer.Deserialize<T[]>(json) ?? [];
-static async Task<bool> Csrf(HttpContext http, IAntiforgery csrf) { try { await csrf.ValidateRequestAsync(http); return true; } catch (AntiforgeryValidationException) { return false; } }
+static Task<bool> Csrf(HttpContext http, IAntiforgery csrf) => NativeAuthCsrf.ValidateRequestAsync(http, csrf);
 static IResult Problem(int status, string message) => Results.Problem(statusCode: status, title: "No se pudo completar la solicitud", detail: message);
 static bool ValidDraftShape(SaveDraftRequest r) => r.Version >= 0 && r.Accounts is { Length: <=50 } && r.Cards is { Length: <=50 } && r.Accounts.All(x => x is not null) && r.Cards.All(x => x is not null) && r.Accounts.Select(x=>x.Id).Concat(r.Cards.Select(x=>x.Id)).Distinct().Count()==r.Accounts.Length+r.Cards.Length && r.Accounts.All(x=>x is not null && (x.Name?.Length ?? 0)<=120 && (x.BankName?.Length ?? 0)<=120) && r.Cards.All(x=>x is not null && (x.Name?.Length ?? 0)<=120 && (x.BankName?.Length ?? 0)<=120);
 static string? ValidateForCompletion(AccountInput[] accounts, CardInput[] cards)
@@ -182,6 +252,14 @@ static bool Amount(string s, bool nonnegative)
         && value <= 9999999999999999.99m;
 }
 static bool appDevelopmentLoginEnabled(WebApplicationBuilder builder) => builder.Environment.IsDevelopment() && builder.Configuration.GetValue<bool>("Authentication:DevelopmentLoginEnabled");
+static void AddNativeRatePolicy(RateLimiterOptions options, string name, int permitsPerMinute) => options.AddPolicy(name, context =>
+    RateLimitPartition.GetFixedWindowLimiter(context.Connection.RemoteIpAddress?.ToString() ?? "unknown", _ => new FixedWindowRateLimiterOptions
+    {
+        PermitLimit = permitsPerMinute,
+        Window = TimeSpan.FromMinutes(1),
+        QueueLimit = 0,
+        AutoReplenishment = true,
+    }));
 static bool Date(string s) => DateOnly.TryParseExact(s,"yyyy-MM-dd",CultureInfo.InvariantCulture,DateTimeStyles.None,out _);
 static bool Day(int? n) => n is null or (>=1 and <=31);
 public partial class Program { }

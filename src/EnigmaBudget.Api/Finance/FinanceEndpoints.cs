@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using EnigmaBudget.Api.Workspaces;
+using EnigmaBudget.Api.Identity;
 
 namespace EnigmaBudget.Api.Finance;
 
@@ -47,18 +48,7 @@ public static partial class FinanceEndpoints
         Task.FromResult(FinanceWorkspaceFilter.Get(http)?.Workspace
             ?? throw new InvalidOperationException("Financial endpoint ran without a resolved workspace context."));
 
-    private static async Task<bool> Csrf(HttpContext h, IAntiforgery csrf)
-    {
-        try
-        {
-            await csrf.ValidateRequestAsync(h);
-            return true;
-        }
-        catch (AntiforgeryValidationException)
-        {
-            return false;
-        }
-    }
+    private static Task<bool> Csrf(HttpContext h, IAntiforgery csrf) => NativeAuthCsrf.ValidateRequestAsync(h, csrf);
 
     private static IResult Problem(int status, string detail) =>
         Results.Problem(

@@ -757,6 +757,121 @@ namespace EnigmaBudget.Api.Data.Migrations
                         });
                 });
 
+            modelBuilder.Entity("EnigmaBudget.Api.Identity.NativeAuthChallenge", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("ConsumedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<byte[]>("NonceDigest")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("bytea");
+
+                    b.Property<string>("Platform")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("NativeAuthChallenges");
+                });
+
+            modelBuilder.Entity("EnigmaBudget.Api.Identity.NativeRefreshToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("ConsumedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ReplacedById")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SessionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<byte[]>("TokenDigest")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("bytea");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SessionId");
+
+                    b.HasIndex("TokenDigest")
+                        .IsUnique();
+
+                    b.ToTable("NativeRefreshTokens");
+                });
+
+            modelBuilder.Entity("EnigmaBudget.Api.Identity.NativeSession", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("AccessExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<byte[]>("AccessTokenDigest")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("bytea");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DeviceName")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<string>("DisplayName")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AccessTokenDigest")
+                        .IsUnique();
+
+                    b.HasIndex("UserId", "RevokedAt");
+
+                    b.ToTable("NativeSessions");
+                });
+
             modelBuilder.Entity("EnigmaBudget.Api.Workspaces.ApplicationUser", b =>
                 {
                     b.Property<Guid>("Id")
@@ -887,12 +1002,6 @@ namespace EnigmaBudget.Api.Data.Migrations
                     b.Property<Guid?>("AcceptedMembershipGeneration")
                         .HasColumnType("uuid");
 
-                    b.Property<int?>("IssuedForMembershipVersion")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid?>("IssuedForUserId")
-                        .HasColumnType("uuid");
-
                     b.Property<string>("Email")
                         .IsRequired()
                         .HasMaxLength(320)
@@ -900,6 +1009,12 @@ namespace EnigmaBudget.Api.Data.Migrations
 
                     b.Property<DateTimeOffset>("ExpiresAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("IssuedForMembershipVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("IssuedForUserId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Role")
                         .IsRequired()
@@ -1037,6 +1152,17 @@ namespace EnigmaBudget.Api.Data.Migrations
                     b.Navigation("OwnerUser");
                 });
 
+            modelBuilder.Entity("EnigmaBudget.Api.Identity.NativeRefreshToken", b =>
+                {
+                    b.HasOne("EnigmaBudget.Api.Identity.NativeSession", "Session")
+                        .WithMany("RefreshTokens")
+                        .HasForeignKey("SessionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Session");
+                });
+
             modelBuilder.Entity("EnigmaBudget.Api.Workspaces.PersonalReadGrant", b =>
                 {
                     b.HasOne("EnigmaBudget.Api.Data.Workspace", null)
@@ -1128,6 +1254,11 @@ namespace EnigmaBudget.Api.Data.Migrations
                     b.Navigation("Draft");
 
                     b.Navigation("Memberships");
+                });
+
+            modelBuilder.Entity("EnigmaBudget.Api.Identity.NativeSession", b =>
+                {
+                    b.Navigation("RefreshTokens");
                 });
 
             modelBuilder.Entity("EnigmaBudget.Api.Workspaces.ApplicationUser", b =>

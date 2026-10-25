@@ -153,6 +153,43 @@ public sealed class WorkspaceInvitationPrivacyIntegrationTests
     }
 
     [Fact]
+    public async Task Pending_invitation_bound_to_removed_subject_cannot_be_accepted_by_recycled_verified_email()
+    {
+        using var factory = new ApiFactory(timeProvider: new FixedTimeProvider(DateTimeOffset.Parse("2026-10-25T12:00:00Z")));
+        using var owner = VerifiedClient(factory, "recycled-email-owner", "owner@example.test");
+        using var removed = VerifiedClient(factory, "recycled-email-removed", "same@example.test");
+        using var recycled = VerifiedClient(factory, "recycled-email-new", "same@example.test");
+        await owner.GetAsync("/api/auth/session");
+        await removed.GetAsync("/api/auth/session");
+        await recycled.GetAsync("/api/auth/session");
+        await AddCsrfAsync(owner);
+        await AddCsrfAsync(removed);
+        await AddCsrfAsync(recycled);
+
+        var household = await CreateHouseholdAsync(owner);
+        var householdId = household.Id;
+        var member = await CreateInvitationAsync(owner, householdId, "same@example.test", "Member");
+        Assert.Equal(HttpStatusCode.OK, (await PostTokenAsync(removed, TokenFrom(member.ShareUrl))).StatusCode);
+
+        var pendingAdmin = await CreateInvitationAsync(owner, householdId, "same@example.test", "Admin");
+        var removedUserId = await UserIdAsync(factory, "recycled-email-removed");
+        using (var remove = new HttpRequestMessage(HttpMethod.Delete, $"/api/workspaces/{householdId}/members/{removedUserId}")
+        {
+            Content = JsonContent.Create(new { version = 1 }),
+        })
+        {
+            remove.Headers.Add("X-CSRF-TOKEN", owner.DefaultRequestHeaders.GetValues("X-CSRF-TOKEN").Single());
+            Assert.Equal(HttpStatusCode.NoContent, (await owner.SendAsync(remove)).StatusCode);
+        }
+
+        var rejected = await PostTokenAsync(recycled, TokenFrom(pendingAdmin.ShareUrl));
+        Assert.Equal(HttpStatusCode.NotFound, rejected.StatusCode);
+        await using var db = Db(factory);
+        Assert.False(await db.WorkspaceMemberships.AnyAsync(x => x.WorkspaceId == householdId && x.User.Subject == "recycled-email-new"));
+        Assert.Equal("Pending", await db.WorkspaceInvitations.Where(x => x.Id == pendingAdmin.Id).Select(x => x.Status).SingleAsync());
+    }
+
+    [Fact]
     public async Task Invitation_requires_csrf_and_current_verified_recipient_even_when_database_profile_is_verified()
     {
         using var factory = new ApiFactory();
