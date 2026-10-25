@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Security.Cryptography;
 using EnigmaBudget.Api.Data;
 using EnigmaBudget.Api.Savings;
 using Microsoft.EntityFrameworkCore;
@@ -133,6 +134,58 @@ public sealed class SavingsAllocationIntegrationTests
         Assert.Equal(1, await db.LedgerEntries.Where(x => x.Source == "operation-payment" && x.SourceId == paymentId).CountAsync());
         var reversal = Assert.Single(await db.SavingsMovements.Where(x => x.ReversesMovementId == applyId).ToArrayAsync());
         Assert.Equal("Pago aplicado por error", reversal.Reason);
+    }
+
+    [Fact]
+    public async Task Reversing_an_application_after_goal_close_releases_the_restored_reserve()
+    {
+        using var client = await _factory.AuthenticatedClientAsync();
+        var accountId = Guid.NewGuid();
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/api/accounts", new { id = accountId, name = "Caja", bankName = "Banco", currency = "ARS", openingBalance = "1000.00", openingDate = "2026-10-01" })).StatusCode);
+        var goalId = await CreateGoalAsync(client); var allocationId = await ReserveAsync(client, goalId, accountId, "600.00");
+        var operationId = Guid.NewGuid();
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/api/operations", new { id = operationId, kind = "Expense", accountId, date = "2026-10-20", description = "Compra", category = "Casa", amount = "100.00", paid = false })).StatusCode);
+        var paymentId = Guid.NewGuid();
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync($"/api/operations/{operationId}/payments", new { id = paymentId, accountId, date = "2026-10-21", amount = "100.00" })).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/api/savings/applications", new { id = Guid.NewGuid(), allocationId, financePaymentId = paymentId, amount = "100.00" })).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync($"/api/savings/goals/{goalId}/close", new { requestId = Guid.NewGuid(), version = 1, confirmRelease = true })).StatusCode);
+        await using var db = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>().UseNpgsql(_factory.TestConnection).Options);
+        var apply = await db.SavingsMovements.SingleAsync(x => x.AllocationId == allocationId && x.Kind == "Apply");
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync($"/api/savings/applications/{apply.Id}/reverse", new { requestId = Guid.NewGuid(), reason = "Corrección posterior al cierre", confirm = true })).StatusCode);
+        Assert.Equal(0m, await db.SavingsAllocations.Where(x => x.Id == allocationId).Select(x => x.ReservedAmount).SingleAsync());
+        Assert.Equal("Closed", await db.SavingsGoals.Where(x => x.Id == goalId).Select(x => x.State).SingleAsync());
+        Assert.Equal(2, await db.SavingsMovements.Where(x => x.AllocationId == allocationId && x.Kind == "Release").CountAsync());
+        Assert.Single(await db.SavingsMovements.Where(x => x.ReversesMovementId == apply.Id).ToArrayAsync());
+        Assert.Equal(1, await db.LedgerEntries.Where(x => x.Source == "operation-payment" && x.SourceId == paymentId).CountAsync());
+    }
+
+    [Fact]
+    public async Task Voiding_an_application_after_goal_close_releases_it_and_uses_fresh_internal_command()
+    {
+        using var client = await _factory.AuthenticatedClientAsync();
+        var accountId = Guid.NewGuid();
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/api/accounts", new { id = accountId, name = "Caja", bankName = "Banco", currency = "ARS", openingBalance = "1000.00", openingDate = "2026-10-01" })).StatusCode);
+        var goalId = await CreateGoalAsync(client); var allocationId = await ReserveAsync(client, goalId, accountId, "600.00");
+        var operationId = Guid.NewGuid();
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/api/operations", new { id = operationId, kind = "Expense", accountId, date = "2026-10-20", description = "Compra", category = "Casa", amount = "100.00", paid = false })).StatusCode);
+        var paymentId = Guid.NewGuid();
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync($"/api/operations/{operationId}/payments", new { id = paymentId, accountId, date = "2026-10-21", amount = "100.00" })).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/api/savings/applications", new { id = Guid.NewGuid(), allocationId, financePaymentId = paymentId, amount = "100.00" })).StatusCode);
+        await using var db = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>().UseNpgsql(_factory.TestConnection).Options);
+        var workspaceId = await db.SavingsGoals.Where(x => x.Id == goalId).Select(x => x.WorkspaceId).SingleAsync();
+        var apply = await db.SavingsMovements.SingleAsync(x => x.AllocationId == allocationId && x.Kind == "Apply");
+        var claimedId = DeterministicGuid(apply.Id);
+        db.SavingsCommands.Add(new SavingsCommand { WorkspaceId = workspaceId, RequestId = claimedId, CommandKind = "ClientClaim", PayloadHash = new string('B', 64), ResultResourceId = goalId, OccurredAt = DateTimeOffset.UtcNow });
+        await db.SaveChangesAsync();
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync($"/api/savings/goals/{goalId}/close", new { requestId = Guid.NewGuid(), version = 1, confirmRelease = true })).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync($"/api/operations/{operationId}/void", new { id = Guid.NewGuid(), version = 2, reason = "Anulación posterior al cierre" })).StatusCode);
+        Assert.Equal(0m, await db.SavingsAllocations.Where(x => x.Id == allocationId).Select(x => x.ReservedAmount).SingleAsync());
+        Assert.Equal("Closed", await db.SavingsGoals.Where(x => x.Id == goalId).Select(x => x.State).SingleAsync());
+        var reversal = await db.SavingsMovements.SingleAsync(x => x.ReversesMovementId == apply.Id);
+        Assert.NotEqual(claimedId, reversal.CommandId);
+        Assert.Equal("PaymentVoidReverse", (await db.SavingsCommands.SingleAsync(x => x.WorkspaceId == workspaceId && x.RequestId == reversal.CommandId)).CommandKind);
+        Assert.Equal(2, await db.SavingsMovements.Where(x => x.AllocationId == allocationId && x.Kind == "Release").CountAsync());
+        Assert.Equal(1, await db.LedgerEntries.Where(x => x.Source == "operation-void" && x.SourceId == paymentId).CountAsync());
     }
 
     [Fact]
@@ -290,6 +343,8 @@ public sealed class SavingsAllocationIntegrationTests
         await using var db = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>().UseNpgsql(_factory.TestConnection).Options);
         return await db.SavingsAllocations.Where(x => x.GoalId == goalId).Select(x => x.Id).SingleAsync();
     }
+
+    private static Guid DeterministicGuid(Guid input) => new(SHA256.HashData(input.ToByteArray()).AsSpan(0, 16));
 
     private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider { public override DateTimeOffset GetUtcNow() => now; }
 }

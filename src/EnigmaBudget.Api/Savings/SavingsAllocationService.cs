@@ -157,12 +157,22 @@ public sealed class SavingsAllocationService(AppDbContext db, BusinessClock cloc
             if (old is not null) return await ReplayAsync(ctx.Workspace.Id, old, "ApplicationReverse", hash, ct);
             var original = await db.SavingsMovements.SingleOrDefaultAsync(x => x.WorkspaceId == ctx.Workspace.Id && x.Id == movementId && x.Kind == "Apply", ct);
             if (original is null) return (null, 409, "Solo se puede revertir una aplicación de reserva.");
-            _ = await SavingsMutationLocks.LockGoalAsync(db, ctx.Workspace.Id, (await db.SavingsAllocations.SingleAsync(x => x.Id == original.AllocationId, ct)).GoalId, ct);
+            var goalId = (await db.SavingsAllocations.SingleAsync(x => x.Id == original.AllocationId, ct)).GoalId;
+            var goal = await SavingsMutationLocks.LockGoalAsync(db, ctx.Workspace.Id, goalId, ct);
+            if (goal is null) return (null, 404, "La meta no existe en este espacio.");
             if (original.FinancePaymentId is { } paymentId) _ = await LockPaymentAsync(ctx.Workspace.Id, paymentId, ct);
             if (await db.SavingsMovements.AnyAsync(x => x.WorkspaceId == ctx.Workspace.Id && x.ReversesMovementId == movementId, ct)) return (null, 409, "La aplicación ya fue revertida.");
             var a = await db.SavingsAllocations.SingleAsync(x => x.WorkspaceId == ctx.Workspace.Id && x.Id == original.AllocationId, ct);
             a.ReservedAmount += original.Amount; a.Version++; AddCommand(ctx.Workspace.Id, r.RequestId, "ApplicationReverse", hash, a.Id);
             AddMovement(ctx.Workspace.Id, a.Id, r.RequestId, "Reversal", original.Amount, fresh.User.Id, original.FinancePaymentId, movementId, r.Reason.Trim());
+            if (goal.State == "Closed")
+            {
+                var releaseCommandId = Guid.NewGuid();
+                a.ReservedAmount -= original.Amount; a.Version++;
+                var releaseReason = "Liberación automática por reversión en meta cerrada";
+                AddCommand(ctx.Workspace.Id, releaseCommandId, "ClosedGoalApplicationRelease", Hash(new { original.Id, reason = releaseReason }), a.Id);
+                AddMovement(ctx.Workspace.Id, a.Id, releaseCommandId, "Release", original.Amount, fresh.User.Id, reason: releaseReason);
+            }
             return await CommitDtoAsync(a, ct);
         }, ct);
     }
@@ -237,13 +247,22 @@ public sealed class SavingsAllocationService(AppDbContext db, BusinessClock cloc
             if (await db.SavingsMovements.AnyAsync(x => x.WorkspaceId == workspaceId && x.ReversesMovementId == application.Id, ct)) continue;
             var allocation = await db.SavingsAllocations.SingleAsync(x => x.WorkspaceId == workspaceId && x.Id == application.AllocationId, ct);
             allocation.ReservedAmount += application.Amount; allocation.Version++;
-            var systemRequest = DeterministicGuid(application.Id);
-            if (!await db.SavingsCommands.AnyAsync(x => x.WorkspaceId == workspaceId && x.RequestId == systemRequest, ct))
-                db.SavingsCommands.Add(new SavingsCommand { WorkspaceId = workspaceId, RequestId = systemRequest, CommandKind = "PaymentVoidReverse", PayloadHash = Hash(new { application.Id, reason = "Anulación del pago" }), ResultResourceId = allocation.Id, OccurredAt = DateTimeOffset.UtcNow });
-            db.SavingsMovements.Add(new SavingsMovement { Id = Guid.NewGuid(), WorkspaceId = workspaceId, AllocationId = allocation.Id, CommandId = systemRequest,
+            var reversalCommandId = Guid.NewGuid();
+            db.SavingsCommands.Add(new SavingsCommand { WorkspaceId = workspaceId, RequestId = reversalCommandId, CommandKind = "PaymentVoidReverse", PayloadHash = Hash(new { application.Id, reason = "Anulación del pago" }), ResultResourceId = allocation.Id, OccurredAt = DateTimeOffset.UtcNow });
+            db.SavingsMovements.Add(new SavingsMovement { Id = Guid.NewGuid(), WorkspaceId = workspaceId, AllocationId = allocation.Id, CommandId = reversalCommandId,
                 Kind = "Reversal", Currency = allocation.Currency, Amount = application.Amount, FinancePaymentId = payment.Id, ReversesMovementId = application.Id,
                 ActorUserId = actorUserId, Reason = "Compensación automática por anulación del pago", OccurredAt = DateTimeOffset.UtcNow });
+            var goal = await db.SavingsGoals.SingleAsync(x => x.WorkspaceId == workspaceId && x.Id == allocation.GoalId, ct);
+            if (goal.State == "Closed")
+            {
+                allocation.ReservedAmount -= application.Amount; allocation.Version++;
+                var releaseCommandId = Guid.NewGuid();
+                var releaseReason = "Liberación automática por anulación en meta cerrada";
+                db.SavingsCommands.Add(new SavingsCommand { WorkspaceId = workspaceId, RequestId = releaseCommandId, CommandKind = "ClosedGoalPaymentVoidRelease",
+                    PayloadHash = Hash(new { application.Id, reason = releaseReason }), ResultResourceId = allocation.Id, OccurredAt = DateTimeOffset.UtcNow });
+                db.SavingsMovements.Add(new SavingsMovement { Id = Guid.NewGuid(), WorkspaceId = workspaceId, AllocationId = allocation.Id, CommandId = releaseCommandId,
+                    Kind = "Release", Currency = allocation.Currency, Amount = application.Amount, ActorUserId = actorUserId, Reason = releaseReason, OccurredAt = DateTimeOffset.UtcNow });
+            }
         }
     }
-    private static Guid DeterministicGuid(Guid input) { var bytes = SHA256.HashData(input.ToByteArray()); return new Guid(bytes.AsSpan(0, 16)); }
 }
