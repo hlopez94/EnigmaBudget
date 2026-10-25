@@ -25,15 +25,14 @@ public sealed class SavingsAllocationIntegrationTests
         try
         {
             await _factory.SavingsLedgerReadBarrier.WaitUntilReadAsync().WaitAsync(TimeSpan.FromSeconds(15));
-            _factory.WorkspaceAuditInsertProbe.Arm();
             var paymentRequest = client.PostAsJsonAsync("/api/operations", new { id = Guid.NewGuid(), kind = "Expense", accountId, date = "2026-10-20", description = "Pago después de reserva", category = "Casa", amount = "500.00", paid = true });
-            await _factory.WorkspaceAuditInsertProbe.WaitUntilObservedAsync().WaitAsync(TimeSpan.FromSeconds(15));
-            var paymentPid = _factory.WorkspaceAuditInsertProbe.BackendPid!.Value;
             var reservePid = _factory.SavingsLedgerReadBarrier.BackendPid!.Value;
-            var wait = await WaitForBlockingAuditInsertAsync(paymentPid, reservePid, TimeSpan.FromSeconds(15));
+            var wait = await WaitForWorkspaceGateBlockAsync(reservePid, TimeSpan.FromSeconds(15));
+            Assert.NotEqual(reservePid, wait.PaymentPid);
             Assert.Contains(reservePid, wait.BlockingPids);
             Assert.Equal("Lock", wait.WaitEventType);
-            Assert.Contains("WorkspaceAuditEvents", wait.CurrentQuery, StringComparison.Ordinal);
+            Assert.Contains("\"Workspaces\"", wait.CurrentQuery, StringComparison.Ordinal);
+            Assert.Contains("FOR UPDATE", wait.CurrentQuery, StringComparison.OrdinalIgnoreCase);
             Assert.False(paymentRequest.IsCompleted);
             await using (var probe = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>().UseNpgsql(_factory.TestConnection).Options))
             {
@@ -53,7 +52,7 @@ public sealed class SavingsAllocationIntegrationTests
         Assert.Single(await db.SavingsAllocations.Where(x => x.GoalId == goalId).ToArrayAsync());
     }
 
-    private async Task<(string? WaitEventType, int[] BlockingPids, string CurrentQuery)> WaitForBlockingAuditInsertAsync(int paymentPid, int reservePid, TimeSpan timeout)
+    private async Task<(int PaymentPid, string? WaitEventType, int[] BlockingPids, string CurrentQuery)> WaitForWorkspaceGateBlockAsync(int reservePid, TimeSpan timeout)
     {
         var until = DateTime.UtcNow + timeout;
         await using var connection = new NpgsqlConnection(_factory.TestConnection);
@@ -61,20 +60,26 @@ public sealed class SavingsAllocationIntegrationTests
         while (DateTime.UtcNow < until)
         {
             await using var command = connection.CreateCommand();
-            command.CommandText = "SELECT wait_event_type, pg_blocking_pids(pid), query FROM pg_stat_activity WHERE pid = @pid";
-            command.Parameters.AddWithValue("pid", paymentPid);
+            command.CommandText = """
+                SELECT pid, wait_event_type, pg_blocking_pids(pid), query
+                FROM pg_stat_activity
+                WHERE datname = current_database()
+                  AND wait_event_type = 'Lock'
+                  AND @reserve_pid = ANY(pg_blocking_pids(pid))
+                  AND query ILIKE '%"Workspaces"%'
+                  AND query ILIKE '%FOR UPDATE%'
+                ORDER BY pid
+                LIMIT 1
+                """;
+            command.Parameters.AddWithValue("reserve_pid", reservePid);
             await using var reader = await command.ExecuteReaderAsync();
             if (await reader.ReadAsync())
             {
-                var waitEventType = reader.IsDBNull(0) ? null : reader.GetString(0);
-                var blockingPids = reader.GetFieldValue<int[]>(1);
-                var currentQuery = reader.GetString(2);
-                if (waitEventType == "Lock" && blockingPids.Contains(reservePid))
-                    return (waitEventType, blockingPids, currentQuery);
+                return (reader.GetInt32(0), reader.IsDBNull(1) ? null : reader.GetString(1), reader.GetFieldValue<int[]>(2), reader.GetString(3));
             }
             await Task.Delay(20);
         }
-        throw new TimeoutException($"Payment backend {paymentPid} did not show a PostgreSQL lock wait blocked by reservation backend {reservePid}.");
+        throw new TimeoutException($"No PostgreSQL workspace FOR UPDATE lock wait blocked by reservation backend {reservePid} was observed.");
     }
 
     [Fact]
