@@ -52,9 +52,9 @@ Google conserva su handler .NET. La afirmación de correo verificado se incorpor
 
 ## Consentimiento personal
 
-GET /api/personal-sharing devuelve los Hogares del propietario con `{householdId,householdName,enabled,version}`. PUT /api/personal-sharing/{householdId}: `{version,enabled}`. Solo el propietario del Personal y estando activo en ese Hogar. Default deshabilitado.
+GET /api/personal-sharing devuelve los Hogares del propietario con `{householdId,householdName,enabled,version,sharedWithUserIds,needsAudienceRenewal}`. PUT /api/personal-sharing/{householdId}: `{version,enabled}`. Solo el propietario del Personal y estando activo en ese Hogar. Default deshabilitado. Activar captura a los integrantes actuales y la generación vigente de sus membresías; un integrante nuevo o que reingresa necesita que el propietario renueve el consentimiento. Reenviar enabled:true con versión vigente renueva ese alcance; needsAudienceRenewal indica integrantes actuales aún no cubiertos. sharedWithUserIds identifica solo lectores actualmente cubiertos. La UI explica «Compartir con los integrantes actuales», sin habilitar lectura automática a futuros invitados.
 
-Acceso requiere propietario y lector aún activos en el Hogar y concesión vigente. Permiso efectivo Reader sobre el Personal ajeno, nunca escritura. Revocar/salir/quitar al propietario invalida concesiones correspondientes; reingresar no vuelve a compartir sin consentimiento. No se pueden retirar copias ya vistas/exportadas; se explica en la UI. El chequeo se reutiliza después en archivos/exportación/sincronización.
+Acceso requiere propietario y lector aún activos en el Hogar, concesión vigente y la generación de membresía que recibió el consentimiento. Una generación cambia al reactivar una membresía, no por un simple cambio de rol. El identificador/generación lo decide el servidor, sin depender de timestamps iguales durante pruebas ni de una versión incrementada por cambios de rol. Permiso efectivo Reader sobre el Personal ajeno, nunca escritura. Revocar/salir/quitar al propietario invalida concesiones correspondientes; reingresar no vuelve a compartir sin consentimiento. No se pueden retirar copias ya vistas/exportadas; se explica en la UI. El chequeo se reutiliza después en archivos/exportación/sincronización.
 
 ## Desarrollo y evidencia
 
