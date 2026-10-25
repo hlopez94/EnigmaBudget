@@ -77,6 +77,28 @@ select {
   font-size: 12px !important;
   margin-bottom: 18px;
 }
+body .finance-action-dialog.p-dialog {
+  --p-dialog-background: #fff;
+  --p-dialog-color: #202b23;
+  --p-dialog-border-color: #dfe6dd;
+  --p-dialog-border-radius: 14px;
+  --p-dialog-shadow: 0 18px 55px rgba(33, 52, 38, 0.14);
+  background: var(--p-dialog-background);
+  color: var(--p-dialog-color);
+  border: 1px solid var(--p-dialog-border-color);
+  border-radius: var(--p-dialog-border-radius);
+  box-shadow: var(--p-dialog-shadow);
+}
+body .finance-action-dialog .p-dialog-header {
+  background: #f8faf7;
+  color: #202b23;
+  border-bottom: 1px solid #e5e9e2;
+  border-radius: 14px 14px 0 0;
+}
+body .finance-action-dialog .p-dialog-content {
+  background: #fff;
+  color: #202b23;
+}
 
 .workspace .mobile-navigation {
   display: none;
@@ -174,13 +196,6 @@ select {
     display: flex;
     font-size: 0;
   }
-  .workspace .period-picker input {
-    min-height: 42px;
-    max-width: 145px;
-  }
-  .workspace .navigation {
-    display: none;
-  }
   .workspace .mobile-navigation {
     position: fixed;
     z-index: 100;
@@ -248,10 +263,6 @@ select {
   .workspace .form-grid textarea,
   .workspace .panel > label select,
   .workspace .filter-label select,
-  .workspace .period-picker input {
-    min-height: 44px;
-    font-size: 16px;
-  }
   .workspace .more-link {
     min-height: 68px;
   }
@@ -261,10 +272,10 @@ select {
     overflow-wrap: anywhere;
     text-align: right;
   }
-  .shell .topbar {
-    min-height: 52px;
+  .shell header.topbar {
+    min-height: 56px;
   }
-  .shell .footer {
+  .shell footer.footer {
     display: none;
   }
   .finance-action-dialog .p-dialog-content {
@@ -284,4 +295,8 @@ select {
   .workspace .inline-payment button {
     min-height: 44px;
   }
+.finance-action-dialog button.p-dialog-close-button {
+  min-width: 44px;
+  min-height: 44px;
+}
 }

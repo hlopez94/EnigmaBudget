@@ -50,7 +50,7 @@ export ENIGMABUDGET_E2E_CONNECTION='Host=127.0.0.1;Port=55432;Database=enigmabud
 ./scripts/verify.sh
 ```
 
-También se puede correr el navegador por separado con `ENIGMABUDGET_E2E_CONNECTION='cadena-a-base-vacía' npm --prefix web run test:e2e`. Playwright exige esa variable y no recurre a la conexión de las pruebas unitarias. La configuración compila y arranca el host de un solo proceso en `127.0.0.1:5080`, aplica las migraciones al iniciar y usa una identidad local fija. Para repetir el flujo, usá otra base vacía. Las capturas de la aceptación se guardan en `work/task3-finance-desktop.png`, `work/task3-finance-mobile-360.png` y `work/task3-sharing-mobile-360.png`.
+También se puede correr el navegador por separado con `ENIGMABUDGET_E2E_CONNECTION='cadena-a-base-vacía' npm --prefix web run test:e2e`. Playwright exige esa variable y no recurre a la conexión de las pruebas unitarias. La configuración compila y arranca el host de un solo proceso en `127.0.0.1:5080`, aplica las migraciones al iniciar y usa una identidad local fija. Para repetir el flujo, usá otra base vacía. La aceptación actual en Chromium verifica el recorrido financiero completo en 390×844, resumen y acciones sobre el pliegue a 360×800, controles y diálogos móviles, y navegación de escritorio en 1280×900. Las capturas locales se guardan en `work/task2-finance-mobile-390.png`, `work/task2-finance-mobile-360.png`, `work/task2-account-dialog-mobile-390.png`, `work/task2-sharing-mobile-360.png` y `work/task2-finance-desktop-1280.png`.
 
 Para crear y publicar la aplicación en `artifacts/publish`:
 

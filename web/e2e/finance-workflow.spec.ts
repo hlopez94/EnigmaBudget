@@ -26,6 +26,9 @@ const waitForApi = (page: Page, method: string, path: string) =>
     return url.pathname === path && response.request().method() === method;
   });
 
+const mobileNavigationButton = (page: Page, name: string) =>
+  page.locator('nav.mobile-navigation').getByRole('button', { name, exact: true });
+
 test('saves and reloads an onboarding draft, then confirms an empty setup', async ({ page }) => {
   const date = dateInArgentina();
   await page.goto('/');
@@ -87,6 +90,7 @@ test('runs real finance, sharing, and card acceptance from empty completed onboa
   const month = date.slice(0, 7);
   const nextMonth = monthAfter(month);
 
+  await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/');
   const signIn = waitForApi(page, 'POST', '/api/auth/development');
   await page.getByRole('button', { name: 'Ingresar como desarrollador' }).click();
@@ -94,16 +98,123 @@ test('runs real finance, sharing, and card acceptance from empty completed onboa
   await expect(page.getByRole('heading', { name: /Tu panorama financiero/ })).toBeVisible();
   await expect(page.getByText('Empezá por agregar una cuenta')).toBeVisible();
 
-  await page.getByRole('button', { name: 'Cuentas', exact: true }).click();
+  await page.getByRole('button', { name: 'Más', exact: true }).click();
+  await page.locator('.more-screen').getByRole('button', { name: /Cuentas/ }).click();
+  const addAccount = page
+    .locator('.accounts-list')
+    .getByRole('button', { name: /Agregar cuenta/ })
+    .first();
+  await addAccount.click();
   const accountForm = page.locator('form').filter({ has: page.locator('[name="accountName"]') });
+  const accountDialog = page.getByRole('dialog');
+  const closeAccountDialog = accountDialog.getByRole('button', { name: 'Cerrar', exact: true });
+  await expect
+    .poll(() =>
+      accountDialog.evaluate((dialog) =>
+        new DOMMatrixReadOnly(getComputedStyle(dialog).transform).a,
+      ),
+    )
+    .toBeGreaterThan(0.99999);
+  const accountDialogMetrics = await accountDialog.evaluate((dialog) => ({
+    fields: Array.from(dialog.querySelectorAll('input:not([type="checkbox"]), select, textarea')).map(
+      (field) => ({
+        height: field.getBoundingClientRect().height,
+        fontSize: Number.parseFloat(getComputedStyle(field).fontSize),
+      }),
+    ),
+    buttons: Array.from(dialog.querySelectorAll('button')).map((button) => ({
+      className: button.className,
+      parentClass: button.parentElement?.className,
+      minHeight: getComputedStyle(button).minHeight,
+      width: button.getBoundingClientRect().width,
+      height: button.getBoundingClientRect().height,
+    })),
+    transform: getComputedStyle(dialog).transform,
+  }));
+  expect(
+    accountDialogMetrics.fields.every((field) => field.height >= 44 && field.fontSize >= 16),
+    JSON.stringify(accountDialogMetrics),
+  ).toBe(true);
+  expect(
+    accountDialogMetrics.buttons.every((button) => button.height >= 44),
+    JSON.stringify(accountDialogMetrics),
+  ).toBe(true);
+  expect(
+    accountDialogMetrics.buttons.every((button) => button.width >= 44),
+    JSON.stringify(accountDialogMetrics),
+  ).toBe(true);
+  await expect(closeAccountDialog).toBeVisible();
+  const dialogTheme = await accountDialog.evaluate((dialog) => {
+    const header = dialog.querySelector('.p-dialog-header')!;
+    const title = header.querySelector('.p-dialog-title')!;
+    const rgb = (value: string) => value.match(/[\d.]+/g)!.slice(0, 3).map(Number);
+    const luminance = (value: string) =>
+      rgb(value)
+        .map((channel) => {
+          const normalized = channel / 255;
+          return normalized <= 0.04045
+            ? normalized / 12.92
+            : ((normalized + 0.055) / 1.055) ** 2.4;
+        })
+        .reduce((total, channel, index) => total + channel * [0.2126, 0.7152, 0.0722][index], 0);
+    const headerBackground = getComputedStyle(header).backgroundColor;
+    const headerColor = getComputedStyle(title).color;
+    const [lighter, darker] = [luminance(headerBackground), luminance(headerColor)].sort(
+      (left, right) => right - left,
+    );
+    return {
+      rootBackground: getComputedStyle(dialog).backgroundColor,
+      headerBackground,
+      headerColor,
+      headerContrast: (lighter + 0.05) / (darker + 0.05),
+      borderColor: getComputedStyle(dialog).borderTopColor,
+      shadow: getComputedStyle(dialog).boxShadow,
+      closeLabel: dialog.querySelector('button.p-dialog-close-button')?.getAttribute('aria-label'),
+    };
+  });
+  expect(dialogTheme.rootBackground).toBe('rgb(255, 255, 255)');
+  expect(dialogTheme.headerBackground).toBe('rgb(248, 250, 247)');
+  expect(dialogTheme.headerContrast).toBeGreaterThanOrEqual(7);
+  expect(dialogTheme.borderColor).toBe('rgb(223, 230, 221)');
+  expect(dialogTheme.shadow).not.toBe('none');
+  expect(dialogTheme.closeLabel).toBe('Cerrar');
+  const output = resolve(process.cwd(), '../work');
+  await mkdir(output, { recursive: true });
+  await page.screenshot({ path: resolve(output, 'task2-account-dialog-mobile-390.png') });
+  await accountForm.locator('[name="accountName"]').fill('Borrador móvil');
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toBeHidden();
+  await expect(addAccount).toBeFocused();
+  await page.getByRole('button', { name: 'Más', exact: true }).click();
+  await page.locator('.more-screen').getByRole('button', { name: /Cuentas/ }).click();
+  await addAccount.click();
+  await expect(accountForm.locator('[name="accountName"]')).toHaveValue('Borrador móvil');
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Más', exact: true }).click();
+  await page.locator('.more-screen').getByRole('button', { name: /Cuentas/ }).click();
+  await addAccount.click();
   const createPrimary = waitForApi(page, 'POST', '/api/accounts');
   await accountForm.locator('[name="accountName"]').fill('Cuenta principal');
   await accountForm.locator('[name="accountBank"]').fill('Banco Uno');
   await accountForm.locator('[name="openingBalance"]').fill('100000');
   await accountForm.locator('[name="openingDate"]').fill(date);
+  let savingAccount = false;
+  await page.route('**/api/accounts', async (route) => {
+    if (route.request().method() === 'POST' && !savingAccount) {
+      savingAccount = true;
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+    await route.continue();
+  });
   await accountForm.getByRole('button', { name: 'Guardar cuenta' }).click();
+  await expect(accountForm.getByRole('button', { name: 'Guardando…' })).toBeDisabled();
   expect((await createPrimary).status()).toBe(200);
+  await page.unroute('**/api/accounts');
 
+  await expect(
+    page.locator('.accounts-list .resource-card').filter({ hasText: 'Cuenta principal' }),
+  ).toBeVisible();
+  await addAccount.click();
   const createSecondary = waitForApi(page, 'POST', '/api/accounts');
   await accountForm.locator('[name="accountName"]').fill('Cuenta secundaria');
   await accountForm.locator('[name="accountBank"]').fill('Banco Dos');
@@ -112,7 +223,8 @@ test('runs real finance, sharing, and card acceptance from empty completed onboa
   await accountForm.getByRole('button', { name: 'Guardar cuenta' }).click();
   expect((await createSecondary).status()).toBe(200);
 
-  await page.getByRole('button', { name: 'Tarjetas y resúmenes' }).click();
+  await page.getByRole('button', { name: 'Tarjetas', exact: true }).click();
+  await page.getByRole('button', { name: 'Agregar tarjeta' }).first().click();
   const cardForm = page.locator('form').filter({ has: page.locator('[name="cardName"]') });
   const createCard = waitForApi(page, 'POST', '/api/cards');
   await cardForm.locator('[name="cardName"]').fill('Visa familiar');
@@ -121,11 +233,12 @@ test('runs real finance, sharing, and card acceptance from empty completed onboa
   await cardForm.getByRole('button', { name: 'Guardar tarjeta' }).click();
   expect((await createCard).status()).toBe(200);
 
-  await page.getByRole('button', { name: 'Movimientos', exact: true }).click();
+  await mobileNavigationButton(page, 'Movimientos').click();
+  await page.getByRole('button', { name: 'Ingreso o gasto' }).click();
   const operationForm = page
     .locator('form')
     .filter({ has: page.locator('[name="opDescription"]') });
-  const createIncome = waitForApi(page, 'POST', '/api/operations');
+  const rejectedOperation = waitForApi(page, 'POST', '/api/operations');
   await operationForm.locator('[name="opKind"]').selectOption('Income');
   await operationForm
     .locator('[name="opAccount"]')
@@ -133,11 +246,21 @@ test('runs real finance, sharing, and card acceptance from empty completed onboa
   await operationForm.locator('[name="opDate"]').fill(date);
   await operationForm.locator('[name="opDescription"]').fill('Ingreso de prueba');
   await operationForm.locator('[name="opCategory"]').fill('Trabajo');
-  await operationForm.locator('[name="opAmount"]').fill('1000');
+  await operationForm.locator('[name="opAmount"]').fill('0');
   await operationForm.locator('[name="opPaid"]').check();
+  await operationForm.getByRole('button', { name: 'Guardar movimiento' }).click();
+  expect((await rejectedOperation).status()).toBe(400);
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await expect(operationForm.locator('[name="opDescription"]')).toHaveValue('Ingreso de prueba');
+  await expect(operationForm.locator('[name="opCategory"]')).toHaveValue('Trabajo');
+  await expect(operationForm.locator('[name="opAmount"]')).toHaveValue('0');
+
+  const createIncome = waitForApi(page, 'POST', '/api/operations');
+  await operationForm.locator('[name="opAmount"]').fill('1000');
   await operationForm.getByRole('button', { name: 'Guardar movimiento' }).click();
   expect((await createIncome).status()).toBe(200);
 
+  await page.getByRole('button', { name: 'Ingreso o gasto' }).click();
   const createExpense = waitForApi(page, 'POST', '/api/operations');
   await operationForm.locator('[name="opKind"]').selectOption('Expense');
   await operationForm
@@ -151,6 +274,7 @@ test('runs real finance, sharing, and card acceptance from empty completed onboa
   await operationForm.getByRole('button', { name: 'Guardar movimiento' }).click();
   expect((await createExpense).status()).toBe(200);
 
+  await page.getByRole('button', { name: 'Transferir' }).click();
   const transferForm = page
     .locator('form')
     .filter({ has: page.locator('[name="transferAmount"]') });
@@ -174,7 +298,8 @@ test('runs real finance, sharing, and card acceptance from empty completed onboa
     overview.accounts.find((account: any) => account.name === 'Cuenta secundaria').currentBalance,
   ).toBe('100.00');
 
-  await page.getByRole('button', { name: 'Compartidos', exact: true }).click();
+  await mobileNavigationButton(page, 'Compartidos').click();
+  await page.getByRole('button', { name: 'Crear grupo' }).first().click();
   const groupForm = page.locator('form').filter({ has: page.locator('[name="groupName"]') });
   const createGroup = waitForApi(page, 'POST', '/api/groups');
   await groupForm.locator('[name="groupName"]').fill('Casa compartida');
@@ -202,12 +327,40 @@ test('runs real finance, sharing, and card acceptance from empty completed onboa
   await page.getByRole('button', { name: 'Confirmar reparto del mes' }).click();
   expect((await confirmFirstRule).status()).toBe(200);
 
-  await page.getByRole('button', { name: 'Tarjetas y resúmenes' }).click();
+  await mobileNavigationButton(page, 'Tarjetas').click();
   const cardResource = page.locator('.resource-card').filter({ hasText: 'Visa familiar' });
   await cardResource.getByRole('button', { name: 'Ver resumen y compras' }).click();
   const purchaseForm = page
     .locator('form')
     .filter({ has: page.locator('[name="purchaseDescription"]') });
+  await page.setViewportSize({ width: 360, height: 800 });
+  await page.getByRole('button', { name: 'Cargar compra' }).click();
+  const lastPurchaseField = purchaseForm.locator('[name="purchaseGroup"]');
+  const firstPurchaseField = purchaseForm.locator('[name="purchaseDescription"]');
+  await expect(firstPurchaseField).toBeFocused();
+  for (let tab = 0; tab < 12; tab++) {
+    if (await lastPurchaseField.evaluate((field) => field === document.activeElement)) break;
+    await page.keyboard.press('Tab');
+  }
+  await expect(lastPurchaseField).toBeFocused();
+  const modalScroll = await page.evaluate(() => {
+    const content = document.querySelector('.finance-action-dialog .p-dialog-content');
+    const field = content?.querySelector('[name="purchaseGroup"]');
+    const contentRect = content?.getBoundingClientRect();
+    const fieldRect = field?.getBoundingClientRect();
+    return {
+      scrollable: !!content && content.scrollHeight > content.clientHeight,
+      scrollTop: content?.scrollTop ?? 0,
+      fieldVisible:
+        !!contentRect &&
+        !!fieldRect &&
+        fieldRect.top >= contentRect.top &&
+        fieldRect.bottom <= contentRect.bottom,
+    };
+  });
+  expect(modalScroll).toMatchObject({ scrollable: true, fieldVisible: true });
+  expect(modalScroll.scrollTop).toBeGreaterThan(0);
+  await page.setViewportSize({ width: 390, height: 844 });
   const purchase = waitForApi(page, 'POST', '/api/purchases');
   await purchaseForm.locator('[name="purchaseDescription"]').fill('Compra familiar');
   await purchaseForm.locator('[name="purchaseCategory"]').fill('Hogar');
@@ -230,7 +383,7 @@ test('runs real finance, sharing, and card acceptance from empty completed onboa
     '40000.00',
   ]);
 
-  await page.getByRole('button', { name: 'Compartidos', exact: true }).click();
+  await mobileNavigationButton(page, 'Compartidos').click();
   let receivables = await (
     await page.request.get(`/api/groups/${groupId}/receivables?period=${month}`)
   ).json();
@@ -274,7 +427,7 @@ test('runs real finance, sharing, and card acceptance from empty completed onboa
   }
   await expect(shareRow.getByRole('button', { name: 'Cobrar parte' })).toHaveCount(0);
 
-  await page.getByRole('button', { name: 'Tarjetas y resúmenes' }).click();
+  await mobileNavigationButton(page, 'Tarjetas').click();
   await page.locator('input[aria-label="Período a consultar"]').fill(month);
   await cardResource.getByRole('button', { name: 'Ver resumen y compras' }).click();
   let statement = await (
@@ -282,6 +435,7 @@ test('runs real finance, sharing, and card acceptance from empty completed onboa
   ).json();
   expect(statement.expectedAmount).toBe('40000.00');
   const statementForm = page.locator('form').filter({ has: page.locator('[name="actualTotal"]') });
+  await page.getByRole('button', { name: 'Revisar resumen' }).click();
   await statementForm.locator('[name="actualTotal"]').fill('40000');
   const saveStatement = waitForApi(page, 'PUT', `/api/cards/${cardId}/statement`);
   await statementForm.getByRole('button', { name: 'Guardar revisión' }).click();
@@ -289,6 +443,8 @@ test('runs real finance, sharing, and card acceptance from empty completed onboa
   const confirmStatement = waitForApi(page, 'POST', `/api/cards/${cardId}/statement/confirm`);
   await statementForm.getByRole('button', { name: 'Confirmar resumen' }).click();
   expect((await confirmStatement).status()).toBe(200);
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Registrar pago' }).click();
   await expect(page.locator('form.pay-card')).toBeVisible();
 
   for (let paymentNumber = 0; paymentNumber < 2; paymentNumber++) {
@@ -303,13 +459,15 @@ test('runs real finance, sharing, and card acceptance from empty completed onboa
     await paymentForm.getByRole('button', { name: 'Registrar pago' }).click();
     expect((await payment).status()).toBe(200);
   }
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toBeHidden();
   statement = await (
     await page.request.get(`/api/cards/${cardId}/statement?period=${month}&currency=ARS`)
   ).json();
   expect(statement.pendingAmount).toBe('0.00');
   expect(statement.payments).toHaveLength(2);
 
-  await page.getByRole('button', { name: 'Compartidos', exact: true }).click();
+  await mobileNavigationButton(page, 'Compartidos').click();
   const period = page.locator('input[aria-label="Período a consultar"]');
   const nextOverview = page.waitForResponse((response) => {
     const url = new URL(response.url());
@@ -374,7 +532,7 @@ test('runs real finance, sharing, and card acceptance from empty completed onboa
   ).toBe('100.00');
   expect(overview.totals.cardDebtArs).toBe('80000.00');
 
-  await page.getByRole('button', { name: 'Inicio', exact: true }).click();
+  await mobileNavigationButton(page, 'Inicio').click();
   await page.reload();
   await expect(page.locator('.balance-card.ars strong')).toContainText('76.900');
   const accountsPanel = page.locator('.dashboard-columns .dash-panel').first();
@@ -385,31 +543,155 @@ test('runs real finance, sharing, and card acceptance from empty completed onboa
     accountsPanel.locator('.list-row').filter({ hasText: 'Cuenta secundaria' }).locator('strong'),
   ).toHaveText(/\$\s*100,00/);
   await expect(page.locator('.summary-card.debt').first()).toContainText('80.000');
-  const output = resolve(process.cwd(), '../work');
-  await mkdir(output, { recursive: true });
-  await page.screenshot({ path: resolve(output, 'task3-finance-desktop.png'), fullPage: true });
+  const homePhoneLayout = await page.evaluate(() => {
+    const rect = (selector: string) =>
+      document.querySelector(selector)?.getBoundingClientRect() ?? new DOMRect();
+    const summary = rect('.summary-grid');
+    const actions = rect('.quick-panel');
+    const register = rect('.quick-panel .quick-actions button');
+    const accounts = rect('.dashboard-columns .dash-panel');
+    const bottomNavigation = rect('nav.mobile-navigation');
+    const period = rect('input[aria-label="Período a consultar"]');
+    return {
+      summaryTop: summary.top,
+      summaryBottom: summary.bottom,
+      actionsBottom: actions.bottom,
+      registerBottom: register.bottom,
+      accountsTop: accounts.top,
+      navigationTop: bottomNavigation.top,
+      periodWidth: period.width,
+      periodValue: (document.querySelector('input[aria-label="Período a consultar"]') as HTMLInputElement)
+        ?.value,
+      viewportHeight: window.innerHeight,
+    };
+  });
+  expect(homePhoneLayout.summaryTop).toBeGreaterThan(0);
+  expect(homePhoneLayout.summaryBottom).toBeLessThanOrEqual(homePhoneLayout.viewportHeight);
+  expect(homePhoneLayout.summaryBottom).toBeLessThan(homePhoneLayout.navigationTop);
+  expect(homePhoneLayout.registerBottom).toBeLessThanOrEqual(homePhoneLayout.viewportHeight);
+  expect(homePhoneLayout.registerBottom).toBeLessThan(homePhoneLayout.navigationTop);
+  expect(homePhoneLayout.actionsBottom).toBeLessThan(homePhoneLayout.accountsTop);
+  expect(homePhoneLayout.periodWidth).toBeGreaterThanOrEqual(170);
+  expect(homePhoneLayout.periodValue).toMatch(/^\d{4}-\d{2}$/);
+  await page.screenshot({ path: resolve(output, 'task2-finance-mobile-390.png'), fullPage: true });
 
   await page.setViewportSize({ width: 360, height: 800 });
-  await page.reload();
-  await expect(page.getByRole('heading', { name: /Tu panorama financiero/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Tu panorama financiero/ })).toBeAttached();
   const dimensions = await page.evaluate(() => ({
     viewport: document.documentElement.clientWidth,
     document: document.documentElement.scrollWidth,
-    navViewport: document.querySelector('nav.navigation')?.clientWidth ?? 0,
-    navContent: document.querySelector('nav.navigation')?.scrollWidth ?? 0,
+    navViewport: document.querySelector('nav.mobile-navigation')?.clientWidth ?? 0,
+    navContent: document.querySelector('nav.mobile-navigation')?.scrollWidth ?? 0,
+    mobileNavVisible: getComputedStyle(document.querySelector('nav.mobile-navigation')!).display !== 'none',
+    navTargets: Array.from(document.querySelectorAll('nav.mobile-navigation button')).map((item) => {
+      const rect = item.getBoundingClientRect();
+      return { width: rect.width, height: rect.height };
+    }),
+    controls: Array.from(
+      document.querySelectorAll(
+        '.workspace button, .workspace input:not([type="checkbox"]), .workspace select, .workspace textarea',
+      ),
+    )
+      .filter((item) => item.getBoundingClientRect().width > 0)
+      .map((item) => ({
+        label: item.getAttribute('aria-label') ?? item.textContent?.trim() ?? item.tagName,
+        tagName: item.tagName,
+        height: item.getBoundingClientRect().height,
+        fontSize: Number.parseFloat(getComputedStyle(item).fontSize),
+      })),
+    desktopNavVisible: getComputedStyle(document.querySelector('nav.navigation')!).display !== 'none',
+    bottomInset: getComputedStyle(document.querySelector('nav.mobile-navigation')!).paddingBottom,
   }));
   expect(dimensions.document).toBeLessThanOrEqual(dimensions.viewport);
-  expect(dimensions.navContent).toBeGreaterThan(dimensions.navViewport);
-  await page.screenshot({ path: resolve(output, 'task3-finance-mobile-360.png'), fullPage: true });
-  const sharingNavigation = page.getByRole('button', { name: 'Compartidos', exact: true });
+  expect(dimensions.navContent).toBeLessThanOrEqual(dimensions.navViewport);
+  expect(dimensions.desktopNavVisible).toBe(false);
+  expect(dimensions.mobileNavVisible).toBe(true);
+  expect(dimensions.navTargets.every((target) => target.width >= 44 && target.height >= 44)).toBe(true);
+  expect(
+    dimensions.controls.every((control) => control.height >= 44),
+    JSON.stringify(dimensions.controls),
+  ).toBe(true);
+  expect(
+    dimensions.controls
+      .filter((control) => control.tagName !== 'BUTTON')
+      .every((control) => control.fontSize >= 16),
+  ).toBe(true);
+  expect(dimensions.bottomInset).not.toBe('0px');
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  const clearContent = await page.evaluate(() => ({
+    contentBottom: document.querySelector('.workspace > main')?.getBoundingClientRect().bottom ?? 0,
+    navigationTop: document.querySelector('nav.mobile-navigation')?.getBoundingClientRect().top ?? 0,
+  }));
+  expect(clearContent.contentBottom).toBeLessThanOrEqual(clearContent.navigationTop);
+  await page.screenshot({ path: resolve(output, 'task2-finance-mobile-360.png'), fullPage: true });
+  const sharingNavigation = mobileNavigationButton(page, 'Compartidos');
   await sharingNavigation.scrollIntoViewIfNeeded();
   await sharingNavigation.click();
   await expect(page.getByRole('heading', { name: 'Repartos y cobros mensuales' })).toBeVisible();
   await expect(page.locator('.balance-card.ars')).toHaveCount(0);
   const sharingWidth = await page.evaluate(() => document.documentElement.scrollWidth);
   expect(sharingWidth).toBeLessThanOrEqual(360);
-  await page.screenshot({
-    path: resolve(output, 'task3-sharing-mobile-360.png'),
-    fullPage: true,
-  });
+  await page.screenshot({ path: resolve(output, 'task2-sharing-mobile-360.png'), fullPage: true });
+
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.locator('nav.navigation').getByRole('button', { name: 'Inicio', exact: true }).click();
+  await expect(page.getByRole('heading', { name: /Tu panorama financiero/ })).toBeVisible();
+  const desktop = await page.evaluate(() => ({
+    viewport: document.documentElement.clientWidth,
+    document: document.documentElement.scrollWidth,
+    navVisible: getComputedStyle(document.querySelector('nav.navigation')!).display !== 'none',
+    mobileNavVisible:
+      getComputedStyle(document.querySelector('nav.mobile-navigation')!).display !== 'none',
+  }));
+  expect(desktop.document).toBeLessThanOrEqual(desktop.viewport);
+  expect(desktop.navVisible).toBe(true);
+  expect(desktop.mobileNavVisible).toBe(false);
+  await page.screenshot({ path: resolve(output, 'task2-finance-desktop-1280.png'), fullPage: true });
+});
+
+test('keeps populated home summary and primary action above the phone fold at both widths', async ({
+  page,
+}) => {
+  await page.goto('/');
+  const signIn = waitForApi(page, 'POST', '/api/auth/development');
+  await page.getByRole('button', { name: 'Ingresar como desarrollador' }).click();
+  expect((await signIn).status()).toBe(204);
+  await expect(page.getByRole('heading', { name: 'Inicio', exact: true })).toBeVisible();
+  await expect(page.locator('.summary-grid')).toBeVisible();
+
+  for (const viewport of [
+    { width: 390, height: 844 },
+    { width: 360, height: 800 },
+  ]) {
+    await page.setViewportSize(viewport);
+    const layout = await page.evaluate(() => {
+      const rect = (selector: string) =>
+        document.querySelector(selector)?.getBoundingClientRect() ?? new DOMRect();
+      const period = document.querySelector(
+        'input[aria-label="Período a consultar"]',
+      ) as HTMLInputElement | null;
+      return {
+        summaryTop: rect('.summary-grid').top,
+        summaryBottom: rect('.summary-grid').bottom,
+        quickActionsBottom: rect('.quick-panel').bottom,
+        registerBottom: rect('.quick-panel .quick-actions button').bottom,
+        accountListTop: rect('.dashboard-columns .dash-panel').top,
+        navigationTop: rect('nav.mobile-navigation').top,
+        periodWidth: period?.getBoundingClientRect().width ?? 0,
+        periodValue: period?.value,
+        viewportHeight: window.innerHeight,
+        phoneNavigationVisible:
+          getComputedStyle(document.querySelector('nav.mobile-navigation')!).display !== 'none',
+      };
+    });
+    expect.soft(layout.summaryTop).toBeGreaterThan(0);
+    expect.soft(layout.summaryBottom).toBeLessThanOrEqual(layout.viewportHeight);
+    expect.soft(layout.summaryBottom).toBeLessThan(layout.navigationTop);
+    expect.soft(layout.registerBottom).toBeLessThanOrEqual(layout.viewportHeight);
+    expect.soft(layout.registerBottom).toBeLessThan(layout.navigationTop);
+    expect.soft(layout.quickActionsBottom).toBeLessThan(layout.accountListTop);
+    expect.soft(layout.periodWidth).toBeGreaterThanOrEqual(170);
+    expect.soft(layout.periodValue).toMatch(/^\d{4}-\d{2}$/);
+    expect.soft(layout.phoneNavigationVisible).toBe(true);
+  }
 });

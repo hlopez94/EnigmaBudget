@@ -6,7 +6,7 @@ Estado inicial auditado el 25/10/2026: rama `codex/rebuild-net10-angular22`, bas
 
 | Área | Estado observado | Evidencia necesaria para completar |
 |---|---|---|
-| Experiencia móvil | Insuficiente: encabezado largo, navegación horizontal y formularios antes de listados | Flujo real a 360/390 px, navegación inferior, acciones accesibles, teclado/diálogos, capturas y escritorio sin regresiones |
+| Experiencia móvil | Primera entrega verificada en Chromium contra ASP.NET y PostgreSQL reales: flujo financiero a 390×844; resumen y acción principal sobre las listas; navegación inferior; borrador, Escape/foco, rechazo real de guardado y controles de diálogos; distribución a 360×800; escritorio a 1280×900. Evidencia: `.superpowers/sdd/2026-10-25-mobile/task-2-report.md` y capturas locales `work/task2-*.png`. | Continuar la revisión móvil de los módulos existentes al avanzar el alcance completo; mantener las comprobaciones de 360/390 px y escritorio en cada circuito relevante |
 | Acceso Google | Código configurado, sin credenciales reales verificadas | Inicio/cierre real, revocación y errores seguros, web y Android |
 | Cuentas, aperturas, conciliación | Base operativa existente | Mantener ARS/USD, tipos/alias, mantenimiento, conciliación y trazabilidad completos |
 | Movimientos y pagos | Base manual existente | Fuentes/categorías/comercios, filtros completos, devoluciones y vínculos, histórico y exportación |

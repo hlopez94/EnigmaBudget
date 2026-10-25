@@ -140,9 +140,11 @@
           </div>
           <span class="period-caption">Los saldos bancarios y de tarjeta son actuales.</span>
         </div>
-        <p class="ready-note">
-          <b>Tu base ya está lista.</b> Elegí una acción para continuar con tus finanzas.
-        </p>
+        @if (activeAccounts.length === 0 && cards.length === 0) {
+          <p class="ready-note">
+            <b>Tu base ya está lista.</b> Elegí una acción para continuar con tus finanzas.
+          </p>
+        }
         <section class="summary-grid" aria-label="Resumen separado por moneda y obligación">
           <article class="summary-card cash balance-card ars">
             <span>Saldo en cuentas · ARS</span
@@ -164,6 +166,17 @@
             ><strong>{{ money(overview.totals.cardDebtUsd, 'USD') }}</strong
             ><small>Crédito a favor: {{ money(overview.totals.cardCreditUsd, 'USD') }}</small>
           </article>
+        </section>
+        <section class="panel quick-panel">
+          <div>
+            <p class="eyebrow">ACCESOS DIRECTOS</p>
+            <h3>¿Qué querés hacer?</h3>
+          </div>
+          <div class="quick-actions">
+            <button type="button" (click)="navigate('operations')">＋ Registrar movimiento</button
+            ><button type="button" (click)="navigate('cards')">＋ Cargar compra</button
+            ><button type="button" (click)="navigate('sharing')">Ver cobros compartidos</button>
+          </div>
         </section>
         <div class="overview-columns dashboard-columns">
           <section class="panel dash-panel">
@@ -246,17 +259,6 @@
             </div>
           </section>
         </div>
-        <section class="panel quick-panel">
-          <div>
-            <p class="eyebrow">ACCESOS DIRECTOS</p>
-            <h3>¿Qué querés hacer?</h3>
-          </div>
-          <div class="quick-actions">
-            <button type="button" (click)="navigate('operations')">＋ Registrar movimiento</button
-            ><button type="button" (click)="navigate('cards')">＋ Cargar compra</button
-            ><button type="button" (click)="navigate('sharing')">Ver cobros compartidos</button>
-          </div>
-        </section>
       </main>
     }
     @defer (when section === 'accounts') {
