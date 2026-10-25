@@ -231,6 +231,82 @@ public sealed class ExchangeRateIntegrationTests
     }
 
     [Fact]
+    public async Task Authorized_goal_rate_replay_is_idempotent_and_does_not_increment_goal_version()
+    {
+        using var factory = new ApiFactory();
+        using var client = await factory.AuthenticatedClientAsync();
+        var created = await client.PostAsJsonAsync("/api/savings/goals", new SavingsGoalCreate(Guid.NewGuid(), "Meta", "ARS", "10.00", null, null, null));
+        using var goal = JsonDocument.Parse(await created.Content.ReadAsStringAsync());
+        var goalId = goal.RootElement.GetProperty("id").GetGuid();
+        var request = new SavingsGoalRateChoice(Guid.NewGuid(), goal.RootElement.GetProperty("version").GetInt32(), "Manual", null, null, null, "1000.00", "Referencia acordada");
+        Assert.Equal(HttpStatusCode.OK, (await client.PutAsJsonAsync($"/api/savings/goals/{goalId}/rate", request)).StatusCode);
+        var replay = await client.PutAsJsonAsync($"/api/savings/goals/{goalId}/rate", request);
+        var changedPayload = await client.PutAsJsonAsync($"/api/savings/goals/{goalId}/rate", request with { ManualReason = "Otra referencia" });
+        Assert.Equal(HttpStatusCode.OK, replay.StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, changedPayload.StatusCode);
+        using var latest = JsonDocument.Parse(await (await client.GetAsync("/api/savings/goals")).Content.ReadAsStringAsync());
+        Assert.Equal(2, latest.RootElement[0].GetProperty("version").GetInt32());
+        await using var db = Db(factory);
+        Assert.Equal(1, await db.SavingsCommands.CountAsync(x => x.RequestId == request.RequestId));
+        Assert.Equal(1, await db.SavingsGoalRateChoices.CountAsync(x => x.GoalId == goalId));
+    }
+
+    [Fact]
+    public async Task Goal_rate_replay_revalidates_membership_after_filter_preflight_before_workspace_lock()
+    {
+        const string ownerSubject = "rate-replay-race-owner";
+        const string memberSubject = "rate-replay-race-member";
+        using var factory = new ApiFactory();
+        using var owner = await factory.AuthenticatedClientAsync(ownerSubject);
+        using var member = await factory.AuthenticatedClientAsync(memberSubject);
+        var created = await owner.PostAsJsonAsync("/api/savings/goals", new SavingsGoalCreate(Guid.NewGuid(), "Meta", "ARS", "10.00", null, null, null));
+        Assert.Equal(HttpStatusCode.OK, created.StatusCode);
+        using var goal = JsonDocument.Parse(await created.Content.ReadAsStringAsync());
+        var goalId = goal.RootElement.GetProperty("id").GetGuid();
+        var workspaceId = Guid.Empty;
+        await using (var setup = Db(factory))
+        {
+            workspaceId = await setup.SavingsGoals.Where(x => x.Id == goalId).Select(x => x.WorkspaceId).SingleAsync();
+            var memberUserId = await setup.ApplicationUsers.Where(x => x.Subject == memberSubject).Select(x => x.Id).SingleAsync();
+            setup.WorkspaceMemberships.Add(new EnigmaBudget.Api.Workspaces.WorkspaceMembership
+            {
+                WorkspaceId = workspaceId, UserId = memberUserId, Role = "Admin", JoinedAt = DateTimeOffset.UtcNow
+            });
+            await setup.SaveChangesAsync();
+        }
+        member.DefaultRequestHeaders.Add("X-Workspace-Id", workspaceId.ToString());
+        var request = new SavingsGoalRateChoice(Guid.NewGuid(), goal.RootElement.GetProperty("version").GetInt32(), "Manual", null, null, null, "1000.00", "Referencia acordada");
+        Assert.Equal(HttpStatusCode.OK, (await member.PutAsJsonAsync($"/api/savings/goals/{goalId}/rate", request)).StatusCode);
+
+        factory.WorkspaceLockBarrier.Arm();
+        var replayTask = member.PutAsJsonAsync($"/api/savings/goals/{goalId}/rate", request);
+        var lockWait = factory.WorkspaceLockBarrier.WaitUntilBlockedAsync();
+        try
+        {
+            var first = await Task.WhenAny(replayTask, lockWait).WaitAsync(TimeSpan.FromSeconds(15));
+            Assert.Same(lockWait, first);
+            await using var revoke = Db(factory);
+            var memberUserId = await revoke.ApplicationUsers.Where(x => x.Subject == memberSubject).Select(x => x.Id).SingleAsync();
+            var membership = await revoke.WorkspaceMemberships.SingleAsync(x => x.WorkspaceId == workspaceId && x.UserId == memberUserId);
+            membership.Active = false;
+            membership.Version++;
+            await revoke.SaveChangesAsync();
+        }
+        finally { factory.WorkspaceLockBarrier.Release(); }
+
+        var replayResponse = await replayTask;
+        Assert.Equal(HttpStatusCode.NotFound, replayResponse.StatusCode);
+        using var responseBody = JsonDocument.Parse(await replayResponse.Content.ReadAsStringAsync());
+        Assert.False(responseBody.RootElement.TryGetProperty("rate", out _));
+        await using var verify = Db(factory);
+        Assert.Equal(1, await verify.SavingsCommands.CountAsync(x => x.RequestId == request.RequestId));
+        Assert.Equal(2, await verify.SavingsGoals.Where(x => x.Id == goalId).Select(x => x.Version).SingleAsync());
+        var choice = await verify.SavingsGoalRateChoices.SingleAsync(x => x.GoalId == goalId);
+        Assert.Equal(1, choice.Version);
+        Assert.Equal(1000m, choice.ManualArsPerUsd);
+    }
+
+    [Fact]
     public async Task Snapshot_goal_choice_requires_matching_house_and_side()
     {
         using var factory = new ApiFactory(exchangeRateHandlerFactory: () => new StubHandler(_ => Json(HttpStatusCode.OK, ValidQuote)));

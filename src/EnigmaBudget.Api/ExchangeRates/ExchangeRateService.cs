@@ -117,9 +117,6 @@ public sealed class ExchangeRateService(AppDbContext db, ExchangeRateRefreshCoor
         if (choice.Error is not null) return (null, 400, choice.Error);
         var canonical = JsonSerializer.Serialize(new { goalId, request });
         var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonical)));
-        var previous = await db.SavingsCommands.AsNoTracking().SingleOrDefaultAsync(x => x.WorkspaceId == context.Workspace.Id && x.RequestId == request.RequestId, ct);
-        if (previous is not null) return previous.CommandKind == "GoalRateChoice" && previous.PayloadHash == hash
-            ? (await ReadChoiceAsync(context.Workspace.Id, goalId, ct), 200, null) : (null, 409, "El identificador de solicitud ya se usó con otros datos.");
 
         var (lease, failure) = await mutationGate.AcquireAsync(context.Workspace.Id, ct);
         if (lease is null) return (null, failure, "El espacio no está disponible.");
