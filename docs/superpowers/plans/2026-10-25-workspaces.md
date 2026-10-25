@@ -66,8 +66,9 @@
 
 ## Task 4: Real multi-user acceptance and safe local delivery
 
-**Files:** Add web/e2e/workspace-privacy.spec.ts, explicit synthetic dev profile config in test server only, status/docs and reproduced integration fixes. Preserve existing3 finance/mobile acceptance cases and monetary assertions.
+**Files:** Add web/e2e/workspace-privacy.spec.ts, explicit synthetic dev profile config for opt-in Development only, status/docs and reproduced integration fixes. For local validation without Google configuration, expose configured synthetic profile labels/keys only in Development+opt-in session metadata and a clearly marked local-test picker; Production must expose none. Preserve default development login, existing3 finance/mobile acceptance cases and monetary assertions. Configure an isolated E2E webroot so tests never replace the live preview frontend before its backend is ready.
 
+- [ ] Add a strictly Development+opt-in local-test identity picker backed only by configured synthetic keys; production session metadata never lists profiles and the login route remains404. Keep default developer login working. Test both environment guards; no automatic user/data seeding or actual OAuth-success claim.
 - [ ] Real host/PostgreSQL/browser with isolated Alice/Bob/Reader contexts: create shared Household, invite/accept, record shared expense, prove personal unchanged/private; optional Personal reading, denied write, revocation/leave/rejoin. Require visible real actions and actual403/404, no mocked API responses.
 - [ ] Exercise four-seat pending/active cap with backend concurrency and browser capacity feedback, archived/owner protections, no old-context data flash/draft posting. Retain phone360/390 and desktop plus full existing finance flow.
 - [ ] Before applying the additive migration to the user preview, create a private ignored PostgreSQL backup with restricted file permissions, verify it by restoring into an explicitly owned disposable test database, and keep the original preview database untouched during the restore check. Never commit backup contents or print user data.
