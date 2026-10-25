@@ -35,9 +35,9 @@ Estado inicial auditado el 25/10/2026: rama `codex/rebuild-net10-angular22`, bas
 ## Orden de ejecución
 
 1. Rediseño móvil de todos los módulos ya operativos y publicación visual local.
-2. Fecha argentina común, ahorros/reservas, proyección y DolarAPI.
-3. Categorías, presupuestos, recurrencias/servicios, devoluciones y préstamos; completar detalles históricos de tarjetas.
-4. Tenants/RBAC, hogar/privacidad y colaboración de grupos independientes.
+2. Fecha argentina común y migración de tenants/membresías/RBAC conservando identidades, IDs e historial personal.
+3. Ahorros/reservas, proyección y DolarAPI; categorías, presupuestos, recurrencias/servicios, devoluciones y préstamos; completar detalles históricos de tarjetas.
+4. Hogar/caja común/privacidad y colaboración de grupos independientes sobre la autorización común.
 5. Archivos privados, exportaciones e importaciones con revisión.
 6. Planes, Mercado Pago y administración.
 7. PWA/Android, integración de acceso/archivos y operación final.
@@ -47,3 +47,9 @@ Cada bloque requiere código, pruebas apropiadas y flujo visible real. Una integ
 ## Restricciones permanentes
 
 Angular 22/OptimusUI 2, .NET 10, PostgreSQL, un solo host. Sin Ionic. S3 compatible para archivos y R2 al desplegar. Importes exactos ARS/USD, permisos en servidor, sin datos privados publicados. Agentes Luna. Tareas pesadas secuenciales, 4 GiB por árbol de procesos/contenedor, pausa con menos de 6 GiB disponibles. Conservar la base de vista previa y los datos que cargue el usuario.
+
+## Decisiones confirmadas durante la ejecución
+
+- 25/10/2026: el usuario confirma que una suscripción Hogar incluye las funciones personales de sus cuatro integrantes y el espacio familiar compartido. Esto no comparte sus datos personales: el consentimiento de lectura sigue siendo opcional y revocable. El máximo de cuatro incluye al propietario.
+- Los cobros de compras compartidas se calculan cuota por cuota según cada mes, como ya fue confirmado. La deuda completa frente al emisor sigue siendo del titular; esta decisión no está abierta.
+- Se anticipa la autorización común antes de nuevos módulos compartidos para evitar repetir resolutores de propietario y migrar fondos/historial dos veces. Es organización de implementación; no elimina módulos ni cambia el alcance.
