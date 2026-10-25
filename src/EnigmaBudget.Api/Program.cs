@@ -6,6 +6,7 @@ using EnigmaBudget.Api.Identity;
 using EnigmaBudget.Api.Onboarding;
 using EnigmaBudget.Api.Storage;
 using EnigmaBudget.Api.Finance;
+using EnigmaBudget.Api.Savings;
 using EnigmaBudget.Api.Workspaces;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -28,6 +29,7 @@ builder.Services.AddScoped<WorkspaceMutationGate>();
 builder.Services.AddScoped<WorkspaceAuditInterceptor>();
 builder.Services.AddScoped<InvitationService>();
 builder.Services.AddScoped<PrivacyGrantService>();
+builder.Services.AddScoped<SavingsService>();
 builder.Services.AddScoped<NativeSessionService>();
 builder.Services.AddSingleton<IGoogleIdTokenValidator, GoogleNativeIdTokenValidator>();
 builder.Services.AddOptions<NativeAuthConfiguration>().Bind(builder.Configuration.GetSection(NativeAuthConfiguration.SectionName))
@@ -222,6 +224,7 @@ api.MapPost("/onboarding/complete", async (HttpContext http, AppDbContext db, Wo
     return Results.Ok(State(draft));
 });
 api.MapFinanceEndpoints();
+api.MapSavingsEndpoints();
 app.MapWorkspaceEndpoints();
 app.Run();
 

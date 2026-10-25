@@ -5,6 +5,22 @@ namespace EnigmaBudget.Api.Tests;
 public sealed class WorkspaceAuthorizationTests
 {
     [Theory]
+    [InlineData("GET", "/api/savings/goals", WorkspacePermissions.Read)]
+    [InlineData("POST", "/api/savings/goals", WorkspacePermissions.ManageResources)]
+    [InlineData("PUT", "/api/savings/goals/123", WorkspacePermissions.ManageResources)]
+    [InlineData("POST", "/api/savings/goals/123/close", WorkspacePermissions.ManageResources)]
+    [InlineData("POST", "/api/savings/allocations", WorkspacePermissions.RecordFinance)]
+    [InlineData("POST", "/api/savings/allocations/123/release", WorkspacePermissions.RecordFinance)]
+    [InlineData("POST", "/api/savings/applications", WorkspacePermissions.RecordFinance)]
+    [InlineData("POST", "/api/savings/applications/123/reverse", WorkspacePermissions.CorrectHistory)]
+    [InlineData("PUT", "/api/accounts/123/liquidity", WorkspacePermissions.ManageResources)]
+    public void Savings_route_permissions_are_explicit(string method, string path, string expected)
+    {
+        var routeClassifier = typeof(FinanceWorkspaceFilter).GetMethod("RequiredPermission", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
+        Assert.Equal(expected, routeClassifier.Invoke(null, [method, new Microsoft.AspNetCore.Http.PathString(path)]));
+    }
+
+    [Theory]
     [InlineData("Owner", true, true, true, true, true, true)]
     [InlineData("Admin", true, true, true, true, true, false)]
     [InlineData("Member", true, true, true, false, false, false)]
