@@ -9,6 +9,94 @@ import { FinanceOperations } from './operations';
 import { FinanceSharing } from './sharing';
 
 describe('finance workspace regressions', () => {
+  it('keeps a closed finance draft on the old space when switching is cancelled, then discards it only after confirmation', async () => {
+    const shell = new (await import('./finance-shell')).FinanceShell(
+      { selectWorkspace: vi.fn() } as unknown as ApiService,
+      { markForCheck: vi.fn() } as unknown as import('@angular/core').ChangeDetectorRef,
+    );
+    const operations = new FinanceOperations({} as ApiService, { markForCheck: vi.fn() } as never);
+    operations.operationDraft.description = 'Cena familiar';
+    operations.activeForm = '';
+    shell.activeWorkspace = { id: 'old-space' } as never;
+    shell.operationComponents = { toArray: () => [operations] } as never;
+    const selected = vi.fn();
+    shell.workspaceSelected.subscribe(selected);
+
+    shell.requestWorkspaceChange('new-space');
+    expect(shell.requestedWorkspaceId).toBe('new-space');
+    shell.cancelWorkspaceChange();
+    expect(operations.operationDraft.description).toBe('Cena familiar');
+    expect(selected).not.toHaveBeenCalled();
+
+    shell.requestWorkspaceChange('new-space');
+    shell.confirmWorkspaceChange();
+    expect(selected).toHaveBeenCalledWith('new-space');
+    expect(operations.hasPendingDraft()).toBe(true);
+  });
+
+  it('blocks workspace switching while a finance save is in flight', async () => {
+    const shell = new (await import('./finance-shell')).FinanceShell(
+      {} as ApiService,
+      { markForCheck: vi.fn() } as never,
+    );
+    const operations = new FinanceOperations({} as ApiService, { markForCheck: vi.fn() } as never);
+    operations.saving = true;
+    shell.operationComponents = { toArray: () => [operations] } as never;
+
+    shell.requestWorkspaceChange('new-space');
+
+    expect(shell.requestedWorkspaceId).toBe('');
+    expect(shell.notice).toMatch(/guardado/i);
+  });
+
+  it('hides resource creation from Members while preserving their finance entry actions', async () => {
+    const api = { createAccount: vi.fn(), adjustAccount: vi.fn() };
+    const accounts = new FinanceAccounts(api as unknown as ApiService, { markForCheck: vi.fn() } as never);
+    accounts.permissions = { read: true, readGroups: true, recordFinance: true, manageResources: false, correctHistory: false, manageMembers: false, managePrivacy: false };
+    accounts.openForm('create');
+    await accounts.saveAccount();
+    accounts.openForm('adjust');
+    await accounts.adjustAccount();
+
+    const operations = new FinanceOperations({} as ApiService, { markForCheck: vi.fn() } as never);
+    operations.permissions = accounts.permissions;
+    operations.openForm('operation');
+
+    expect(accounts.activeForm).toBe('');
+    expect(operations.activeForm).toBe('operation');
+    expect(api.createAccount).not.toHaveBeenCalled();
+    expect(api.adjustAccount).not.toHaveBeenCalled();
+  });
+
+  it('ignores an old overview response after the active workspace changes', async () => {
+    let finishOld!: (value: never) => void;
+    const oldOverview = new Promise<never>((resolve) => { finishOld = resolve; });
+    let selectedId = '';
+    const api = {
+      selectWorkspace: vi.fn((id: string) => { selectedId = id; }),
+      workspace: vi.fn(() => Promise.resolve({ id: selectedId, permissions: { read: true, readGroups: true, recordFinance: true, manageResources: true, correctHistory: true, manageMembers: true, managePrivacy: true }, isArchived: false })),
+      financeOverview: vi.fn(() => selectedId === 'old-space' ? oldOverview : Promise.resolve({ period: '2026-11', marker: 'new-space' })),
+    };
+    const shell = new (await import('./finance-shell')).FinanceShell(
+      api as unknown as ApiService,
+      { markForCheck: vi.fn() } as never,
+    );
+    shell.activeWorkspace = { id: 'old-space' } as never;
+    const first = shell.ngOnInit();
+    await Promise.resolve();
+    shell.activeWorkspace = { id: 'new-space' } as never;
+    shell.ngOnChanges({ activeWorkspace: { previousValue: { id: 'old-space' }, currentValue: { id: 'new-space' } } as never });
+    await Promise.resolve();
+    await Promise.resolve();
+    await api.financeOverview.mock.results[1].value;
+    finishOld({ period: '2026-10', marker: 'old-space' } as never);
+    await first;
+
+    expect(api.selectWorkspace).toHaveBeenLastCalledWith('new-space');
+    expect(shell.overview?.period).toBe('2026-11');
+    expect(shell.overview).toMatchObject({ marker: 'new-space' });
+  });
+
   it('navigates from Más to accounts without changing the selected period', async () => {
     const shell = new (await import('./finance-shell')).FinanceShell(
       { financeOverview: vi.fn() } as unknown as ApiService,
@@ -161,6 +249,9 @@ describe('finance workspace regressions', () => {
         developmentLoginEnabled: false,
         csrfToken: 'csrf',
       }),
+      me: vi.fn().mockResolvedValue({ id: 'user', displayName: 'Ana', email: null, emailVerified: false, personalWorkspaceId: 'personal' }),
+      workspaces: vi.fn().mockResolvedValue([{ id: 'personal', name: 'Personal', ownerDisplayName: 'Ana', kind: 'Personal', role: 'Owner', isSharedPersonalRead: false, isArchived: false, version: 1, permissions: { read: true, readGroups: true, recordFinance: true, manageResources: true, correctHistory: true, manageMembers: true, managePrivacy: true } }]),
+      selectWorkspace: vi.fn(),
       loadOnboarding: vi
         .fn()
         .mockResolvedValue({ version: 0, completed: false, accounts: [], cards: [] }),
@@ -260,6 +351,7 @@ describe('finance workspace regressions', () => {
 
   it('refreshes the selected period after changing it without losing the selection', async () => {
     const api = {
+      workspace: vi.fn().mockResolvedValue({ id: 'personal', permissions: { read: true, readGroups: true, recordFinance: true, manageResources: true, correctHistory: true, manageMembers: true, managePrivacy: true }, isArchived: false }),
       financeOverview: vi.fn().mockImplementation((period: string) =>
         Promise.resolve({
           period,
@@ -279,6 +371,7 @@ describe('finance workspace regressions', () => {
       { markForCheck: vi.fn() } as unknown as import('@angular/core').ChangeDetectorRef,
     );
     shell.period = '2026-11';
+    shell.activeWorkspace = { id: 'personal' } as never;
 
     await shell.refresh();
 

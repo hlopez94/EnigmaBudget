@@ -8,13 +8,13 @@
   <section class="panel accounts-list">
     <div class="panel-title">
       <h3>Tus cuentas</h3>
-      <button type="button" class="primary" (click)="openForm('create')">＋ Agregar cuenta</button>
+      @if (permissions?.manageResources !== false && !workspaceArchived) { <button type="button" class="primary" (click)="openForm('create')">＋ Agregar cuenta</button> }
     </div>
     @if (accounts.length === 0) {
       <div class="empty">
         <b>Todavía no hay cuentas</b>
         <p>Agregá una para empezar a registrar ingresos, gastos y pagos.</p>
-        <button type="button" (click)="openForm('create')">Agregar cuenta</button>
+        @if (permissions?.manageResources !== false && !workspaceArchived) { <button type="button" (click)="openForm('create')">Agregar cuenta</button> }
       </div>
     }
     @for (a of accounts; track a.id) {
@@ -30,15 +30,15 @@
           </div>
           <strong>{{ money(a.currentBalance, a.currency) }}</strong>
         </div>
-        <button type="button" class="text-action" (click)="editAccount(a); openForm('edit')">
+        @if (permissions?.manageResources !== false && !workspaceArchived) { <button type="button" class="text-action" (click)="editAccount(a); openForm('edit')">
           Editar nombre o archivo
-        </button>
+        </button> }
       </div>
     }
     @if (activeAccounts.length) {
-      <button type="button" class="text-action" (click)="openForm('adjust')">
+      @if (permissions?.correctHistory !== false && !workspaceArchived) { <button type="button" class="text-action history-action" (click)="openForm('adjust')">
         Conciliar un saldo
-      </button>
+      </button> }
     }
   </section>
   <div class="section-heading">
@@ -177,9 +177,9 @@
           </div>
           <strong>{{ money(a.currentBalance, a.currency) }}</strong>
         </div>
-        <button type="button" class="text-action" (click)="editAccount(a)">
+        @if (permissions?.manageResources !== false && !workspaceArchived) { <button type="button" class="text-action" (click)="editAccount(a)">
           Editar nombre o archivo
-        </button>
+        </button> }
       </div>
     }
   </section>

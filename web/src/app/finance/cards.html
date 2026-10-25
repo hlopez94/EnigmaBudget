@@ -12,7 +12,7 @@
       <p>Una compra crea cuotas; el pago del resumen cancela deuda y no suma otro gasto.</p>
     </div>
     <div class="quick-actions">
-      <button type="button" class="primary" (click)="openForm('create')">＋ Agregar tarjeta</button>
+      @if (permissions?.manageResources !== false && !workspaceArchived) { <button type="button" class="primary" (click)="openForm('create')">＋ Agregar tarjeta</button> }
       @if (selectedCard) {
         <button type="button" class="secondary" (click)="openForm('purchase')">
           ＋ Cargar compra
@@ -90,7 +90,7 @@
       <div class="empty">
         <b>Todavía no hay tarjetas</b>
         <p>Agregá una tarjeta para cargar compras y revisar resúmenes.</p>
-        <button type="button" (click)="openForm('create')">Agregar tarjeta</button>
+        @if (permissions?.manageResources !== false && !workspaceArchived) { <button type="button" (click)="openForm('create')">Agregar tarjeta</button> }
       </div>
     }
     @for (c of cards; track c.id) {
@@ -110,13 +110,14 @@
           >
         </div>
         <div class="row-actions">
-          <button
+          @if (permissions?.manageResources !== false && !workspaceArchived) { <button
             type="button"
             class="text-action"
             (click)="selectedCardId = c.id; editCard(c); loadStatement(); loadPurchases()"
           >
             Administrar</button
-          ><button
+          > }
+          <button
             type="button"
             class="text-action"
             (click)="selectedCardId = c.id; loadStatement(); loadPurchases()"
@@ -287,7 +288,7 @@
             Importe esperado {{ money(statement.expectedAmount, statement.currency) }} · saldo
             anterior {{ money(statement.carryAmount, statement.currency) }}
           </p>
-          @if (statement.state !== 'Confirmed') {
+          @if (statement.state !== 'Confirmed' && permissions?.recordFinance !== false && !workspaceArchived) {
             <button type="button" class="secondary" (click)="openForm('statement')">
               Revisar resumen
             </button>

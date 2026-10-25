@@ -37,11 +37,11 @@ public static class WorkspaceEndpoints
     private static async Task<IResult> List(HttpContext http, AppDbContext db, WorkspaceProvisioner provisioner)
     {
         var personal = await provisioner.EnsurePersonalAsync(http.User, http.RequestAborted);
-        var rows = await db.WorkspaceMemberships.AsNoTracking().Include(x => x.Workspace)
+        var rows = await db.WorkspaceMemberships.AsNoTracking().Include(x => x.Workspace).ThenInclude(x => x.OwnerUser)
             .Where(x => x.UserId == personal.OwnerUserId && x.Active)
             .OrderBy(x => x.Workspace.Kind == "Personal" ? 0 : 1).ThenBy(x => x.Workspace.Name)
             .ToArrayAsync(http.RequestAborted);
-        var result = rows.Select(x => ToDto(x.Workspace, x.Role, personal.OwnerUserId)).ToList();
+        var result = rows.Select(x => ToDto(x.Workspace, x.Role, personal.OwnerUserId, membershipVersion: x.Version)).ToList();
         var shared = await (
             from grant in db.PersonalReadGrants.AsNoTracking()
             join audience in db.PersonalReadGrantAudience.AsNoTracking()
@@ -50,10 +50,10 @@ public static class WorkspaceEndpoints
                 on new { WorkspaceId = audience.HouseholdWorkspaceId, audience.UserId } equals new { member.WorkspaceId, member.UserId }
             join workspace in db.Workspaces.AsNoTracking() on grant.PersonalWorkspaceId equals workspace.Id
             where grant.Enabled && audience.UserId == personal.OwnerUserId && member.Active && member.ActivationGeneration == audience.MembershipGeneration
-            select workspace
+            select new { Workspace = workspace, OwnerDisplayName = workspace.OwnerUser.DisplayName }
         ).ToArrayAsync(http.RequestAborted);
         foreach (var workspace in shared)
-            if (result.All(x => x.Id != workspace.Id)) result.Add(ToDto(workspace, "Reader", personal.OwnerUserId, sharedPersonalRead: true));
+            if (result.All(x => x.Id != workspace.Workspace.Id)) result.Add(ToDto(workspace.Workspace, "Reader", personal.OwnerUserId, sharedPersonalRead: true, ownerDisplayName: workspace.OwnerDisplayName));
         return Results.Ok(result);
     }
 
@@ -65,7 +65,7 @@ public static class WorkspaceEndpoints
         var existing = await db.Workspaces.SingleOrDefaultAsync(x => x.Id == request.Id, http.RequestAborted);
         if (existing is not null)
         {
-            if (existing.Kind == request.Kind && existing.Name == request.Name.Trim() && existing.OwnerUserId == personal.OwnerUserId) return Results.Ok(ToDto(existing, "Owner", personal.OwnerUserId));
+            if (existing.Kind == request.Kind && existing.Name == request.Name.Trim() && existing.OwnerUserId == personal.OwnerUserId) return Results.Ok(ToDto(existing, "Owner", personal.OwnerUserId, ownerDisplayName: personal.OwnerUser.DisplayName, membershipVersion: 1));
             return Problem(409, "El identificador ya se usa con otros datos.");
         }
         var workspace = new Workspace { Id = request.Id, Name = request.Name.Trim(), Kind = "Household", OwnerUserId = personal.OwnerUserId, OwnerUser = personal.OwnerUser, IsArchived = false };
@@ -74,13 +74,16 @@ public static class WorkspaceEndpoints
         db.WorkspaceAuditEvents.Add(new WorkspaceAuditEvent { WorkspaceId = workspace.Id, ActorUserId = personal.OwnerUserId, Action = "workspace.created", ResourceType = "Workspace", ResourceId = workspace.Id.ToString(), OccurredAt = DateTimeOffset.UtcNow });
         try { await db.SaveChangesAsync(http.RequestAborted); }
         catch (DbUpdateException) { return Problem(409, "No se pudo crear el espacio. Actualizá y volvé a intentar."); }
-        return Results.Created($"/api/workspaces/{workspace.Id}", ToDto(workspace, "Owner", personal.OwnerUserId));
+        return Results.Created($"/api/workspaces/{workspace.Id}", ToDto(workspace, "Owner", personal.OwnerUserId, ownerDisplayName: personal.OwnerUser.DisplayName, membershipVersion: 1));
     }
 
-    private static async Task<IResult> Get(HttpContext http, WorkspaceAccessService access, Guid id)
+    private static async Task<IResult> Get(HttpContext http, AppDbContext db, WorkspaceAccessService access, Guid id)
     {
         var (context, failure) = await access.ResolveAsync(http.User, id.ToString(), WorkspacePermissions.Read, http.RequestAborted);
-        return context is null ? AccessFailure(failure) : Results.Ok(ToDto(context.Workspace, context.Role, context.User.Id, context.IsSharedPersonalRead));
+        if (context is null) return AccessFailure(failure);
+        var ownerDisplayName = await db.ApplicationUsers.AsNoTracking().Where(x => x.Id == context.Workspace.OwnerUserId).Select(x => x.DisplayName).SingleOrDefaultAsync(http.RequestAborted);
+        var membershipVersion = context.IsSharedPersonalRead ? null : await db.WorkspaceMemberships.AsNoTracking().Where(x => x.WorkspaceId == id && x.UserId == context.User.Id && x.Active).Select(x => (int?)x.Version).SingleOrDefaultAsync(http.RequestAborted);
+        return Results.Ok(ToDto(context.Workspace, context.Role, context.User.Id, context.IsSharedPersonalRead, ownerDisplayName, membershipVersion));
     }
 
     private static async Task<IResult> Update(HttpContext http, AppDbContext db, WorkspaceAccessService access, WorkspaceMutationGate gate, IAntiforgery csrf, Guid id, UpdateWorkspaceRequest request)
@@ -100,7 +103,9 @@ public static class WorkspaceEndpoints
         AddAudit(db, ctx, "workspace.updated", "Workspace", ws.Id);
         mutation.MarkChanged();
         try { await db.SaveChangesAsync(http.RequestAborted); await mutation.CommitAsync(http.RequestAborted); } catch (DbUpdateConcurrencyException) { return Problem(409, "El espacio cambió. Actualizá la pantalla."); }
-        return Results.Ok(ToDto(ws, ctx.Role, ctx.User.Id));
+        var ownerDisplayName = await db.ApplicationUsers.AsNoTracking().Where(x => x.Id == ws.OwnerUserId).Select(x => x.DisplayName).SingleOrDefaultAsync(http.RequestAborted);
+        var membershipVersion = await db.WorkspaceMemberships.AsNoTracking().Where(x => x.WorkspaceId == id && x.UserId == ctx.User.Id && x.Active).Select(x => (int?)x.Version).SingleOrDefaultAsync(http.RequestAborted);
+        return Results.Ok(ToDto(ws, ctx.Role, ctx.User.Id, ownerDisplayName: ownerDisplayName, membershipVersion: membershipVersion));
     }
 
     private static async Task<IResult> Members(HttpContext http, AppDbContext db, WorkspaceAccessService access, Guid id)
@@ -212,11 +217,11 @@ public static class WorkspaceEndpoints
         return Results.Ok(rows);
     }
 
-    private static WorkspaceDto ToDto(Workspace ws, string role, Guid userId, bool sharedPersonalRead = false)
+    private static WorkspaceDto ToDto(Workspace ws, string role, Guid userId, bool sharedPersonalRead = false, string? ownerDisplayName = null, int? membershipVersion = null)
     {
         var permissions = WorkspacePermissions.For(role, ws.Kind == "Personal" && role == "Owner" && ws.OwnerUserId == userId);
         if (sharedPersonalRead) permissions = new HashSet<string>([WorkspacePermissions.Read], StringComparer.Ordinal);
-        return new WorkspaceDto(ws.Id, ws.Name, ws.Kind, role, sharedPersonalRead, ws.IsArchived, ws.Version,
+        return new WorkspaceDto(ws.Id, ws.Name, ownerDisplayName ?? ws.OwnerUser?.DisplayName, membershipVersion, ws.Kind, role, sharedPersonalRead, ws.IsArchived, ws.Version,
             new(permissions.Contains(WorkspacePermissions.Read), permissions.Contains(WorkspacePermissions.ReadGroups), permissions.Contains(WorkspacePermissions.RecordFinance), permissions.Contains(WorkspacePermissions.ManageResources), permissions.Contains(WorkspacePermissions.CorrectHistory), permissions.Contains(WorkspacePermissions.ManageMembers), permissions.Contains(WorkspacePermissions.ManagePrivacy)));
     }
 

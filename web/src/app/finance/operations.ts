@@ -40,6 +40,9 @@ export class FinanceOperations extends FinanceActions {
   constructor(api: ApiService, changeDetector: ChangeDetectorRef) {
     super(api, changeDetector);
   }
+  protected override permissionsChanged(): void {
+    if (this.workspaceArchived || !this.allowed('recordFinance')) this.activeForm = '';
+  }
   get accounts() {
     return this.overview?.accounts ?? [];
   }
@@ -56,7 +59,11 @@ export class FinanceOperations extends FinanceActions {
   get operations() {
     return this.overview?.operations ?? [];
   }
+  override hasPendingDraft(): boolean {
+    return this.operationDraft.description.trim() !== '' || this.operationDraft.category.trim() !== '' || this.operationDraft.amount.trim() !== '' || this.operationDraft.accountId !== '' || this.operationDraft.kind !== 'Expense' || !this.operationDraft.paid || this.payment.amount.trim() !== '' || this.payment.accountId.trim() !== '' || this.transferDraft.fromAccountId !== '' || this.transferDraft.toAccountId !== '' || this.transferDraft.amount.trim() !== '' || this.transferDraft.destinationAmount.trim() !== '';
+  }
   openForm(form: 'operation' | 'transfer'): void {
+    if (!this.allowed('recordFinance')) return;
     this.activeForm = form;
   }
   closeForm(): void {
@@ -74,6 +81,7 @@ export class FinanceOperations extends FinanceActions {
   }
 
   async saveOperation(): Promise<void> {
+    if (!this.allowed('recordFinance')) return;
     const draft = { ...this.operationDraft };
     const payload = {
       ...draft,
@@ -100,6 +108,7 @@ export class FinanceOperations extends FinanceActions {
   }
 
   async payOperation(operation: Operation): Promise<void> {
+    if (!this.allowed('recordFinance')) return;
     const draft = { ...this.payment };
     const payload = {
       accountId: draft.accountId || operation.accountId,
@@ -123,6 +132,7 @@ export class FinanceOperations extends FinanceActions {
   }
 
   async voidOperation(operation: Operation): Promise<void> {
+    if (!this.allowed('correctHistory')) return;
     const reason = window.prompt('Motivo de anulación');
     if (!reason?.trim()) return;
     const payload = { version: operation.version, reason: reason.trim() };
@@ -143,6 +153,7 @@ export class FinanceOperations extends FinanceActions {
   }
 
   async transfer(): Promise<void> {
+    if (!this.allowed('recordFinance')) return;
     const draft = { ...this.transferDraft };
     const source = this.activeAccounts.find((account) => account.id === draft.fromAccountId);
     const destination = this.activeAccounts.find((account) => account.id === draft.toAccountId);

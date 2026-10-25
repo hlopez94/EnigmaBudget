@@ -103,14 +103,26 @@ public sealed class WorkspaceInvitationPrivacyIntegrationTests
         var token = TokenFrom(invitation.ShareUrl);
         Assert.Equal(HttpStatusCode.OK, (await PostTokenAsync(reader, token)).StatusCode);
 
+        var readerSpacesBeforeConsent = await reader.GetFromJsonAsync<JsonElement[]>("/api/workspaces");
+        Assert.DoesNotContain(readerSpacesBeforeConsent!, x => x.GetProperty("id").GetGuid() == personal.GetProperty("id").GetGuid());
+
         var sharing = await owner.PutAsJsonAsync($"/api/personal-sharing/{household.Id}", new { version = 1, enabled = true });
         Assert.Equal(HttpStatusCode.OK, sharing.StatusCode);
+        await using (var profiles = Db(factory))
+        {
+            (await profiles.ApplicationUsers.SingleAsync(x => x.Subject == "privacy-owner")).DisplayName = "Ana Titular";
+            (await profiles.ApplicationUsers.SingleAsync(x => x.Subject == "privacy-reader")).DisplayName = "Bruno Lector";
+            await profiles.SaveChangesAsync();
+        }
 
         var readerSpaces = await reader.GetFromJsonAsync<JsonElement[]>("/api/workspaces");
         Assert.NotNull(readerSpaces);
         var shared = Assert.Single(readerSpaces!, x => x.GetProperty("id").GetGuid() == personal.GetProperty("id").GetGuid());
         Assert.Equal("Reader", shared.GetProperty("role").GetString());
         Assert.True(shared.GetProperty("isSharedPersonalRead").GetBoolean());
+        Assert.Equal("Ana Titular", shared.GetProperty("ownerDisplayName").GetString());
+        Assert.DoesNotContain("email", shared.GetRawText(), StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("subject", shared.GetRawText(), StringComparison.OrdinalIgnoreCase);
 
         reader.DefaultRequestHeaders.Add("X-Workspace-Id", personal.GetProperty("id").GetString());
         using var overview = await reader.GetAsync("/api/finance");
@@ -224,6 +236,43 @@ public sealed class WorkspaceInvitationPrivacyIntegrationTests
         Assert.Equal(4, await db.WorkspaceMemberships.CountAsync(x => x.WorkspaceId == household.Id && x.Active));
         foreach (var response in accepted) response.Dispose();
         foreach (var invitee in invitees) invitee.Client.Dispose();
+    }
+
+    [Fact]
+    public async Task Member_can_leave_with_own_membership_version_without_roster_read_permission()
+    {
+        using var factory = new ApiFactory();
+        using var owner = VerifiedClient(factory, "leave-owner", "leave-owner@example.test");
+        using var member = VerifiedClient(factory, "leave-member", "leave-member@example.test");
+        await owner.GetAsync("/api/auth/session");
+        await member.GetAsync("/api/auth/session");
+        await AddCsrfAsync(owner);
+        await AddCsrfAsync(member);
+        var household = await CreateHouseholdAsync(owner);
+        var invitation = await CreateInvitationAsync(owner, household.Id, "leave-member@example.test");
+        var accept = await PostTokenAsync(member, TokenFrom(invitation.ShareUrl));
+        Assert.Equal(HttpStatusCode.OK, accept.StatusCode);
+
+        await using (var db = Db(factory))
+        {
+            var workspace = await db.Workspaces.SingleAsync(x => x.Id == household.Id);
+            workspace.Version = 7;
+            await db.SaveChangesAsync();
+        }
+        using var roster = await member.GetAsync($"/api/workspaces/{household.Id}/members");
+        Assert.Equal(HttpStatusCode.Forbidden, roster.StatusCode);
+        var spaces = await member.GetFromJsonAsync<JsonElement[]>("/api/workspaces");
+        var selected = Assert.Single(spaces!, x => x.GetProperty("id").GetGuid() == household.Id);
+        Assert.Equal(7, selected.GetProperty("version").GetInt32());
+        Assert.Equal(1, selected.GetProperty("membershipVersion").GetInt32());
+
+        using var leave = new HttpRequestMessage(HttpMethod.Post, $"/api/workspaces/{household.Id}/leave")
+        {
+            Content = JsonContent.Create(new { version = selected.GetProperty("membershipVersion").GetInt32() }),
+        };
+        leave.Headers.Add("X-CSRF-TOKEN", member.DefaultRequestHeaders.GetValues("X-CSRF-TOKEN").Single());
+        using var response = await member.SendAsync(leave);
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
     }
 
     [Fact]

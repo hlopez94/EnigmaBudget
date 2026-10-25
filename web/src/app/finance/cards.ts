@@ -61,6 +61,8 @@ export class FinanceCards extends FinanceActions implements OnChanges {
     actualTotal: '',
     adjustments: [] as CardAdjustment[],
   };
+  private cardEditOriginal: typeof this.cardEdit | null = null;
+  private statementDraftOriginal = '';
   cardPayment = {
     accountId: '',
     date: financeToday(),
@@ -71,6 +73,9 @@ export class FinanceCards extends FinanceActions implements OnChanges {
 
   constructor(api: ApiService, changeDetector: ChangeDetectorRef) {
     super(api, changeDetector);
+  }
+  protected override permissionsChanged(): void {
+    if (this.workspaceArchived || !this.allowed('recordFinance') || (!this.allowed('manageResources') && ['create', 'edit'].includes(this.activeForm))) this.activeForm = '';
   }
   get cards() {
     return this.overview?.cards ?? [];
@@ -91,7 +96,13 @@ export class FinanceCards extends FinanceActions implements OnChanges {
   get selectedCard() {
     return this.cards.find((card) => card.id === this.selectedCardId);
   }
+  override hasPendingDraft(): boolean {
+    const cardEditChanged = !!this.cardEditOriginal && (this.cardEdit.name !== this.cardEditOriginal.name || this.cardEdit.bankName !== this.cardEditOriginal.bankName || this.cardEdit.closingDay !== this.cardEditOriginal.closingDay || this.cardEdit.dueDay !== this.cardEditOriginal.dueDay || this.cardEdit.isArchived !== this.cardEditOriginal.isArchived);
+    const statementChanged = this.statementDraftOriginal !== '' && JSON.stringify(this.statementDraft) !== this.statementDraftOriginal;
+    return this.cardDraft.name.trim() !== '' || this.cardDraft.bankName.trim() !== '' || this.cardDraft.statementDebtArs !== '0' || this.cardDraft.statementDebtUsd !== '0' || this.purchaseDraft.description.trim() !== '' || this.purchaseDraft.category.trim() !== '' || this.purchaseDraft.totalAmount.trim() !== '' || this.purchaseDraft.groupId !== '' || this.cardPayment.amount.trim() !== '' || this.cardPayment.appliedAmount.trim() !== '' || this.cardPayment.accountId !== '' || cardEditChanged || statementChanged;
+  }
   openForm(form: 'create' | 'purchase' | 'statement' | 'payment'): void {
+    if (form === 'create' ? !this.allowed('manageResources') : !this.allowed('recordFinance')) return;
     this.activeForm = form;
   }
   closeForm(): void {
@@ -119,6 +130,7 @@ export class FinanceCards extends FinanceActions implements OnChanges {
   }
 
   editCard(card: NonNullable<FinanceCards['selectedCard']>): void {
+    if (!this.allowed('manageResources')) return;
     this.selectedCardId = card.id;
     this.cardEdit = {
       id: card.id,
@@ -129,6 +141,7 @@ export class FinanceCards extends FinanceActions implements OnChanges {
       isArchived: card.isArchived,
       version: card.version,
     };
+    this.cardEditOriginal = { ...this.cardEdit };
     this.activeForm = 'edit';
   }
 
@@ -147,6 +160,7 @@ export class FinanceCards extends FinanceActions implements OnChanges {
         ...adjustment,
         category: adjustment.category ?? '',
       }));
+      this.statementDraftOriginal = JSON.stringify(this.statementDraft);
       this.cardPayment.currency = this.statement.currency;
     } catch (error) {
       this.error = this.message(error);
@@ -166,6 +180,7 @@ export class FinanceCards extends FinanceActions implements OnChanges {
   }
 
   async saveCard(): Promise<void> {
+    if (!this.allowed('manageResources')) return;
     const payload = {
       ...this.cardDraft,
       closingDay: this.day(this.cardDraft.closingDay),
@@ -190,6 +205,7 @@ export class FinanceCards extends FinanceActions implements OnChanges {
   }
 
   async saveCardEdit(): Promise<void> {
+    if (!this.allowed('manageResources')) return;
     const draft = { ...this.cardEdit };
     if (
       !(await this.runMutation(
@@ -212,6 +228,7 @@ export class FinanceCards extends FinanceActions implements OnChanges {
   }
 
   async savePurchase(): Promise<void> {
+    if (!this.allowed('recordFinance')) return;
     const draft = { ...this.purchaseDraft };
     const payload = {
       cardId: this.selectedCardId,
@@ -243,6 +260,7 @@ export class FinanceCards extends FinanceActions implements OnChanges {
   }
 
   async saveStatement(): Promise<void> {
+    if (!this.allowed('recordFinance')) return;
     if (!this.selectedCardId) return;
     const statement = this.statement;
     const adjustments = this.statementDraft.adjustments.map((adjustment) => ({
@@ -288,6 +306,7 @@ export class FinanceCards extends FinanceActions implements OnChanges {
   }
 
   async confirmStatement(): Promise<void> {
+    if (!this.allowed('recordFinance')) return;
     if (!this.selectedCardId || !this.statement?.id) return;
     const statement = this.statement;
     if (
@@ -307,6 +326,7 @@ export class FinanceCards extends FinanceActions implements OnChanges {
   }
 
   async payStatement(): Promise<void> {
+    if (!this.allowed('recordFinance')) return;
     if (!this.selectedCardId || !this.statement) return;
     const statement = this.statement;
     const draft = { ...this.cardPayment };

@@ -1,6 +1,6 @@
-import { ChangeDetectorRef } from '@angular/core';
+import { ChangeDetectorRef, Directive, Input } from '@angular/core';
 import { ApiService } from '../core/api.service';
-import { Currency } from '../core/api.models';
+import { Currency, WorkspacePermissions } from '../core/api.models';
 import { formatMoney, normalizeDecimal } from '../onboarding/draft';
 
 export type RefreshFinanceOverview = () => Promise<void>;
@@ -18,11 +18,32 @@ export const financeToday = (): string => {
 };
 export const financePeriod = (): string => financeToday().slice(0, 7);
 
+@Directive()
 export abstract class FinanceActions {
+  private permissionState: WorkspacePermissions | null = null;
+  private archivedState = false;
+  @Input() set permissions(value: WorkspacePermissions | null) {
+    this.permissionState = value;
+    this.permissionsChanged();
+  }
+  get permissions(): WorkspacePermissions | null { return this.permissionState; }
+  @Input() set workspaceArchived(value: boolean) {
+    this.archivedState = value;
+    if (value) this.permissionsChanged();
+  }
+  get workspaceArchived(): boolean { return this.archivedState; }
   saving = false;
   error = '';
   notice = '';
   private readonly idempotencyKeys = new Map<string, string>();
+
+  hasPendingDraft(): boolean {
+    return false;
+  }
+  protected allowed(permission: keyof WorkspacePermissions): boolean {
+    return !this.workspaceArchived && (this.permissions?.[permission] ?? true);
+  }
+  protected permissionsChanged(): void {}
 
   protected constructor(
     protected readonly api: ApiService,

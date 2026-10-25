@@ -198,7 +198,7 @@
           >{{ op.kind === 'Expense' ? '−' : '+' }}{{ money(op.amount, op.currency) }}</strong
         >
         <div class="row-actions">
-          @if (op.status === 'Pending' || op.status === 'Partial') {
+          @if ((op.status === 'Pending' || op.status === 'Partial') && permissions?.recordFinance !== false && !workspaceArchived) {
             <button
               type="button"
               class="text-action"
@@ -207,8 +207,8 @@
               Registrar pago/cobro
             </button>
           }
-          @if (op.status !== 'Voided') {
-            <button type="button" class="text-action danger-text" (click)="voidOperation(op)">
+          @if (op.status !== 'Voided' && permissions?.correctHistory !== false && !workspaceArchived) {
+            <button type="button" class="text-action danger-text history-action" (click)="voidOperation(op)">
               Anular
             </button>
           }

@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Inject, Injectable, InjectionToken, Optional } from '@angular/core';
 import {
   Account,
   AccountSummary,
@@ -14,9 +14,15 @@ import {
   SaveDraftRequest,
   SessionInfo,
   Statement,
+  InvitationPreview,
+  PersonalSharing,
+  Workspace,
+  WorkspaceInvitation,
+  WorkspaceMember,
 } from './api.models';
 
 type Fetcher = typeof fetch;
+const API_FETCHER = new InjectionToken<Fetcher>('API_FETCHER');
 export class ApiProblem extends Error {
   constructor(
     readonly status: number,
@@ -30,7 +36,38 @@ export class ApiProblem extends Error {
 @Injectable({ providedIn: 'root' })
 export class ApiService {
   private csrfToken = '';
-  private readonly fetcher: Fetcher = (...args) => fetch(...args);
+  private readonly fetcher: Fetcher;
+  private selectedWorkspaceId: string | null = null;
+  private pendingInviteToken: string | null = null;
+
+  constructor(@Optional() @Inject(API_FETCHER) fetcher?: Fetcher) {
+    this.fetcher = fetcher ?? ((...args) => fetch(...args));
+  }
+
+  selectWorkspace(workspaceId: string | null): void {
+    this.selectedWorkspaceId = workspaceId;
+  }
+
+  clearWorkspace(): void {
+    this.selectedWorkspaceId = null;
+  }
+  capturePendingInvitation(): string | null {
+    const fragment = window.location.hash;
+    const match = /^#invite=([^&]+)$/.exec(fragment);
+    if (match) {
+      this.pendingInviteToken = decodeURIComponent(match[1]);
+      try { sessionStorage.setItem('enigma-budget:pending-invite', this.pendingInviteToken); } catch { /* Keep the token only in this tab's memory. */ }
+      window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
+    } else {
+      try { this.pendingInviteToken = sessionStorage.getItem('enigma-budget:pending-invite'); } catch { /* Storage may be unavailable. */ }
+    }
+    return this.pendingInviteToken;
+  }
+  pendingInvitation(): string | null { return this.pendingInviteToken; }
+  clearPendingInvitation(): void {
+    this.pendingInviteToken = null;
+    try { sessionStorage.removeItem('enigma-budget:pending-invite'); } catch { /* No persisted value to clear. */ }
+  }
 
   async session(): Promise<SessionInfo> {
     const session = await this.request<SessionInfo>('/api/auth/session');
@@ -48,7 +85,60 @@ export class ApiService {
   async logout(): Promise<void> {
     await this.mutate<void>('/api/auth/logout', { method: 'POST', body: '{}' });
     this.csrfToken = '';
+    this.clearWorkspace();
+    this.clearPendingInvitation();
     await this.session();
+  }
+  me(): Promise<{ id: string; displayName: string; email: string | null; emailVerified: boolean; personalWorkspaceId: string }> {
+    return this.request('/api/me');
+  }
+  workspaces(): Promise<Workspace[]> {
+    return this.request('/api/workspaces');
+  }
+  workspace(id: string): Promise<Workspace> {
+    return this.request(`/api/workspaces/${id}`);
+  }
+  createWorkspace(input: { id: string; kind: 'Household'; name: string }): Promise<Workspace> {
+    return this.mutate('/api/workspaces', { method: 'POST', body: JSON.stringify(input) });
+  }
+  updateWorkspace(id: string, input: { version: number; name: string; isArchived: boolean }): Promise<Workspace> {
+    return this.mutate(`/api/workspaces/${id}`, { method: 'PUT', body: JSON.stringify(input) });
+  }
+  members(id: string): Promise<WorkspaceMember[]> {
+    return this.request(`/api/workspaces/${id}/members`);
+  }
+  changeMember(id: string, userId: string, input: { version: number; role: string }): Promise<void> {
+    return this.mutate(`/api/workspaces/${id}/members/${userId}`, { method: 'PUT', body: JSON.stringify(input) });
+  }
+  removeMember(id: string, userId: string, version: number): Promise<void> {
+    return this.mutate(`/api/workspaces/${id}/members/${userId}`, { method: 'DELETE', body: JSON.stringify({ version }) });
+  }
+  leaveWorkspace(id: string, version: number): Promise<void> {
+    return this.mutate(`/api/workspaces/${id}/leave`, { method: 'POST', body: JSON.stringify({ version }) });
+  }
+  transferOwner(id: string, version: number, userId: string): Promise<void> {
+    return this.mutate(`/api/workspaces/${id}/owner-transfer`, { method: 'POST', body: JSON.stringify({ version, userId }) });
+  }
+  invitations(id: string): Promise<WorkspaceInvitation[]> {
+    return this.request(`/api/workspaces/${id}/invitations`);
+  }
+  createInvitation(id: string, input: { id: string; email: string; role: string }): Promise<WorkspaceInvitation> {
+    return this.mutate(`/api/workspaces/${id}/invitations`, { method: 'POST', body: JSON.stringify(input) });
+  }
+  revokeInvitation(id: string, invitationId: string, version: number): Promise<void> {
+    return this.mutate(`/api/workspaces/${id}/invitations/${invitationId}`, { method: 'DELETE', body: JSON.stringify({ version }) });
+  }
+  previewInvitation(token: string): Promise<InvitationPreview> {
+    return this.mutate('/api/invitations/preview', { method: 'POST', body: JSON.stringify({ token }) });
+  }
+  acceptInvitation(token: string): Promise<Workspace> {
+    return this.mutate('/api/invitations/accept', { method: 'POST', body: JSON.stringify({ token }) });
+  }
+  personalSharing(): Promise<PersonalSharing[]> {
+    return this.request('/api/personal-sharing');
+  }
+  updatePersonalSharing(householdId: string, version: number, enabled: boolean): Promise<PersonalSharing> {
+    return this.mutate(`/api/personal-sharing/${householdId}`, { method: 'PUT', body: JSON.stringify({ version, enabled }) });
   }
   loadOnboarding(): Promise<OnboardingState> {
     return this.request('/api/onboarding');
@@ -63,108 +153,112 @@ export class ApiService {
     });
   }
   accounts(): Promise<AccountSummary[]> {
-    return this.request('/api/accounts');
+    return this.financeRequest('/api/accounts');
   }
   cards(): Promise<CardSummary[]> {
-    return this.request('/api/cards');
+    return this.financeRequest('/api/cards');
   }
 
   financeOverview(period: string): Promise<FinanceOverview> {
-    return this.request(`/api/finance?period=${encodeURIComponent(period)}`);
+    return this.financeRequest<FinanceOverview & { groups?: Group[]; receivables?: Receivable[] }>(`/api/finance?period=${encodeURIComponent(period)}`).then((overview) => ({
+      ...overview,
+      groups: overview.groups ?? [],
+      receivables: overview.receivables ?? [],
+    }));
   }
   operations(period: string, accountId?: string): Promise<Operation[]> {
     const query = new URLSearchParams({ period });
     if (accountId) query.set('accountId', accountId);
-    return this.request(`/api/operations?${query}`);
+    return this.financeRequest(`/api/operations?${query}`);
   }
   createAccount(input: Record<string, unknown>): Promise<Account> {
-    return this.mutate('/api/accounts', { method: 'POST', body: JSON.stringify(input) });
+    return this.financeMutate('/api/accounts', { method: 'POST', body: JSON.stringify(input) });
   }
   updateAccount(id: string, input: Record<string, unknown>): Promise<Account> {
-    return this.mutate(`/api/accounts/${id}`, { method: 'PUT', body: JSON.stringify(input) });
+    return this.financeMutate(`/api/accounts/${id}`, { method: 'PUT', body: JSON.stringify(input) });
   }
   adjustAccount(id: string, input: Record<string, unknown>): Promise<Account> {
-    return this.mutate(`/api/accounts/${id}/adjustments`, {
+    return this.financeMutate(`/api/accounts/${id}/adjustments`, {
       method: 'POST',
       body: JSON.stringify(input),
     });
   }
   createOperation(input: Record<string, unknown>): Promise<Operation> {
-    return this.mutate('/api/operations', { method: 'POST', body: JSON.stringify(input) });
+    return this.financeMutate('/api/operations', { method: 'POST', body: JSON.stringify(input) });
   }
   payOperation(id: string, input: Record<string, unknown>): Promise<Operation> {
-    return this.mutate(`/api/operations/${id}/payments`, {
+    return this.financeMutate(`/api/operations/${id}/payments`, {
       method: 'POST',
       body: JSON.stringify(input),
     });
   }
   voidOperation(id: string, input: Record<string, unknown>): Promise<Operation> {
-    return this.mutate(`/api/operations/${id}/void`, {
+    return this.financeMutate(`/api/operations/${id}/void`, {
       method: 'POST',
       body: JSON.stringify(input),
     });
   }
   transfer(input: Record<string, unknown>): Promise<unknown> {
-    return this.mutate('/api/transfers', { method: 'POST', body: JSON.stringify(input) });
+    return this.financeMutate('/api/transfers', { method: 'POST', body: JSON.stringify(input) });
   }
   createCard(input: Record<string, unknown>): Promise<Card> {
-    return this.mutate('/api/cards', { method: 'POST', body: JSON.stringify(input) });
+    return this.financeMutate('/api/cards', { method: 'POST', body: JSON.stringify(input) });
   }
   updateCard(id: string, input: Record<string, unknown>): Promise<Card> {
-    return this.mutate(`/api/cards/${id}`, { method: 'PUT', body: JSON.stringify(input) });
+    return this.financeMutate(`/api/cards/${id}`, { method: 'PUT', body: JSON.stringify(input) });
   }
   purchases(cardId: string): Promise<Purchase[]> {
-    return this.request(`/api/cards/${cardId}/purchases`);
+    return this.financeRequest(`/api/cards/${cardId}/purchases`);
   }
   createPurchase(input: Record<string, unknown>): Promise<Purchase> {
-    return this.mutate('/api/purchases', { method: 'POST', body: JSON.stringify(input) });
+    return this.financeMutate('/api/purchases', { method: 'POST', body: JSON.stringify(input) });
   }
   statement(cardId: string, period: string, currency: string): Promise<Statement> {
-    return this.request(
+    return this.financeRequest(
       `/api/cards/${cardId}/statement?period=${encodeURIComponent(period)}&currency=${currency}`,
     );
   }
   saveStatement(cardId: string, input: Record<string, unknown>): Promise<Statement> {
-    return this.mutate(`/api/cards/${cardId}/statement`, {
+    return this.financeMutate(`/api/cards/${cardId}/statement`, {
       method: 'PUT',
       body: JSON.stringify(input),
     });
   }
   confirmStatement(cardId: string, input: Record<string, unknown>): Promise<Statement> {
-    return this.mutate(`/api/cards/${cardId}/statement/confirm`, {
+    return this.financeMutate(`/api/cards/${cardId}/statement/confirm`, {
       method: 'POST',
       body: JSON.stringify(input),
     });
   }
   payCard(cardId: string, input: Record<string, unknown>): Promise<unknown> {
-    return this.mutate(`/api/cards/${cardId}/payments`, {
+    return this.financeMutate(`/api/cards/${cardId}/payments`, {
       method: 'POST',
       body: JSON.stringify(input),
     });
   }
   groups(period: string): Promise<Group[]> {
-    return this.request(`/api/groups?period=${encodeURIComponent(period)}`);
+    return this.financeRequest(`/api/groups?period=${encodeURIComponent(period)}`);
   }
   createGroup(input: Record<string, unknown>): Promise<Group> {
-    return this.mutate('/api/groups', { method: 'POST', body: JSON.stringify(input) });
+    return this.financeMutate('/api/groups', { method: 'POST', body: JSON.stringify(input) });
   }
   saveRule(groupId: string, period: string, input: Record<string, unknown>): Promise<unknown> {
-    return this.mutate(`/api/groups/${groupId}/rules/${period}`, {
+    return this.financeMutate(`/api/groups/${groupId}/rules/${period}`, {
       method: 'PUT',
       body: JSON.stringify(input),
     });
   }
   confirmRule(groupId: string, period: string, input: Record<string, unknown>): Promise<unknown> {
-    return this.mutate(`/api/groups/${groupId}/rules/${period}/confirm`, {
+    return this.financeMutate(`/api/groups/${groupId}/rules/${period}/confirm`, {
       method: 'POST',
       body: JSON.stringify(input),
     });
   }
   receivables(groupId: string, period: string): Promise<Receivable[]> {
-    return this.request(`/api/groups/${groupId}/receivables?period=${encodeURIComponent(period)}`);
+    return this.financeRequest(`/api/groups/${groupId}/receivables?period=${encodeURIComponent(period)}`);
   }
   collect(groupId: string, input: Record<string, unknown>): Promise<unknown> {
-    return this.mutate(`/api/groups/${groupId}/collections`, {
+    return this.financeMutate(`/api/groups/${groupId}/collections`, {
       method: 'POST',
       body: JSON.stringify(input),
     });
@@ -175,6 +269,18 @@ export class ApiService {
       ...init,
       headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': this.csrfToken },
     });
+  }
+  private financeMutate<T>(url: string, init: RequestInit): Promise<T> {
+    const headers = new Headers(init.headers);
+    const workspaceIdAtDispatch = this.selectedWorkspaceId;
+    if (workspaceIdAtDispatch) headers.set('X-Workspace-Id', workspaceIdAtDispatch);
+    return this.request(url, { ...init, headers });
+  }
+  private financeRequest<T>(url: string): Promise<T> {
+    const headers = new Headers();
+    const workspaceIdAtDispatch = this.selectedWorkspaceId;
+    if (workspaceIdAtDispatch) headers.set('X-Workspace-Id', workspaceIdAtDispatch);
+    return this.request(url, { headers });
   }
   private async request<T>(url: string, init: RequestInit = {}): Promise<T> {
     const response = await this.fetcher(url, { ...init, credentials: 'include' });

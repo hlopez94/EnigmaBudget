@@ -1,0 +1,90 @@
+<section class="space-control panel" aria-label="Espacio de trabajo">
+  <div class="space-title">
+    <div>
+      <p class="eyebrow">ESPACIO ACTUAL</p>
+      <strong>{{ activeWorkspace ? label(activeWorkspace) : 'Cargando espacios…' }}</strong>
+    </div>
+    <label class="space-picker">Cambiar espacio
+      <select aria-label="Cambiar espacio" [ngModel]="activeWorkspace?.id || ''" (ngModelChange)="select($event)" [disabled]="busy || switchBlocked">
+        @for (space of workspaces; track space.id) {
+          <option [value]="space.id">{{ label(space) }}</option>
+        }
+      </select>
+    </label>
+  </div>
+  @if (open) {
+    @if (error) { <div class="feedback error" role="alert">{{ error }} <div class="feedback-actions"><button class="quiet-button" type="button" (click)="refreshSpaces()">Actualizar espacios</button>@if (pendingInviteToken && googleConfigured) { <button class="quiet-button" type="button" (click)="reloginWithGoogle()">Volver a iniciar sesión con Google</button> }</div></div> }
+    @if (notice) { <div class="feedback success" role="status">{{ notice }}</div> }
+    @if (pendingInviteToken) {
+      <section class="management-card invite-accept" aria-labelledby="accept-title">
+        <p class="eyebrow">INVITACIÓN</p>
+        @if (invitePreview) {
+          <h3 id="accept-title">Sumarte a {{ invitePreview.workspaceName }}</h3>
+          <p>Vas a ingresar como {{ invitePreview.role === 'Reader' ? 'lector' : invitePreview.role === 'Admin' ? 'administrador' : 'integrante' }}. La invitación requiere el correo verificado para el que se creó.</p>
+          <button class="primary" type="button" [disabled]="busy" (click)="acceptInvite()">{{ busy ? 'Aceptando…' : 'Aceptar invitación' }}</button>
+        } @else if (!error) { <p>Verificando el enlace de invitación…</p> }
+      </section>
+    }
+    @if (activeWorkspace?.kind === 'Household' && canManageMembers) {
+      <section class="management-card" aria-labelledby="members-title">
+        <div class="section-title"><div><p class="eyebrow">HOGAR · {{ activeMembers.length }} DE 4 LUGARES</p><h3 id="members-title">Integrantes e invitaciones</h3></div></div>
+        <p class="helper">Las invitaciones pendientes también reservan un lugar. Crear un Hogar no inicia una suscripción ni confirma un precio.</p>
+        @for (member of memberRows; track member.userId) {
+          <div class="member-row" [class.inactive]="!member.active">
+            <div><b>{{ member.displayName }}</b><small>{{ member.active ? 'Activo' : 'Salió del Hogar' }} · {{ member.role === 'Owner' ? 'Titular' : member.role === 'Admin' ? 'Administración' : member.role === 'Member' ? 'Integrante' : 'Solo lectura' }}</small></div>
+            @if (member.active && member.role !== 'Owner') {
+              <div class="member-actions">
+                <select [attr.aria-label]="'Rol de ' + member.displayName" [ngModel]="member.role" (ngModelChange)="changeRole(member, $event)" [disabled]="busy"><option value="Admin">Administración</option><option value="Member">Integrante</option><option value="Reader">Solo lectura</option></select>
+                <button class="quiet-button danger" type="button" (click)="removeMember(member)" [disabled]="busy">Quitar</button>
+                @if (currentOwner && activeWorkspace?.kind === 'Household') { <button class="quiet-button" type="button" (click)="transferOwner(member)" [disabled]="busy">Transferir titularidad</button> }
+              </div>
+            }
+          </div>
+        }
+        @for (invitation of invites; track invitation.id) {
+          <div class="member-row">
+            <div><b>{{ invitation.email }}</b><small>Invitación {{ invitation.status === 'Pending' ? 'pendiente' : invitation.status === 'Expired' ? 'vencida' : invitation.status === 'Revoked' ? 'revocada' : 'aceptada' }} · vence {{ invitation.expiresAt | date:'d/M/yyyy' }}</small></div>
+            @if (invitation.status === 'Pending') { <button class="quiet-button danger" type="button" (click)="revoke(invitation)" [disabled]="busy">Revocar</button> }
+          </div>
+        }
+        @if (shareUrl) {
+          <div class="share-link" role="status"><p>Enlace de un solo uso. Si se pierde, revocá la invitación y creá otra.</p><button class="primary" type="button" (click)="copyInvite()">Copiar enlace ahora</button></div>
+        }
+        <form class="invite-form" (ngSubmit)="invite()">
+          <label>Correo de la persona<input type="email" name="inviteEmail" [(ngModel)]="inviteEmail" required maxlength="320" autocomplete="email" [disabled]="busy"></label>
+          <label>Acceso inicial<select name="inviteRole" [(ngModel)]="inviteRole" [disabled]="busy"><option value="Member">Integrante</option><option value="Admin">Administración</option><option value="Reader">Solo lectura</option></select></label>
+          <button class="primary" type="submit" [disabled]="busy || activeMembers.length + pendingInvitations.length >= 4">Crear invitación</button>
+        </form>
+        @if (activeWorkspace?.role !== 'Owner') { <button class="quiet-button danger leave" type="button" (click)="leave()" [disabled]="busy">Salir del Hogar</button> }
+      </section>
+    }
+    @if (activeWorkspace?.kind === 'Household' && activeWorkspace?.isArchived) {
+      <p class="owner-note">Este Hogar está archivado y sus finanzas son de solo lectura. La persona con permiso para administrar recursos puede restaurarlo desde Configuración.</p>
+    }
+    @if (activeWorkspace?.kind === 'Household' && activeWorkspace?.permissions.manageResources) {
+      <section class="management-card" aria-labelledby="settings-title">
+        <p class="eyebrow">CONFIGURACIÓN</p><h3 id="settings-title">Nombre y estado del Hogar</h3>
+        <form class="invite-form" (ngSubmit)="saveWorkspace()"><label>Nombre<input name="workspaceName" [(ngModel)]="editName" maxlength="120" required [disabled]="busy"></label><button class="secondary" type="submit" [disabled]="busy">Guardar nombre</button></form>
+        <button class="quiet-button danger" type="button" (click)="toggleArchive()" [disabled]="busy">{{ activeWorkspace?.isArchived ? 'Restaurar Hogar' : 'Archivar Hogar' }}</button>
+      </section>
+    }
+    @if (isOwnPersonal && canManagePrivacy) {
+      <section class="management-card" aria-labelledby="privacy-title">
+        <p class="eyebrow">PRIVACIDAD PERSONAL</p><h3 id="privacy-title">Elegís qué puede ver cada Hogar</h3>
+        <p class="helper">Por defecto, tus finanzas son privadas. El permiso solo permite lectura general a integrantes actuales cubiertos; no incluye tus grupos independientes ni permite registrar o cambiar datos. Las personas que se sumen o reingresen necesitan que renueves el alcance. Podés revocarlo cuando quieras. No se pueden retirar copias ya vistas o exportadas.</p>
+        @for (item of sharing; track item.householdId) {
+          <div class="member-row privacy-row"><div><b>{{ item.householdName }}</b><small>{{ item.enabled ? 'Lectura compartida' : 'Privado' }} · {{ item.enabled ? item.sharedWithUserIds.length + ' integrante(s) cubierto(s)' : 'Solo vos' }}</small>@if (item.needsAudienceRenewal) { <small>Hay integrantes actuales que todavía no tienen consentimiento vigente.</small> }</div><button class="secondary" type="button" (click)="toggleSharing(item)" [disabled]="busy">{{ item.enabled ? (item.needsAudienceRenewal ? 'Renovar alcance' : 'Revocar acceso') : 'Compartir con integrantes actuales' }}</button></div>
+        }
+        @if (sharing.length === 0) { <p class="empty-note">No hay Hogares activos para compartir en este momento.</p> }
+      </section>
+    }
+    @if (activeWorkspace?.kind === 'Household' && activeWorkspace?.role === 'Owner') {
+      <p class="owner-note">La titularidad del espacio y la responsabilidad de facturación son distintas. La cobertura Hogar no se activa en esta pantalla.</p>
+    }
+    <section class="management-card create-space" aria-labelledby="create-title">
+      <p class="eyebrow">NUEVO ESPACIO</p><h3 id="create-title">Crear un Hogar</h3>
+      <p class="helper">Un Hogar comparte solo lo que se registra allí. Tus datos Personales siguen siendo privados hasta que autorices lectura.</p>
+      <form class="invite-form" (ngSubmit)="createHousehold()"><label>Nombre del Hogar<input name="householdName" [(ngModel)]="householdName" maxlength="120" required [disabled]="busy" placeholder="Por ejemplo, Casa"></label><button class="primary" type="submit" [disabled]="busy || !householdName.trim()">Crear Hogar</button></form>
+    </section>
+  }
+</section>

@@ -37,6 +37,9 @@ export class FinanceSharing extends FinanceActions implements OnChanges {
   constructor(api: ApiService, changeDetector: ChangeDetectorRef) {
     super(api, changeDetector);
   }
+  protected override permissionsChanged(): void {
+    if (this.workspaceArchived || !this.allowed('manageResources')) this.activeForm = '';
+  }
 
   get groups(): Group[] {
     return this.overview?.groups ?? [];
@@ -50,6 +53,16 @@ export class FinanceSharing extends FinanceActions implements OnChanges {
   get selectedGroup(): Group | undefined {
     return this.groups.find((group) => group.id === this.selectedGroupId);
   }
+  override hasPendingDraft(): boolean {
+    const rule = this.selectedGroup?.rule;
+    const weightsChanged = rule
+      ? this.selectedGroup!.participants.some((participant) => (this.ruleWeights[participant.id] ?? '') !== (rule.weights.find((weight) => weight.id === participant.id)?.value ?? ''))
+      : Object.values(this.ruleWeights).some((value) => value.trim() !== '');
+    const ruleChanged = weightsChanged || (rule
+      ? this.ruleMode !== rule.mode || this.ruleCurrency !== rule.basisCurrency
+      : this.ruleMode !== 'Equal' || this.ruleCurrency !== 'ARS');
+    return this.groupDraft.name.trim() !== '' || this.groupDraft.selfName.trim() !== 'Yo' || this.groupDraft.others.trim() !== '' || this.collection.amount.trim() !== '' || this.collection.appliedAmount.trim() !== '' || this.collection.participantId !== '' || ruleChanged;
+  }
   get collectionCurrenciesDiffer(): boolean {
     const row = this.groupReceivables.find(
       (item) =>
@@ -60,6 +73,7 @@ export class FinanceSharing extends FinanceActions implements OnChanges {
     return !!row && !!account && account.currency !== row.currency;
   }
   openForm(): void {
+    if (!this.allowed('manageResources')) return;
     this.activeForm = 'group';
   }
   closeForm(): void {
@@ -94,6 +108,7 @@ export class FinanceSharing extends FinanceActions implements OnChanges {
   }
 
   async createGroup(): Promise<void> {
+    if (!this.allowed('manageResources')) return;
     const names = [
       this.groupDraft.selfName,
       ...this.groupDraft.others
@@ -127,6 +142,7 @@ export class FinanceSharing extends FinanceActions implements OnChanges {
   }
 
   async saveRule(): Promise<void> {
+    if (!this.allowed('manageResources')) return;
     const group = this.selectedGroup;
     if (!group) return;
     const request = {
@@ -154,6 +170,7 @@ export class FinanceSharing extends FinanceActions implements OnChanges {
   }
 
   async confirmRule(): Promise<void> {
+    if (!this.allowed('manageResources')) return;
     const group = this.selectedGroup;
     if (!group?.rule) return;
     if (
@@ -182,6 +199,7 @@ export class FinanceSharing extends FinanceActions implements OnChanges {
   }
 
   async collect(row: Receivable): Promise<void> {
+    if (!this.allowed('recordFinance')) return;
     const group = this.selectedGroup;
     if (!group) return;
     const draft = { ...this.collection };

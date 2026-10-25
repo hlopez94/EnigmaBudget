@@ -32,11 +32,24 @@
       </div>
       <app-onboarding [initialState]="state!" (completed)="completed($event)" />
     } @else if (session?.authenticated && financeAvailable) {
-      <app-finance-shell
-        [name]="session?.displayName || 'tu espacio'"
-        [setupIncomplete]="!state?.completed"
-        (setupRequested)="startSetup()"
-      />
+      @defer (when financeAvailable) {
+        <app-finance-shell
+          [name]="session?.displayName || 'tu espacio'"
+          [setupIncomplete]="!state?.completed && activeWorkspace?.id === personalWorkspaceId"
+          [workspaces]="workspaces"
+          [activeWorkspace]="activeWorkspace"
+          [personalWorkspaceId]="personalWorkspaceId"
+          [currentUserId]="currentUserId"
+          [googleConfigured]="session?.googleConfigured || false"
+          [pendingInviteToken]="pendingInviteToken"
+          (workspaceSelected)="selectWorkspace($event)"
+          (workspacesChanged)="reloadWorkspaces()"
+          (workspaceUpdated)="updateWorkspace($event)"
+          (setupRequested)="startSetup()"
+        />
+      } @placeholder {
+        <section class="loading" aria-live="polite"><p>Abriendo tus finanzas…</p></section>
+      }
     }
   </main>
   <footer class="footer">

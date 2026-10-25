@@ -26,10 +26,14 @@ export class FinanceAccounts extends FinanceActions {
     openingDate: financeToday(),
   };
   accountEdit = { id: '', name: '', bankName: '', isArchived: false, version: 0 };
+  private accountEditOriginal: typeof this.accountEdit | null = null;
   accountAdjustment = { date: financeToday(), observedBalance: '', reason: '' };
 
   constructor(api: ApiService, changeDetector: ChangeDetectorRef) {
     super(api, changeDetector);
+  }
+  protected override permissionsChanged(): void {
+    if (this.workspaceArchived || !this.allowed('manageResources') || !this.allowed('correctHistory')) this.activeForm = '';
   }
 
   get accounts(): Account[] {
@@ -42,7 +46,13 @@ export class FinanceAccounts extends FinanceActions {
     return this.accounts.find((account) => account.id === this.selectedAccountId);
   }
 
+  override hasPendingDraft(): boolean {
+    const editChanged = !!this.accountEditOriginal && (this.accountEdit.name !== this.accountEditOriginal.name || this.accountEdit.bankName !== this.accountEditOriginal.bankName || this.accountEdit.isArchived !== this.accountEditOriginal.isArchived);
+    return this.accountDraft.name.trim() !== '' || this.accountDraft.bankName.trim() !== '' || this.accountDraft.openingBalance !== '0' || this.accountAdjustment.observedBalance.trim() !== '' || this.accountAdjustment.reason.trim() !== '' || editChanged;
+  }
+
   openForm(form: 'create' | 'adjust' | 'edit'): void {
+    if (form === 'adjust' ? !this.allowed('correctHistory') : !this.allowed('manageResources')) return;
     this.activeForm = form;
   }
   closeForm(): void {
@@ -50,6 +60,7 @@ export class FinanceAccounts extends FinanceActions {
   }
 
   async saveAccount(): Promise<void> {
+    if (!this.allowed('manageResources')) return;
     const payload = {
       ...this.accountDraft,
       openingBalance: this.decimal(this.accountDraft.openingBalance),
@@ -72,6 +83,7 @@ export class FinanceAccounts extends FinanceActions {
   }
 
   editAccount(account: Account): void {
+    if (!this.allowed('manageResources')) return;
     this.accountEdit = {
       id: account.id,
       name: account.name,
@@ -79,9 +91,11 @@ export class FinanceAccounts extends FinanceActions {
       isArchived: account.isArchived,
       version: account.version,
     };
+    this.accountEditOriginal = { ...this.accountEdit };
   }
 
   async saveAccountEdit(): Promise<void> {
+    if (!this.allowed('manageResources')) return;
     const draft = { ...this.accountEdit };
     if (
       !(await this.runMutation(
@@ -102,6 +116,7 @@ export class FinanceAccounts extends FinanceActions {
   }
 
   async adjustAccount(): Promise<void> {
+    if (!this.allowed('correctHistory')) return;
     const account = this.selectedAccount;
     if (!account) return;
     const payload = {

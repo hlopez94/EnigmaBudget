@@ -126,7 +126,8 @@ public static class InvitationPrivacyEndpoints
         if (invitation.Status == "Accepted")
         {
             if (invitation.AcceptedByUserId == actor.Id && membership is { Active: true } && membership.ActivationGeneration == invitation.AcceptedMembershipGeneration)
-                return Results.Ok(ToAccepted(mutation.Workspace, membership.Role));
+                return Results.Ok(ToAccepted(mutation.Workspace, membership.Role, membership.Version,
+                    await db.ApplicationUsers.AsNoTracking().Where(x => x.Id == mutation.Workspace.OwnerUserId).Select(x => x.DisplayName).SingleOrDefaultAsync(http.RequestAborted)));
             return NotFound();
         }
         if (invitation.Status != "Pending" || invitation.ExpiresAt <= invitations.Now || mutation.Workspace.IsArchived) return NotFound();
@@ -156,7 +157,8 @@ public static class InvitationPrivacyEndpoints
         mutation.MarkChanged();
         try { await db.SaveChangesAsync(http.RequestAborted); await mutation.CommitAsync(http.RequestAborted); }
         catch (DbUpdateException) { return Problem(409, "La invitación ya cambió o el Hogar alcanzó su capacidad."); }
-        return Results.Ok(ToAccepted(mutation.Workspace, membership.Role));
+        return Results.Ok(ToAccepted(mutation.Workspace, membership.Role, membership.Version,
+            await db.ApplicationUsers.AsNoTracking().Where(x => x.Id == mutation.Workspace.OwnerUserId).Select(x => x.DisplayName).SingleOrDefaultAsync(http.RequestAborted)));
     }
 
     private static async Task<IResult> GetPersonalSharing(HttpContext http, WorkspaceProvisioner provisioner, PrivacyGrantService grants)
@@ -191,10 +193,10 @@ public static class InvitationPrivacyEndpoints
     }
 
     private static InvitationDto ToDto(WorkspaceInvitation invitation, string? shareUrl) => new(invitation.Id, invitation.Email, invitation.Role, invitation.Status, invitation.ExpiresAt, invitation.Version, shareUrl);
-    private static WorkspaceDto ToAccepted(Workspace workspace, string role)
+    private static WorkspaceDto ToAccepted(Workspace workspace, string role, int membershipVersion, string? ownerDisplayName)
     {
         var permissions = WorkspacePermissions.For(role, personalOwner: false);
-        return new WorkspaceDto(workspace.Id, workspace.Name, workspace.Kind, role, false, workspace.IsArchived, workspace.Version,
+        return new WorkspaceDto(workspace.Id, workspace.Name, ownerDisplayName, membershipVersion, workspace.Kind, role, false, workspace.IsArchived, workspace.Version,
             new(permissions.Contains(WorkspacePermissions.Read), permissions.Contains(WorkspacePermissions.ReadGroups), permissions.Contains(WorkspacePermissions.RecordFinance), permissions.Contains(WorkspacePermissions.ManageResources), permissions.Contains(WorkspacePermissions.CorrectHistory), permissions.Contains(WorkspacePermissions.ManageMembers), permissions.Contains(WorkspacePermissions.ManagePrivacy)));
     }
     private static WorkspaceAuditEvent Audit(Guid actor, Guid workspaceId, string action, Guid resourceId) => new() { WorkspaceId = workspaceId, ActorUserId = actor, Action = action, ResourceType = "WorkspaceInvitation", ResourceId = resourceId.ToString(), OccurredAt = DateTimeOffset.UtcNow };

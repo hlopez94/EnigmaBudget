@@ -6,6 +6,58 @@ export interface SessionInfo {
   developmentLoginEnabled: boolean;
   csrfToken: string;
 }
+export type WorkspaceRole = 'Owner' | 'Admin' | 'Member' | 'Reader';
+export interface WorkspacePermissions {
+  read: boolean;
+  readGroups: boolean;
+  recordFinance: boolean;
+  manageResources: boolean;
+  correctHistory: boolean;
+  manageMembers: boolean;
+  managePrivacy: boolean;
+}
+export interface Workspace {
+  id: string;
+  name: string;
+  ownerDisplayName: string | null;
+  membershipVersion: number | null;
+  kind: 'Personal' | 'Household';
+  role: WorkspaceRole;
+  isSharedPersonalRead: boolean;
+  isArchived: boolean;
+  version: number;
+  permissions: WorkspacePermissions;
+}
+export interface WorkspaceMember {
+  userId: string;
+  displayName: string;
+  role: WorkspaceRole;
+  active: boolean;
+  version: number;
+}
+export interface WorkspaceInvitation {
+  id: string;
+  email: string;
+  role: Exclude<WorkspaceRole, 'Owner'>;
+  status: 'Pending' | 'Expired' | 'Revoked' | 'Accepted';
+  expiresAt: string;
+  version: number;
+  shareUrl: string | null;
+}
+export interface PersonalSharing {
+  householdId: string;
+  householdName: string;
+  enabled: boolean;
+  version: number;
+  sharedWithUserIds: string[];
+  needsAudienceRenewal: boolean;
+}
+export interface InvitationPreview {
+  workspaceId: string;
+  workspaceName: string;
+  role: Exclude<WorkspaceRole, 'Owner'>;
+  expiresAt: string;
+}
 export interface AccountInput {
   id: string;
   name: string;

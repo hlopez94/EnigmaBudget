@@ -1,7 +1,7 @@
 namespace EnigmaBudget.Api.Workspaces;
 
 public sealed record WorkspaceDto(
-    Guid Id, string Name, string Kind, string Role, bool IsSharedPersonalRead,
+    Guid Id, string Name, string? OwnerDisplayName, int? MembershipVersion, string Kind, string Role, bool IsSharedPersonalRead,
     bool IsArchived, int Version, WorkspacePermissionsDto Permissions);
 public sealed record WorkspacePermissionsDto(bool Read, bool ReadGroups, bool RecordFinance, bool ManageResources, bool CorrectHistory, bool ManageMembers, bool ManagePrivacy);
 public sealed record MeDto(Guid Id, string DisplayName, string? Email, bool EmailVerified, Guid PersonalWorkspaceId);
