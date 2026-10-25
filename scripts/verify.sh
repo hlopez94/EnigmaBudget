@@ -30,14 +30,11 @@ if [[ -z "${ENIGMABUDGET_TEST_CONNECTION:-}" ]]; then
 fi
 
 npm --prefix "$ROOT/web" ci
-ENIGMABUDGET_TEST_CONNECTION="$ENIGMABUDGET_TEST_CONNECTION" "$DOTNET_COMMAND" test "$ROOT/EnigmaBudget.sln" --configuration Release
-npm --prefix "$ROOT/web" test -- --run
+ENIGMABUDGET_TEST_CONNECTION="$ENIGMABUDGET_TEST_CONNECTION" "$DOTNET_COMMAND" test "$ROOT/EnigmaBudget.sln" --configuration Release --maxcpucount:1 -p:UseSharedCompilation=false
+npm --prefix "$ROOT/web" test -- --run --maxWorkers=2
 npm --prefix "$ROOT/web" run build
 
-WEB_ROOT="$ROOT/src/EnigmaBudget.Api/wwwroot"
-mkdir -p "$WEB_ROOT"
-find "$WEB_ROOT" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
-cp -R "$ROOT/web/dist/web/browser/." "$WEB_ROOT/"
+"$ROOT/scripts/sync-frontend.sh"
 
 if [[ -n "${ENIGMABUDGET_E2E_CONNECTION:-}" ]]; then
   DOTNET_COMMAND="$DOTNET_COMMAND" ENIGMABUDGET_E2E_CONNECTION="$ENIGMABUDGET_E2E_CONNECTION" npm --prefix "$ROOT/web" run test:e2e

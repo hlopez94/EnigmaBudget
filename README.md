@@ -1,8 +1,8 @@
 # EnigmaBudget
 
-Fundación ejecutable para configurar cuentas, saldos iniciales y deuda del resumen actual. Un único host ASP.NET Core sirve la API y los archivos compilados de Angular; PostgreSQL guarda los datos estructurados. La configuración de S3/R2 queda preparada para una etapa posterior, sin endpoints de archivos todavía.
+Aplicación web para llevar cuentas, tarjetas, movimientos, cuotas, gastos compartidos y cobranzas manuales. Un único host ASP.NET Core sirve la API y los archivos compilados de Angular; PostgreSQL guarda los datos estructurados. La configuración de S3/R2 queda preparada para una etapa posterior, sin endpoints de archivos todavía.
 
-La aplicación aún no reemplaza toda la planilla ni representa el SaaS terminado. La primera entrega cubre el inicio de sesión disponible, el borrador de configuración inicial y la confirmación idempotente de cuentas y tarjetas.
+La aplicación todavía no reemplaza toda la planilla ni representa el SaaS terminado. Incluye una base operativa para registrar movimientos y cuotas, administrar resúmenes y repartir gastos en un espacio personal; importaciones, automatizaciones y colaboración entre hogares siguen pendientes.
 
 ## Requisitos
 
@@ -34,7 +34,7 @@ Eliminá los volúmenes solo si también querés borrar los datos locales de Pos
 
 ## Compilar y verificar
 
-`scripts/verify.sh` corre las pruebas .NET con PostgreSQL real, las pruebas unitarias web y el build Angular. Si `ENIGMABUDGET_E2E_CONNECTION` está definido, también levanta el host .NET real y ejecuta Playwright contra esa base. La base de navegador debe ser nueva, aislada y descartable: el acceso de desarrollo usa una identidad fija de prueba.
+`scripts/verify.sh` corre las pruebas .NET con PostgreSQL real, las pruebas unitarias web, el build Angular y, si se configura `ENIGMABUDGET_E2E_CONNECTION`, Playwright contra el host .NET real y Chromium. La aceptación de navegador cubre borrador/confirmación de configuración, operaciones, cuotas y reparto mensual, cobranzas idempotentes, resumen/pagos, recarga y vista móvil. La base de navegador debe ser nueva, aislada y descartable: el acceso de desarrollo usa una identidad fija de prueba.
 
 Con el Compose local activo, creá una base vacía `enigmabudget_e2e` con el usuario local:
 
@@ -50,7 +50,7 @@ export ENIGMABUDGET_E2E_CONNECTION='Host=127.0.0.1;Port=55432;Database=enigmabud
 ./scripts/verify.sh
 ```
 
-También se puede correr el navegador por separado con `ENIGMABUDGET_E2E_CONNECTION='cadena-a-base-vacía' npm --prefix web run test:e2e`. Playwright exige esa variable y no recurre a la conexión de las pruebas unitarias. La configuración compila y arranca el host de un solo proceso en `127.0.0.1:5080`, aplica las migraciones al iniciar y usa una identidad local fija. Para repetir el flujo, usá otra base vacía. Las capturas de la prueba se guardan en `work/task3-dashboard.png`.
+También se puede correr el navegador por separado con `ENIGMABUDGET_E2E_CONNECTION='cadena-a-base-vacía' npm --prefix web run test:e2e`. Playwright exige esa variable y no recurre a la conexión de las pruebas unitarias. La configuración compila y arranca el host de un solo proceso en `127.0.0.1:5080`, aplica las migraciones al iniciar y usa una identidad local fija. Para repetir el flujo, usá otra base vacía. Las capturas de la aceptación se guardan en `work/task3-finance-desktop.png`, `work/task3-finance-mobile-360.png` y `work/task3-sharing-mobile-360.png`.
 
 Para crear y publicar la aplicación en `artifacts/publish`:
 
@@ -86,25 +86,27 @@ Para Cloudflare R2, configurá el endpoint regional de la API S3, el bucket priv
 
 ## Estado del producto
 
-### Disponible en esta base
+### Disponible
 
 - Inicio con Google cuando hay credenciales configuradas y acceso local opt-in en Development.
 - Espacio personal y borrador de configuración aislado por identidad autenticada.
 - Cuentas ARS/USD, saldos iniciales y deuda del resumen actual en monedas separadas.
 - Guardado versionado y confirmación idempotente dentro de una transacción PostgreSQL.
 - Host único, migraciones al inicio, frontend compilado y servido desde el mismo proceso.
+- Libro manual de ingresos, gastos y transferencias entre cuentas, con saldos actualizados.
+- Compras con tarjeta, cuotas, ciclos de resumen, confirmación y pagos parciales de deuda.
+- Grupos personales para repartir gastos, reglas mensuales de porcentajes y registro de cobranzas parciales con reintentos idempotentes.
+- Panel con saldos y pendientes del período; recarga conserva los datos guardados.
 
-### Pendiente
+### Próximas etapas
 
-- Libro de ingresos, gastos, transferencias, pagos, reintegros y conciliación.
-- Movimientos, categorías, presupuestos, límites y estados de resúmenes.
-- Calendario, cuotas futuras, pagos de tarjeta y proyecciones de deuda y disponibilidad.
-- Hogares, grupos, participantes, invitaciones, permisos y reparto de gastos.
-- Metas de ahorro, pronósticos y cotizaciones de DolarAPI.
-- Migración de historial Excel/CSV y revisión de duplicados.
+- Importación de historial Excel/CSV, revisión de duplicados y sincronización con bancos.
+- Conciliación, categorías, presupuestos y límites.
+- Metas de ahorro, pronósticos avanzados y cotizaciones de DolarAPI.
+- Hogares con varios usuarios, invitaciones y permisos compartidos.
 - Carga, lectura y descarga privada de adjuntos en S3/R2.
 - Sincronización offline y experiencia Android/Capacitor.
 - Planes, suscripciones, Mercado Pago y administración.
 - Auditoría ampliada, gestión operativa, copias y restauración.
 
-No hay pantallas ficticias para esas funciones. Los saldos actuales no incorporan movimientos ni cuotas futuras.
+Las funciones próximas no se presentan como disponibles. Los saldos y pendientes reflejan las operaciones cargadas; no hay importación automática ni cotizaciones externas.

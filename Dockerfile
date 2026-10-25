@@ -1,5 +1,6 @@
 FROM node:24-alpine AS web-build
 WORKDIR /web
+ENV NODE_OPTIONS=--max-old-space-size=2048 NG_BUILD_MAX_WORKERS=2
 COPY web/package.json web/package-lock.json ./
 RUN npm ci
 COPY web/ ./
@@ -11,7 +12,7 @@ COPY src/EnigmaBudget.Api/EnigmaBudget.Api.csproj src/EnigmaBudget.Api/
 RUN dotnet restore src/EnigmaBudget.Api/EnigmaBudget.Api.csproj
 COPY src/EnigmaBudget.Api/ src/EnigmaBudget.Api/
 COPY --from=web-build /web/dist/web/browser/ src/EnigmaBudget.Api/wwwroot/
-RUN dotnet publish src/EnigmaBudget.Api/EnigmaBudget.Api.csproj --configuration Release --no-restore --output /publish
+RUN dotnet publish src/EnigmaBudget.Api/EnigmaBudget.Api.csproj --configuration Release --no-restore --output /publish --maxcpucount:1 -p:UseSharedCompilation=false
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app

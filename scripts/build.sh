@@ -13,8 +13,5 @@ fi
 
 npm --prefix "$ROOT/web" ci
 npm --prefix "$ROOT/web" run build
-WEB_ROOT="$ROOT/src/EnigmaBudget.Api/wwwroot"
-mkdir -p "$WEB_ROOT"
-find "$WEB_ROOT" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
-cp -R "$ROOT/web/dist/web/browser/." "$WEB_ROOT/"
-"$DOTNET_COMMAND" publish "$ROOT/src/EnigmaBudget.Api/EnigmaBudget.Api.csproj" --configuration Release --output "$ROOT/artifacts/publish"
+"$ROOT/scripts/sync-frontend.sh"
+"$DOTNET_COMMAND" publish "$ROOT/src/EnigmaBudget.Api/EnigmaBudget.Api.csproj" --configuration Release --output "$ROOT/artifacts/publish" --maxcpucount:1 -p:UseSharedCompilation=false

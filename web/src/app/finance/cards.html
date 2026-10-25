@@ -112,60 +112,62 @@
       </div>
     }
   </section>
-  @if (selectedCard && cardEdit.id === selectedCard.id) {
-    <section class="panel">
-      <div class="panel-title">
-        <div>
-          <p class="eyebrow">{{ selectedCard.name }}</p>
-          <h3>Editar tarjeta</h3>
+  @if (selectedCard) {
+    @if (cardEdit.id === selectedCard.id) {
+      <section class="panel">
+        <div class="panel-title">
+          <div>
+            <p class="eyebrow">{{ selectedCard.name }}</p>
+            <h3>Editar tarjeta</h3>
+          </div>
         </div>
-      </div>
-      <form (ngSubmit)="saveCardEdit()" class="form-grid">
-        <label
-          >Nombre<input
-            name="editCardName"
-            [(ngModel)]="cardEdit.name"
-            required
-            [disabled]="saving" /></label
-        ><label
-          >Banco<input
-            name="editCardBank"
-            [(ngModel)]="cardEdit.bankName"
-            required
-            [disabled]="saving" /></label
-        ><label
-          >Día de cierre<input
-            name="editClosing"
-            type="number"
-            min="1"
-            max="31"
-            [(ngModel)]="cardEdit.closingDay"
-            [disabled]="saving" /></label
-        ><label
-          >Día de vencimiento<input
-            name="editDue"
-            type="number"
-            min="1"
-            max="31"
-            [(ngModel)]="cardEdit.dueDay"
-            [disabled]="saving" /></label
-        ><label class="check"
-          ><input
-            name="archiveCard"
-            type="checkbox"
-            [(ngModel)]="cardEdit.isArchived"
-            [disabled]="saving"
-          />
-          Tarjeta archivada</label
-        ><button
-          class="secondary"
-          type="submit"
-          [disabled]="saving || cardEdit.id !== selectedCard.id"
-        >
-          Guardar cambios
-        </button>
-      </form>
-    </section>
+        <form (ngSubmit)="saveCardEdit()" class="form-grid">
+          <label
+            >Nombre<input
+              name="editCardName"
+              [(ngModel)]="cardEdit.name"
+              required
+              [disabled]="saving" /></label
+          ><label
+            >Banco<input
+              name="editCardBank"
+              [(ngModel)]="cardEdit.bankName"
+              required
+              [disabled]="saving" /></label
+          ><label
+            >Día de cierre<input
+              name="editClosing"
+              type="number"
+              min="1"
+              max="31"
+              [(ngModel)]="cardEdit.closingDay"
+              [disabled]="saving" /></label
+          ><label
+            >Día de vencimiento<input
+              name="editDue"
+              type="number"
+              min="1"
+              max="31"
+              [(ngModel)]="cardEdit.dueDay"
+              [disabled]="saving" /></label
+          ><label class="check"
+            ><input
+              name="archiveCard"
+              type="checkbox"
+              [(ngModel)]="cardEdit.isArchived"
+              [disabled]="saving"
+            />
+            Tarjeta archivada</label
+          ><button
+            class="secondary"
+            type="submit"
+            [disabled]="saving || cardEdit.id !== selectedCard.id"
+          >
+            Guardar cambios
+          </button>
+        </form>
+      </section>
+    }
     <div class="two-columns">
       <section class="panel">
         <h3>Cargar compra</h3>

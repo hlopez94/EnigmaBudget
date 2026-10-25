@@ -70,7 +70,7 @@ PUT /api/groups/{groupId}/rules/{period}:
 {version,mode:'Equal'|'Percentage'|'Income',basisCurrency:'ARS'|'USD',
  weights:[{participantId,value}]}
 ```
-MonthlyRule {period,version,mode,basisCurrency,weights,confirmed}. Equal reparte iguales; Percentage suma100.00; Income suma positiva, permite ceros individuales y bases de una misma moneda. No acceder a movimientos privados de otros para calcular; los valores son bases declaradas. Todos los participantes deben aparecer una vez. Grupo conserva versión agregada para serializar regla/confirmación/cobro.
+La petición identifica cada peso con `participantId`; la respuesta `MonthlyRule {period,version,mode,basisCurrency,weights,confirmed}` devuelve cada peso como `{id: participantId, value}`. Equal reparte iguales; Percentage suma100.00; Income suma positiva, permite ceros individuales y bases de una misma moneda. No acceder a movimientos privados de otros para calcular; los valores son bases declaradas. Todos los participantes deben aparecer una vez. Grupo conserva versión agregada para serializar regla/confirmación/cobro.
 
 POST /api/groups/{groupId}/rules/{period}/confirm: {version}; congelar regla del mes. Intento de modificar regla confirmada devuelve409; meses futuros sin confirmar pueden cambiar. Crear regla de un mes sin regla usa version0.
 
