@@ -68,33 +68,6 @@ public sealed class SavingsAllocationIntegrationTests
         Assert.Single(await db.SavingsAllocations.Where(x => x.GoalId == goalId).ToArrayAsync());
     }
 
-    [Fact(Skip = "Immutable BASE control; temporarily unskip and run against its original CashService.")]
-    public async Task Legacy_paid_operation_waits_on_account_fk_during_paused_reservation_negative_control()
-    {
-        using var client = await _factory.AuthenticatedClientAsync();
-        var accountId = Guid.NewGuid();
-        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/api/accounts", new { id = accountId, name = "Caja", bankName = "Banco", currency = "ARS", openingBalance = "1000.00", openingDate = "2026-10-01" })).StatusCode);
-        var goalId = await CreateGoalAsync(client);
-        _factory.SavingsLedgerReadBarrier.Arm();
-        var reserveRequest = client.PostAsJsonAsync("/api/savings/allocations", new { id = Guid.NewGuid(), goalId, accountId, amount = "600.00" });
-        try
-        {
-            await _factory.SavingsLedgerReadBarrier.WaitUntilReadAsync().WaitAsync(TimeSpan.FromSeconds(15));
-            _factory.LedgerInsertBarrier.ObserveNextLedgerInsert();
-            var paymentRequest = client.PostAsJsonAsync("/api/operations", new { id = Guid.NewGuid(), kind = "Expense", accountId, date = "2026-10-20", description = "Pago legacy", category = "Casa", amount = "500.00", paid = true });
-            await _factory.LedgerInsertBarrier.WaitForLedgerInsertAsync().WaitAsync(TimeSpan.FromSeconds(15));
-            Assert.False(paymentRequest.IsCompleted, "Legacy payment's account foreign-key lock must wait for reservation's account FOR UPDATE.");
-            _factory.SavingsLedgerReadBarrier.Release();
-            Assert.Equal(HttpStatusCode.OK, (await reserveRequest).StatusCode);
-            Assert.Equal(HttpStatusCode.OK, (await paymentRequest).StatusCode);
-        }
-        finally { _factory.SavingsLedgerReadBarrier.Release(); }
-        var balance = Assert.Single(await client.GetFromJsonAsync<System.Text.Json.JsonElement[]>("/api/savings/balances") ?? []);
-        Assert.Equal("500.00", balance.GetProperty("cashBalance").GetString());
-        Assert.Equal("600.00", balance.GetProperty("totalReserved").GetString());
-        Assert.Equal("100.00", balance.GetProperty("backingDeficit").GetString());
-    }
-
     [Fact]
     public async Task Spending_after_reserve_is_allowed_and_archived_reserve_stays_visible()
     {

@@ -515,18 +515,14 @@ public sealed class LedgerInsertBarrierInterceptor : DbCommandInterceptor
     private TaskCompletionSource _workspaceLock = NewSignal();
     private int _observeWorkspaceKeyShare;
     private TaskCompletionSource _workspaceKeyShare = NewSignal();
-    private int _observeLedgerInsert;
-    private TaskCompletionSource _ledgerInsert = NewSignal();
     public void Arm() { _arrived = NewSignal(); _release = NewSignal(); Volatile.Write(ref _armed, 1); }
     public void ObserveNextAccountLock() { _accountLock = NewSignal(); Volatile.Write(ref _observeAccountLock, 1); }
     public void ObserveNextWorkspaceLock() { _workspaceLock = NewSignal(); Volatile.Write(ref _observeWorkspaceLock, 1); }
     public void ObserveNextWorkspaceKeyShare() { _workspaceKeyShare = NewSignal(); Volatile.Write(ref _observeWorkspaceKeyShare, 1); }
-    public void ObserveNextLedgerInsert() { _ledgerInsert = NewSignal(); Volatile.Write(ref _observeLedgerInsert, 1); }
     public Task WaitUntilBlockedAsync() => _arrived.Task;
     public Task WaitForAccountLockAsync() => _accountLock.Task;
     public Task WaitForWorkspaceLockAsync() => _workspaceLock.Task;
     public Task WaitForWorkspaceKeyShareAsync() => _workspaceKeyShare.Task;
-    public Task WaitForLedgerInsertAsync() => _ledgerInsert.Task;
     public void Release() => _release.TrySetResult();
     public override ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(DbCommand command, CommandEventData eventData, InterceptionResult<DbDataReader> result, CancellationToken cancellationToken = default)
     {
@@ -536,8 +532,6 @@ public sealed class LedgerInsertBarrierInterceptor : DbCommandInterceptor
             _workspaceLock.TrySetResult();
         if (command.CommandText.Contains("\"Workspaces\"", StringComparison.OrdinalIgnoreCase) && command.CommandText.Contains("FOR KEY SHARE", StringComparison.OrdinalIgnoreCase) && Interlocked.Exchange(ref _observeWorkspaceKeyShare, 0) == 1)
             _workspaceKeyShare.TrySetResult();
-        if (command.CommandText.Contains("INSERT INTO \"LedgerEntries\"", StringComparison.OrdinalIgnoreCase) && Interlocked.Exchange(ref _observeLedgerInsert, 0) == 1)
-            _ledgerInsert.TrySetResult();
         if (command.CommandText.Contains("INSERT INTO \"LedgerEntries\"", StringComparison.OrdinalIgnoreCase) && Interlocked.Exchange(ref _armed, 0) == 1)
             return PauseReaderAsync(command, eventData, result, cancellationToken);
         return ValueTask.FromResult(result);
