@@ -22,7 +22,9 @@ public static class SavingsMutationLocks
     public static async Task LockAccountsThenAllocationsAsync(AppDbContext db, Guid workspaceId,
         IEnumerable<Guid> accountIds, IEnumerable<Guid> allocationIds, CancellationToken cancellationToken)
     {
-        await AccountMutationLocks.LockAsync(db, workspaceId, accountIds, cancellationToken);
+        foreach (var accountId in accountIds.Distinct().OrderBy(x => x))
+            _ = await db.Accounts.FromSqlInterpolated($"SELECT * FROM \"Accounts\" WHERE \"WorkspaceId\" = {workspaceId} AND \"Id\" = {accountId} FOR UPDATE")
+                .AsNoTracking().ToListAsync(cancellationToken);
         foreach (var allocationId in allocationIds.Distinct().OrderBy(x => x))
             _ = await db.SavingsAllocations.FromSqlInterpolated($"SELECT * FROM \"SavingsAllocations\" WHERE \"WorkspaceId\" = {workspaceId} AND \"Id\" = {allocationId} FOR UPDATE")
                 .AsNoTracking().ToListAsync(cancellationToken);

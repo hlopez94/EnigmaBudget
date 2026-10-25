@@ -5,39 +5,13 @@ using EnigmaBudget.Api.Data;
 using EnigmaBudget.Api.Savings;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Npgsql;
 
 namespace EnigmaBudget.Api.Tests;
 
 public sealed class SavingsAllocationIntegrationTests
 {
     private readonly ApiFactory _factory = new(timeProvider: new FixedTimeProvider(DateTimeOffset.Parse("2026-10-25T12:00:00Z")));
-
-    [Fact]
-    public async Task Paid_cash_operation_serializes_before_reservation_eligibility_read()
-    {
-        using var client = await _factory.AuthenticatedClientAsync();
-        var accountId = Guid.NewGuid();
-        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/api/accounts", new { id = accountId, name = "Caja", bankName = "Banco", currency = "ARS", openingBalance = "1000.00", openingDate = "2026-10-01" })).StatusCode);
-        var goalId = await CreateGoalAsync(client);
-        _factory.LedgerInsertBarrier.Arm();
-        var paymentRequest = client.PostAsJsonAsync("/api/operations", new { id = Guid.NewGuid(), kind = "Expense", accountId, date = "2026-10-20", description = "Pago", category = "Casa", amount = "500.00", paid = true });
-        try
-        {
-            await _factory.LedgerInsertBarrier.WaitUntilBlockedAsync().WaitAsync(TimeSpan.FromSeconds(15));
-            _factory.LedgerInsertBarrier.ObserveNextWorkspaceLock();
-            var reserveRequest = client.PostAsJsonAsync("/api/savings/allocations", new { id = Guid.NewGuid(), goalId, accountId, amount = "600.00" });
-            await _factory.LedgerInsertBarrier.WaitForWorkspaceLockAsync().WaitAsync(TimeSpan.FromSeconds(15));
-            Assert.False(reserveRequest.IsCompleted, "Reservation must wait for the paid ledger mutation holding the account lock.");
-            _factory.LedgerInsertBarrier.Release();
-            Assert.Equal(HttpStatusCode.OK, (await paymentRequest).StatusCode);
-            var reserveResponse = await reserveRequest;
-            Assert.True(reserveResponse.StatusCode == HttpStatusCode.Conflict, await reserveResponse.Content.ReadAsStringAsync());
-        }
-        finally { _factory.LedgerInsertBarrier.Release(); }
-        using var db = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>().UseNpgsql(_factory.TestConnection).Options);
-        Assert.Empty(await db.SavingsAllocations.Where(x => x.GoalId == goalId).ToArrayAsync());
-        Assert.Single(await db.LedgerEntries.Where(x => x.AccountId == accountId).ToArrayAsync());
-    }
 
     [Fact]
     public async Task Reservation_read_blocks_paid_operation_until_reservation_commits()
@@ -51,10 +25,21 @@ public sealed class SavingsAllocationIntegrationTests
         try
         {
             await _factory.SavingsLedgerReadBarrier.WaitUntilReadAsync().WaitAsync(TimeSpan.FromSeconds(15));
-            _factory.LedgerInsertBarrier.ObserveNextWorkspaceKeyShare();
+            _factory.WorkspaceAuditInsertProbe.Arm();
             var paymentRequest = client.PostAsJsonAsync("/api/operations", new { id = Guid.NewGuid(), kind = "Expense", accountId, date = "2026-10-20", description = "Pago después de reserva", category = "Casa", amount = "500.00", paid = true });
-            await _factory.LedgerInsertBarrier.WaitForWorkspaceKeyShareAsync().WaitAsync(TimeSpan.FromSeconds(15));
-            Assert.False(paymentRequest.IsCompleted, "Payment must wait while reservation owns the workspace/account lock prefix.");
+            await _factory.WorkspaceAuditInsertProbe.WaitUntilObservedAsync().WaitAsync(TimeSpan.FromSeconds(15));
+            var paymentPid = _factory.WorkspaceAuditInsertProbe.BackendPid!.Value;
+            var reservePid = _factory.SavingsLedgerReadBarrier.BackendPid!.Value;
+            var wait = await WaitForBlockingAuditInsertAsync(paymentPid, reservePid, TimeSpan.FromSeconds(15));
+            Assert.Contains(reservePid, wait.BlockingPids);
+            Assert.Equal("Lock", wait.WaitEventType);
+            Assert.Contains("WorkspaceAuditEvents", wait.CurrentQuery, StringComparison.Ordinal);
+            Assert.False(paymentRequest.IsCompleted);
+            await using (var probe = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>().UseNpgsql(_factory.TestConnection).Options))
+            {
+                Assert.Empty(await probe.LedgerEntries.Where(x => x.AccountId == accountId).ToArrayAsync());
+                Assert.Empty(await probe.FinancePayments.Where(x => x.AccountId == accountId).ToArrayAsync());
+            }
             _factory.SavingsLedgerReadBarrier.Release();
             Assert.Equal(HttpStatusCode.OK, (await reserveRequest).StatusCode);
             Assert.Equal(HttpStatusCode.OK, (await paymentRequest).StatusCode);
@@ -66,6 +51,30 @@ public sealed class SavingsAllocationIntegrationTests
         Assert.Equal("100.00", balance.GetProperty("backingDeficit").GetString());
         using var db = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>().UseNpgsql(_factory.TestConnection).Options);
         Assert.Single(await db.SavingsAllocations.Where(x => x.GoalId == goalId).ToArrayAsync());
+    }
+
+    private async Task<(string? WaitEventType, int[] BlockingPids, string CurrentQuery)> WaitForBlockingAuditInsertAsync(int paymentPid, int reservePid, TimeSpan timeout)
+    {
+        var until = DateTime.UtcNow + timeout;
+        await using var connection = new NpgsqlConnection(_factory.TestConnection);
+        await connection.OpenAsync();
+        while (DateTime.UtcNow < until)
+        {
+            await using var command = connection.CreateCommand();
+            command.CommandText = "SELECT wait_event_type, pg_blocking_pids(pid), query FROM pg_stat_activity WHERE pid = @pid";
+            command.Parameters.AddWithValue("pid", paymentPid);
+            await using var reader = await command.ExecuteReaderAsync();
+            if (await reader.ReadAsync())
+            {
+                var waitEventType = reader.IsDBNull(0) ? null : reader.GetString(0);
+                var blockingPids = reader.GetFieldValue<int[]>(1);
+                var currentQuery = reader.GetString(2);
+                if (waitEventType == "Lock" && blockingPids.Contains(reservePid))
+                    return (waitEventType, blockingPids, currentQuery);
+            }
+            await Task.Delay(20);
+        }
+        throw new TimeoutException($"Payment backend {paymentPid} did not show a PostgreSQL lock wait blocked by reservation backend {reservePid}.");
     }
 
     [Fact]

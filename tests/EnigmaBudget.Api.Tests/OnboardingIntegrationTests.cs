@@ -394,7 +394,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
     public QueuedGoogleValidator GoogleValidator { get; }
     public SaveChangesBarrierInterceptor SaveBarrier { get; } = new();
     public WorkspaceLockCommandBarrierInterceptor WorkspaceLockBarrier { get; } = new();
-    public LedgerInsertBarrierInterceptor LedgerInsertBarrier { get; } = new();
+    public WorkspaceAuditInsertProbeInterceptor WorkspaceAuditInsertProbe { get; } = new();
     public SavingsLedgerReadBarrierInterceptor SavingsLedgerReadBarrier { get; } = new();
     internal string TestConnection => _connection;
     public ApiFactory(bool relaxSecureCookiesForTests = true, string environment = "Development", TimeProvider? timeProvider = null, IReadOnlyDictionary<string, string?>? extraConfiguration = null, QueuedGoogleValidator? googleValidator = null)
@@ -421,7 +421,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
                 services.AddSingleton(_timeProvider);
             }
             services.AddSingleton(SaveBarrier);
-            services.AddDbContext<AppDbContext>((serviceProvider, options) => options.AddInterceptors(serviceProvider.GetRequiredService<SaveChangesBarrierInterceptor>(), WorkspaceLockBarrier, LedgerInsertBarrier, SavingsLedgerReadBarrier));
+            services.AddDbContext<AppDbContext>((serviceProvider, options) => options.AddInterceptors(serviceProvider.GetRequiredService<SaveChangesBarrierInterceptor>(), WorkspaceLockBarrier, WorkspaceAuditInsertProbe, SavingsLedgerReadBarrier));
             services.AddAuthentication(o => { o.DefaultScheme = "TestOrCookie"; o.DefaultAuthenticateScheme = "TestOrCookie"; o.DefaultChallengeScheme = "TestOrCookie"; }).AddPolicyScheme("TestOrCookie", "Test identity or cookie", o => o.ForwardDefaultSelector = context => context.Request.Headers.ContainsKey("Authorization") ? NativeBearerHandler.SchemeName : context.Request.Headers.ContainsKey("X-Test-Identity") ? "TestIdentity" : CookieAuthenticationDefaults.AuthenticationScheme).AddScheme<AuthenticationSchemeOptions, TestIdentityHandler>("TestIdentity", _ => { });
             services.RemoveAll<IGoogleIdTokenValidator>();
             services.AddSingleton<IGoogleIdTokenValidator>(GoogleValidator);
@@ -487,6 +487,7 @@ public sealed class SavingsLedgerReadBarrierInterceptor : DbCommandInterceptor
     private int _armed;
     private TaskCompletionSource _arrived = NewSignal();
     private TaskCompletionSource _release = NewSignal();
+    public int? BackendPid { get; private set; }
     public void Arm() { _arrived = NewSignal(); _release = NewSignal(); Volatile.Write(ref _armed, 1); }
     public Task WaitUntilReadAsync() => _arrived.Task;
     public void Release() => _release.TrySetResult();
@@ -496,6 +497,7 @@ public sealed class SavingsLedgerReadBarrierInterceptor : DbCommandInterceptor
             && command.CommandText.Contains("SUM", StringComparison.OrdinalIgnoreCase)
             && Interlocked.Exchange(ref _armed, 0) == 1)
         {
+            BackendPid = (command.Connection as NpgsqlConnection)?.ProcessID;
             _arrived.TrySetResult();
             await _release.Task.WaitAsync(cancellationToken);
         }
@@ -504,54 +506,30 @@ public sealed class SavingsLedgerReadBarrierInterceptor : DbCommandInterceptor
     private static TaskCompletionSource NewSignal() => new(TaskCreationOptions.RunContinuationsAsynchronously);
 }
 
-public sealed class LedgerInsertBarrierInterceptor : DbCommandInterceptor
+public sealed class WorkspaceAuditInsertProbeInterceptor : DbCommandInterceptor
 {
     private int _armed;
     private TaskCompletionSource _arrived = NewSignal();
-    private TaskCompletionSource _release = NewSignal();
-    private int _observeAccountLock;
-    private TaskCompletionSource _accountLock = NewSignal();
-    private int _observeWorkspaceLock;
-    private TaskCompletionSource _workspaceLock = NewSignal();
-    private int _observeWorkspaceKeyShare;
-    private TaskCompletionSource _workspaceKeyShare = NewSignal();
-    public void Arm() { _arrived = NewSignal(); _release = NewSignal(); Volatile.Write(ref _armed, 1); }
-    public void ObserveNextAccountLock() { _accountLock = NewSignal(); Volatile.Write(ref _observeAccountLock, 1); }
-    public void ObserveNextWorkspaceLock() { _workspaceLock = NewSignal(); Volatile.Write(ref _observeWorkspaceLock, 1); }
-    public void ObserveNextWorkspaceKeyShare() { _workspaceKeyShare = NewSignal(); Volatile.Write(ref _observeWorkspaceKeyShare, 1); }
-    public Task WaitUntilBlockedAsync() => _arrived.Task;
-    public Task WaitForAccountLockAsync() => _accountLock.Task;
-    public Task WaitForWorkspaceLockAsync() => _workspaceLock.Task;
-    public Task WaitForWorkspaceKeyShareAsync() => _workspaceKeyShare.Task;
-    public void Release() => _release.TrySetResult();
+    public int? BackendPid { get; private set; }
+    public void Arm() { _arrived = NewSignal(); Volatile.Write(ref _armed, 1); }
+    public Task WaitUntilObservedAsync() => _arrived.Task;
     public override ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(DbCommand command, CommandEventData eventData, InterceptionResult<DbDataReader> result, CancellationToken cancellationToken = default)
     {
-        if (command.CommandText.Contains("\"Accounts\"", StringComparison.OrdinalIgnoreCase) && command.CommandText.Contains("FOR UPDATE", StringComparison.OrdinalIgnoreCase) && Interlocked.Exchange(ref _observeAccountLock, 0) == 1)
-            _accountLock.TrySetResult();
-        if (command.CommandText.Contains("\"Workspaces\"", StringComparison.OrdinalIgnoreCase) && command.CommandText.Contains("FOR UPDATE", StringComparison.OrdinalIgnoreCase) && Interlocked.Exchange(ref _observeWorkspaceLock, 0) == 1)
-            _workspaceLock.TrySetResult();
-        if (command.CommandText.Contains("\"Workspaces\"", StringComparison.OrdinalIgnoreCase) && command.CommandText.Contains("FOR KEY SHARE", StringComparison.OrdinalIgnoreCase) && Interlocked.Exchange(ref _observeWorkspaceKeyShare, 0) == 1)
-            _workspaceKeyShare.TrySetResult();
-        if (command.CommandText.Contains("INSERT INTO \"LedgerEntries\"", StringComparison.OrdinalIgnoreCase) && Interlocked.Exchange(ref _armed, 0) == 1)
-            return PauseReaderAsync(command, eventData, result, cancellationToken);
+        Observe(command);
         return ValueTask.FromResult(result);
     }
-    private async ValueTask<InterceptionResult<DbDataReader>> PauseReaderAsync(DbCommand command, CommandEventData eventData, InterceptionResult<DbDataReader> result, CancellationToken cancellationToken)
+    public override ValueTask<InterceptionResult<int>> NonQueryExecutingAsync(DbCommand command, CommandEventData eventData, InterceptionResult<int> result, CancellationToken cancellationToken = default)
     {
-        _arrived.TrySetResult();
-        await _release.Task.WaitAsync(cancellationToken);
-        return result;
+        Observe(command);
+        return ValueTask.FromResult(result);
     }
-    public override async ValueTask<InterceptionResult<int>> NonQueryExecutingAsync(DbCommand command, CommandEventData eventData, InterceptionResult<int> result, CancellationToken cancellationToken = default)
+    private void Observe(DbCommand command)
     {
-        if (command.CommandText.Contains("\"Accounts\"", StringComparison.OrdinalIgnoreCase) && command.CommandText.Contains("FOR UPDATE", StringComparison.OrdinalIgnoreCase) && Interlocked.Exchange(ref _observeAccountLock, 0) == 1)
-            _accountLock.TrySetResult();
-        if (command.CommandText.Contains("INSERT INTO \"LedgerEntries\"", StringComparison.OrdinalIgnoreCase) && Interlocked.Exchange(ref _armed, 0) == 1)
+        if (command.CommandText.Contains("INSERT INTO \"WorkspaceAuditEvents\"", StringComparison.OrdinalIgnoreCase) && Interlocked.Exchange(ref _armed, 0) == 1)
         {
+            BackendPid = (command.Connection as NpgsqlConnection)?.ProcessID;
             _arrived.TrySetResult();
-            await _release.Task.WaitAsync(cancellationToken);
         }
-        return result;
     }
     private static TaskCompletionSource NewSignal() => new(TaskCreationOptions.RunContinuationsAsynchronously);
 }
