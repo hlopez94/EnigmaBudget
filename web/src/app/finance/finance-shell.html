@@ -62,15 +62,12 @@
     >
       Movimientos
     </button>
-    <button type="button" [class.active]="section === 'accounts'" (click)="navigate('accounts')">
-      Cuentas
-    </button>
     <button type="button" [class.active]="section === 'cards'" (click)="navigate('cards')">
       Tarjetas y resúmenes
     </button>
     @if (canReadGroups) { <button type="button" [class.active]="section === 'sharing'" (click)="navigate('sharing')">Compartidos</button> }
     <button type="button" [class.active]="section === 'spaces'" (click)="navigate('spaces')">Espacios</button>
-    <button type="button" [class.active]="section === 'more' || section === 'savings' || section === 'projection' || section === 'exchange'" (click)="navigate('more')">Más</button>
+    <button type="button" [class.active]="section === 'more' || section === 'accounts' || section === 'savings' || section === 'projection' || section === 'exchange'" (click)="navigate('more')">Más</button>
   </nav>
   <nav class="mobile-navigation" aria-label="Navegación principal">
     <button type="button" [class.active]="section === 'home'" (click)="navigate('home')">
@@ -86,10 +83,14 @@
     <button type="button" [class.active]="section === 'cards'" (click)="navigate('cards')">
       <i class="pi pi-credit-card" aria-hidden="true"></i><small>Tarjetas</small>
     </button>
-    <button type="button" [class.active]="section === 'accounts'" (click)="navigate('accounts')"><i class="pi pi-wallet" aria-hidden="true"></i><small>Cuentas</small></button>
+    @if (canReadGroups) {
+      <button type="button" [class.active]="section === 'sharing'" (click)="navigate('sharing')"><i class="pi pi-users" aria-hidden="true"></i><small>Compartidos</small></button>
+    } @else {
+      <button type="button" [class.active]="section === 'accounts'" (click)="navigate('accounts')"><i class="pi pi-wallet" aria-hidden="true"></i><small>Cuentas</small></button>
+    }
     <button
       type="button"
-      [class.active]="section === 'more' || section === 'spaces' || section === 'sharing' || section === 'savings' || section === 'projection' || section === 'exchange'"
+      [class.active]="section === 'more' || section === 'accounts' || section === 'spaces' || section === 'savings' || section === 'projection' || section === 'exchange'"
       (click)="navigate('more')"
     >
       <i class="pi pi-ellipsis-h" aria-hidden="true"></i><small>Más</small>

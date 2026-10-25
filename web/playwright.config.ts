@@ -6,6 +6,7 @@ const e2eConnection = process.env.ENIGMABUDGET_E2E_CONNECTION;
 const dotnet = process.env.DOTNET_COMMAND ?? '../work/tooling/dotnet/dotnet';
 const quoteShellArgument = (value: string) => `'${value.replaceAll("'", "'\\''")}'`;
 const configDir = process.cwd();
+const webRoot = process.env.ENIGMABUDGET_E2E_WEBROOT ?? resolve(configDir, 'dist/web/browser');
 
 if (!e2eConnection) {
   throw new Error(
@@ -34,6 +35,10 @@ export default defineConfig({
         env: {
           ...process.env,
           ASPNETCORE_ENVIRONMENT: 'Development',
+          DOTNET_PROCESSOR_COUNT: process.env.DOTNET_PROCESSOR_COUNT ?? '1',
+          DOTNET_CLI_USE_MSBUILD_SERVER: '0',
+          MSBUILDDISABLENODEREUSE: '1',
+          UseSharedCompilation: 'false',
           Authentication__DevelopmentLoginEnabled: 'true',
           Authentication__DevelopmentUsers__Users__0__Key: 'alice',
           Authentication__DevelopmentUsers__Users__0__Subject: 'e2e-alice',
@@ -52,7 +57,8 @@ export default defineConfig({
           Authentication__DevelopmentUsers__Users__3__DisplayName: 'Dana de prueba',
           Authentication__DevelopmentUsers__Users__3__Email: 'dana@example.test',
           ConnectionStrings__Default: e2eConnection ?? '',
-          ASPNETCORE_WEBROOT: resolve(configDir, 'dist/web/browser'),
+          ExchangeRates__AutomaticRefreshEnabled: 'false',
+          ASPNETCORE_WEBROOT: webRoot,
         },
       },
 });

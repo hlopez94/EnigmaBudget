@@ -1,6 +1,7 @@
 :host{display:block;color:var(--ink,#22291f)}
 :host[hidden]{display:none!important}
 .savings-screen{gap:14px}
+.savings-screen .primary{color:#fff}
 .goal-panel{padding:20px 22px;background:#fff}
 .goal-panel.selected-goal{border-color:#c8d9c5}
 .goal-header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}

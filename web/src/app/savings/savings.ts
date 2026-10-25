@@ -51,7 +51,10 @@ export class FinanceSavings extends FinanceActions implements OnChanges {
   paymentFollowupId = '';
 
   constructor(api: ApiService, changeDetector: ChangeDetectorRef) { super(api, changeDetector); }
-  override ngOnChanges(changes: SimpleChanges): void { super.ngOnChanges(changes); if ((changes['workspaceId'] || changes['contextGeneration']) && this.workspaceId) void this.load(); }
+  override ngOnChanges(changes: SimpleChanges): void {
+    super.ngOnChanges(changes);
+    if (((changes['workspaceId'] || changes['contextGeneration']) && this.workspaceId) || (changes['overview'] && !changes['overview'].firstChange && this.workspaceId)) void this.load();
+  }
   protected override permissionsChanged(): void {
     if (this.workspaceArchived || (!this.allowed('recordFinance') && ['allocate', 'release', 'apply'].includes(this.dialog)) || (!this.allowed('correctHistory') && this.dialog === 'reverse') || (!this.allowed('manageResources') && ['create', 'edit', 'rate', 'liquidity', 'close'].includes(this.dialog))) this.discardDialogDraft();
   }
@@ -66,6 +69,7 @@ export class FinanceSavings extends FinanceActions implements OnChanges {
   get accounts(): Account[] { return (this.overview?.accounts ?? []).filter(x => !x.isArchived); }
   get selectedGoal(): SavingsGoal | undefined { return this.goals.find(x => x.id === this.selectedGoalId); }
   get activeGoals(): SavingsGoal[] { return this.goals.filter(x => x.state === 'Active'); }
+  get activeAllocations(): SavingsAllocation[] { return (this.details?.allocations ?? []).filter(x => (scaled(x.reservedAmount, 2) ?? 0n) > 0n); }
   get selectedBalance(): SavingsAccountBalance | undefined { return this.balances.find(x => x.accountId === this.liquidityDraft.accountId); }
   get canManage(): boolean { return this.allowed('manageResources'); }
   get canRecord(): boolean { return this.allowed('recordFinance'); }

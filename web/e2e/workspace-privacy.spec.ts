@@ -21,13 +21,13 @@ const openMore = async (page: Page) => page.locator('nav.mobile-navigation').get
 const openSpaces = async (page: Page) => {
   if (await page.locator('.create-space').isVisible().catch(() => false)) return;
   if (await page.locator('.more-screen').isVisible().catch(() => false)) {
-    await page.locator('.more-screen').getByRole('button', { name: /Hogares, integrantes y privacidad/ }).click();
+    await page.locator('.more-screen').getByRole('button', { name: /Espacios y privacidad/ }).click();
   } else if (!(await page.getByRole('heading', { name: 'Espacios y privacidad' }).isVisible().catch(() => false))) {
     await openMore(page);
     const discardDialog = page.getByRole('dialog');
     if (await discardDialog.isVisible().catch(() => false)) await discardDialog.getByRole('button', { name: /Descartar y cambiar/ }).click();
     await expect(page.locator('.more-screen')).toBeVisible();
-    await page.locator('.more-screen').getByRole('button', { name: /Hogares, integrantes y privacidad/ }).click();
+    await page.locator('.more-screen').getByRole('button', { name: /Espacios y privacidad/ }).click();
   }
   await expect(page.locator('.create-space')).toBeVisible();
 };
@@ -99,9 +99,10 @@ test('real Alice, Bob and Reader contexts enforce Household scope, personal cons
 
   await alice.getByLabel('Cambiar espacio').first().selectOption({ label: 'Mi espacio Personal' });
   await openSpaces(alice);
-  await expect(alice.getByRole('button', { name: 'Compartir con integrantes actuales' })).toBeVisible();
+  const sharingRow = alice.locator('.privacy-row').filter({ hasText: 'Casa de Ana' });
+  await expect(sharingRow.getByRole('button', { name: 'Compartir con integrantes actuales' })).toBeVisible();
   const consent = waitForApi(alice, 'PUT', `/api/personal-sharing/${household.id}`);
-  await alice.getByRole('button', { name: 'Compartir con integrantes actuales' }).click();
+  await sharingRow.getByRole('button', { name: 'Compartir con integrantes actuales' }).click();
   expect((await consent).status()).toBe(200);
 
   await bob.reload();
@@ -363,7 +364,7 @@ test('mobile workspace header stays readable and in bounds at 360 and 390 px', a
   await signInAs(page, 'alice');
   await openMore(page);
   await expect(page.locator('.more-screen')).toBeVisible();
-  await page.locator('.more-screen').getByRole('button', { name: /Hogares, integrantes y privacidad/ }).click();
+  await page.locator('.more-screen').getByRole('button', { name: /Espacios y privacidad/ }).click();
   await expect(page.locator('.create-space')).toBeVisible();
   const title = page.getByRole('heading', { name: 'Espacios y privacidad' });
   await expect(title).toBeVisible();
