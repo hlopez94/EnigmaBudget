@@ -6,6 +6,7 @@ using EnigmaBudget.Api.Identity;
 using EnigmaBudget.Api.Onboarding;
 using EnigmaBudget.Api.Storage;
 using EnigmaBudget.Api.Finance;
+using EnigmaBudget.Api.Workspaces;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.Google;
@@ -18,7 +19,11 @@ var builder = WebApplication.CreateBuilder(args);
 var googleId = builder.Configuration["Authentication:Google:ClientId"];
 var googleSecret = builder.Configuration["Authentication:Google:ClientSecret"];
 var googleConfigured = !string.IsNullOrWhiteSpace(googleId) && !string.IsNullOrWhiteSpace(googleSecret);
-builder.Services.AddDbContext<AppDbContext>(o => o.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<WorkspaceProvisioner>();
+builder.Services.AddScoped<WorkspaceAccessService>();
+builder.Services.AddScoped<WorkspaceAuditInterceptor>();
+builder.Services.AddDbContext<AppDbContext>((services, o) => o.UseNpgsql(builder.Configuration.GetConnectionString("Default")).AddInterceptors(services.GetRequiredService<WorkspaceAuditInterceptor>()));
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<BusinessClock>();
 builder.Services.AddOptions<StorageOptions>().Bind(builder.Configuration.GetSection(StorageOptions.SectionName)).Validate(StorageOptions.IsValid, "S3 storage configuration must include a bucket and region, and use a valid HTTP(S) endpoint when configured.").ValidateOnStart();
@@ -29,7 +34,7 @@ var auth = builder.Services.AddAuthentication(CookieAuthenticationDefaults.Authe
     o.Events.OnRedirectToLogin = context => { context.Response.StatusCode = StatusCodes.Status401Unauthorized; return Task.CompletedTask; };
     o.Events.OnRedirectToAccessDenied = context => { context.Response.StatusCode = StatusCodes.Status403Forbidden; return Task.CompletedTask; };
 });
-if (googleConfigured) auth.AddGoogle(GoogleDefaults.AuthenticationScheme, o => { o.ClientId = googleId!; o.ClientSecret = googleSecret!; o.SignInScheme = CookieAuthenticationDefaults.AuthenticationScheme; o.CallbackPath = "/signin-google"; o.Events.OnCreatingTicket = async context => { var sub = context.Principal?.FindFirstValue(ClaimTypes.NameIdentifier); if (string.IsNullOrWhiteSpace(sub)) throw new InvalidOperationException("Google subject missing"); await Task.CompletedTask; }; });
+if (googleConfigured) auth.AddGoogle(GoogleDefaults.AuthenticationScheme, o => { o.ClientId = googleId!; o.ClientSecret = googleSecret!; o.SignInScheme = CookieAuthenticationDefaults.AuthenticationScheme; o.CallbackPath = "/signin-google"; o.ClaimActions.MapJsonKey("email_verified", "email_verified", ClaimValueTypes.Boolean); o.Events.OnCreatingTicket = async context => { var sub = context.Principal?.FindFirstValue(ClaimTypes.NameIdentifier); if (string.IsNullOrWhiteSpace(sub)) throw new InvalidOperationException("Google subject missing"); await Task.CompletedTask; }; });
 builder.Services.AddAuthorization();
 builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase);
 
@@ -72,11 +77,11 @@ app.MapFallback(async context =>
     context.Response.ContentType = "text/html; charset=utf-8";
     await context.Response.SendFileAsync(indexPath);
 });
-app.MapGet("/api/auth/session", async (HttpContext http, IAntiforgery antiforgery, AppDbContext db) =>
+app.MapGet("/api/auth/session", async (HttpContext http, IAntiforgery antiforgery, WorkspaceProvisioner provisioner) =>
 {
     var tokens = antiforgery.GetAndStoreTokens(http);
     var authenticated = http.User.Identity?.IsAuthenticated == true;
-    if (authenticated) await EnsureWorkspace(db, CurrentIdentity.Subject(http.User));
+    if (authenticated) await provisioner.EnsurePersonalAsync(http.User, http.RequestAborted);
     return Results.Ok(new { authenticated, displayName = authenticated ? http.User.Identity!.Name : null, googleConfigured, developmentLoginEnabled = app.Environment.IsDevelopment() && builder.Configuration.GetValue<bool>("Authentication:DevelopmentLoginEnabled"), csrfToken = tokens.RequestToken });
 });
 app.MapGet("/api/auth/google", (HttpContext http) => googleConfigured ? Results.Challenge(new AuthenticationProperties { RedirectUri = "/" }, [GoogleDefaults.AuthenticationScheme]) : Results.StatusCode(503));
@@ -91,12 +96,12 @@ if (app.Environment.IsDevelopment()) app.MapPost("/api/auth/development", async 
 app.MapPost("/api/auth/logout", async (HttpContext http, IAntiforgery antiforgery) => { try { await antiforgery.ValidateRequestAsync(http); } catch (AntiforgeryValidationException) { return Results.BadRequest(); } await http.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme); return Results.NoContent(); });
 
 var api = app.MapGroup("/api").RequireAuthorization();
-api.MapGet("/onboarding", async (HttpContext http, AppDbContext db) => Results.Ok(await GetState(db, CurrentIdentity.Subject(http.User))));
-api.MapPut("/onboarding", async (HttpContext http, AppDbContext db, IAntiforgery csrf, SaveDraftRequest request) =>
+api.MapGet("/onboarding", async (HttpContext http, AppDbContext db, WorkspaceProvisioner provisioner) => Results.Ok(await GetState(db, provisioner, http.User)));
+api.MapPut("/onboarding", async (HttpContext http, AppDbContext db, WorkspaceProvisioner provisioner, IAntiforgery csrf, SaveDraftRequest request) =>
 {
     if (!await Csrf(http, csrf)) return Results.BadRequest();
     if (!ValidDraftShape(request)) return Problem(400, "El borrador excede los límites permitidos o contiene identificadores repetidos.");
-    var workspace = await EnsureWorkspace(db, CurrentIdentity.Subject(http.User));
+    var workspace = await provisioner.EnsurePersonalAsync(http.User, http.RequestAborted);
     var draft = await db.Drafts.FindAsync(workspace.Id);
     if (draft is { Completed: true }) return Problem(409, "La configuración inicial ya está confirmada.");
     if ((draft?.Version ?? 0) != request.Version) return Problem(409, "El borrador cambió. Actualizá la pantalla antes de guardar.");
@@ -105,10 +110,10 @@ api.MapPut("/onboarding", async (HttpContext http, AppDbContext db, IAntiforgery
     try { await db.SaveChangesAsync(); } catch (DbUpdateConcurrencyException) { return Problem(409, "El borrador cambió. Actualizá la pantalla antes de guardar."); }
     return Results.Ok(State(draft));
 });
-api.MapPost("/onboarding/complete", async (HttpContext http, AppDbContext db, IAntiforgery csrf, CompleteDraftRequest request) =>
+api.MapPost("/onboarding/complete", async (HttpContext http, AppDbContext db, WorkspaceProvisioner provisioner, IAntiforgery csrf, CompleteDraftRequest request) =>
 {
     if (!await Csrf(http, csrf)) return Results.BadRequest();
-    var workspace = await EnsureWorkspace(db, CurrentIdentity.Subject(http.User));
+    var workspace = await provisioner.EnsurePersonalAsync(http.User, http.RequestAborted);
     var draft = await db.Drafts.FindAsync(workspace.Id);
     if (draft is null) return Problem(409, "Guardá el borrador antes de confirmar.");
     if (draft.Completed) return Results.Ok(State(draft));
@@ -125,29 +130,12 @@ api.MapPost("/onboarding/complete", async (HttpContext http, AppDbContext db, IA
     return Results.Ok(State(draft));
 });
 api.MapFinanceEndpoints();
+app.MapWorkspaceEndpoints();
 app.Run();
 
-static async Task<Workspace> EnsureWorkspace(AppDbContext db, string subject)
+static async Task<OnboardingState> GetState(AppDbContext db, WorkspaceProvisioner provisioner, System.Security.Claims.ClaimsPrincipal principal)
 {
-    var workspace = await db.Workspaces.Include(x => x.Draft).FirstOrDefaultAsync(x => x.OwnerSubject == subject);
-    if (workspace is not null) return workspace;
-    workspace = new Workspace { OwnerSubject = subject, Draft = new OnboardingDraft() }; db.Workspaces.Add(workspace);
-    try { await db.SaveChangesAsync(); return workspace; }
-    catch (DbUpdateException ex) when (IsWorkspaceOwnerUniqueViolation(ex))
-    {
-        db.ChangeTracker.Clear();
-        var winner = await db.Workspaces.Include(x => x.Draft).FirstOrDefaultAsync(x => x.OwnerSubject == subject);
-        if (winner is not null) return winner;
-        throw;
-    }
-}
-static bool IsWorkspaceOwnerUniqueViolation(DbUpdateException exception) =>
-    exception.GetBaseException() is PostgresException postgres
-    && postgres.SqlState == PostgresErrorCodes.UniqueViolation
-    && postgres.ConstraintName == "IX_Workspaces_OwnerSubject";
-static async Task<OnboardingState> GetState(AppDbContext db, string subject)
-{
-    var workspace = await EnsureWorkspace(db, subject); var draft = workspace.Draft!; return State(draft);
+    var workspace = await provisioner.EnsurePersonalAsync(principal); var draft = workspace.Draft!; return State(draft);
 }
 static OnboardingState State(OnboardingDraft d) => new(d.Version, d.Completed, Deserialize<AccountInput>(d.AccountsJson), Deserialize<CardInput>(d.CardsJson));
 static T[] Deserialize<T>(string json) => JsonSerializer.Deserialize<T[]>(json) ?? [];

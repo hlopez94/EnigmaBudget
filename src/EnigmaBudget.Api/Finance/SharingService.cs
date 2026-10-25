@@ -31,7 +31,7 @@ public static partial class FinanceEndpoints
                 "El grupo necesita entre 2 y 50 participantes y exactamente una persona propia."
             );
 
-        var ws = await Workspace(db, Subject(http));
+        var ws = await Workspace(db, http);
         var existing = await db.Groups.SingleOrDefaultAsync(x =>
             x.WorkspaceId == ws.Id && x.Id == r.Id
         );
@@ -104,7 +104,7 @@ public static partial class FinanceEndpoints
         string? period = null
     )
     {
-        var ws = await Workspace(db, Subject(http));
+        var ws = await Workspace(db, http);
         period ??= clock.CurrentPeriod;
         var groups = await db.Groups.Where(x => x.WorkspaceId == ws.Id).ToArrayAsync();
         var result = new List<object>();
@@ -167,7 +167,7 @@ public static partial class FinanceEndpoints
     {
         if (!await Csrf(http, csrf))
             return Results.BadRequest();
-        var ws = await Workspace(db, Subject(http));
+        var ws = await Workspace(db, http);
         if (
             !MoneyRules.IsPeriod(period)
             || !await db.Groups.AnyAsync(x => x.WorkspaceId == ws.Id && x.Id == groupId)
@@ -252,7 +252,7 @@ public static partial class FinanceEndpoints
     {
         if (!await Csrf(http, csrf))
             return Results.BadRequest();
-        var ws = await Workspace(db, Subject(http));
+        var ws = await Workspace(db, http);
         var rule = await db.MonthlyRules.SingleOrDefaultAsync(x =>
             x.WorkspaceId == ws.Id && x.GroupId == groupId && x.Period == period
         );
@@ -281,7 +281,7 @@ public static partial class FinanceEndpoints
         string? period = null
     )
     {
-        var ws = await Workspace(db, Subject(http));
+        var ws = await Workspace(db, http);
         if (!await db.Groups.AnyAsync(x => x.WorkspaceId == ws.Id && x.Id == groupId))
             return Results.NotFound();
         if (!MoneyRules.IsPeriod(period ?? ""))
@@ -413,7 +413,7 @@ public static partial class FinanceEndpoints
             || date > clock.Today
         )
             return Problem(400, "Revisá los datos del cobro.");
-        var ws = await Workspace(db, Subject(http));
+        var ws = await Workspace(db, http);
         await using var transaction = await db.Database.BeginTransactionAsync(
             IsolationLevel.Serializable
         );

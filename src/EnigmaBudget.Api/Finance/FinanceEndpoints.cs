@@ -1,10 +1,10 @@
 using System.Data;
 using System.Globalization;
-using System.Security.Claims;
 using EnigmaBudget.Api.Data;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
+using EnigmaBudget.Api.Workspaces;
 
 namespace EnigmaBudget.Api.Finance;
 
@@ -14,58 +14,38 @@ public static partial class FinanceEndpoints
 
     public static void MapFinanceEndpoints(this RouteGroupBuilder api)
     {
-        api.MapGet("/accounts", Accounts);
-        api.MapGet("/finance", FinanceOverview);
-        api.MapPost("/accounts", CreateAccount);
-        api.MapPut("/accounts/{id:guid}", UpdateAccount);
-        api.MapPost("/accounts/{id:guid}/adjustments", AdjustAccount);
-        api.MapGet("/cards", Cards);
-        api.MapPost("/operations", CreateOperation);
-        api.MapGet("/operations", Operations);
-        api.MapPost("/operations/{id:guid}/payments", PayOperation);
-        api.MapPost("/operations/{id:guid}/void", VoidOperation);
-        api.MapPost("/transfers", Transfer);
-        api.MapPost("/cards", CreateCard);
-        api.MapPut("/cards/{id:guid}", UpdateCard);
-        api.MapPost("/groups", CreateGroup);
-        api.MapGet("/groups", GetGroups);
-        api.MapPut("/groups/{groupId:guid}/rules/{period}", PutRule);
-        api.MapPost("/groups/{groupId:guid}/rules/{period}/confirm", ConfirmRule);
-        api.MapPost("/purchases", CreatePurchase);
-        api.MapGet("/groups/{groupId:guid}/receivables", GetReceivables);
-        api.MapPost("/groups/{groupId:guid}/collections", Collect);
-        api.MapGet("/purchases/{id:guid}", GetPurchase);
-        api.MapGet("/cards/{cardId:guid}/purchases", GetPurchases);
-        api.MapGet("/cards/{cardId:guid}/statement", GetStatement);
-        api.MapPut("/cards/{cardId:guid}/statement", SaveStatement);
-        api.MapPost("/cards/{cardId:guid}/statement/confirm", ConfirmStatement);
-        api.MapPost("/cards/{cardId:guid}/payments", PayCard);
+        var finance = api.MapGroup("").AddEndpointFilter<FinanceWorkspaceFilter>();
+        finance.MapGet("/accounts", Accounts);
+        finance.MapGet("/finance", FinanceOverview);
+        finance.MapPost("/accounts", CreateAccount);
+        finance.MapPut("/accounts/{id:guid}", UpdateAccount);
+        finance.MapPost("/accounts/{id:guid}/adjustments", AdjustAccount);
+        finance.MapGet("/cards", Cards);
+        finance.MapPost("/operations", CreateOperation);
+        finance.MapGet("/operations", Operations);
+        finance.MapPost("/operations/{id:guid}/payments", PayOperation);
+        finance.MapPost("/operations/{id:guid}/void", VoidOperation);
+        finance.MapPost("/transfers", Transfer);
+        finance.MapPost("/cards", CreateCard);
+        finance.MapPut("/cards/{id:guid}", UpdateCard);
+        finance.MapPost("/groups", CreateGroup);
+        finance.MapGet("/groups", GetGroups);
+        finance.MapPut("/groups/{groupId:guid}/rules/{period}", PutRule);
+        finance.MapPost("/groups/{groupId:guid}/rules/{period}/confirm", ConfirmRule);
+        finance.MapPost("/purchases", CreatePurchase);
+        finance.MapGet("/groups/{groupId:guid}/receivables", GetReceivables);
+        finance.MapPost("/groups/{groupId:guid}/collections", Collect);
+        finance.MapGet("/purchases/{id:guid}", GetPurchase);
+        finance.MapGet("/cards/{cardId:guid}/purchases", GetPurchases);
+        finance.MapGet("/cards/{cardId:guid}/statement", GetStatement);
+        finance.MapPut("/cards/{cardId:guid}/statement", SaveStatement);
+        finance.MapPost("/cards/{cardId:guid}/statement/confirm", ConfirmStatement);
+        finance.MapPost("/cards/{cardId:guid}/payments", PayCard);
     }
 
-    private static string Subject(HttpContext h) =>
-        h.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
-
-    private static async Task<Workspace> Workspace(AppDbContext db, string subject)
-    {
-        var ws = await db.Workspaces.FirstOrDefaultAsync(x => x.OwnerSubject == subject);
-        if (ws is not null)
-            return ws;
-        ws = new Workspace { OwnerSubject = subject, Draft = new OnboardingDraft() };
-        db.Workspaces.Add(ws);
-        try
-        {
-            await db.SaveChangesAsync();
-            return ws;
-        }
-        catch (DbUpdateException ex)
-            when (ex.GetBaseException()
-                    is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation }
-            )
-        {
-            db.ChangeTracker.Clear();
-            return await db.Workspaces.SingleAsync(x => x.OwnerSubject == subject);
-        }
-    }
+    private static Task<Workspace> Workspace(AppDbContext db, HttpContext http) =>
+        Task.FromResult(FinanceWorkspaceFilter.Get(http)?.Workspace
+            ?? throw new InvalidOperationException("Financial endpoint ran without a resolved workspace context."));
 
     private static async Task<bool> Csrf(HttpContext h, IAntiforgery csrf)
     {

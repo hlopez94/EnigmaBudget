@@ -133,6 +133,7 @@ public sealed class BusinessClockIntegrationTests
         Assert.Equal(expectedDefaultPeriod, groups!.Single().GetProperty("rule").GetProperty("period").GetString());
         using var currentOverview = JsonDocument.Parse(await client.GetStringAsync("/api/finance"));
         Assert.Equal(expectedDefaultPeriod, currentOverview.RootElement.GetProperty("period").GetString());
+        Assert.Equal(expectedAccountBalance, currentOverview.RootElement.GetProperty("totals").GetProperty("balanceArs").GetString());
     }
 
     private static ApiFactory Factory(string instant) => new(timeProvider: new FixedTimeProvider(DateTimeOffset.Parse(instant)));

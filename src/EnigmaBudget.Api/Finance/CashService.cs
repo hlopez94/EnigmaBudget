@@ -36,7 +36,7 @@ public static partial class FinanceEndpoints
             )
         )
             return Problem(400, "Revisá los datos del movimiento.");
-        var ws = await Workspace(db, Subject(http));
+        var ws = await Workspace(db, http);
         var account = await db.Accounts.SingleOrDefaultAsync(x =>
             x.WorkspaceId == ws.Id && x.Id == r.AccountId
         );
@@ -112,7 +112,7 @@ public static partial class FinanceEndpoints
         Guid? accountId = null
     )
     {
-        var ws = await Workspace(db, Subject(http));
+        var ws = await Workspace(db, http);
         var query = db.FinanceOperations.Where(x => x.WorkspaceId == ws.Id);
         if (accountId.HasValue)
             query = query.Where(x => x.AccountId == accountId);
@@ -185,7 +185,7 @@ public static partial class FinanceEndpoints
             || date > clock.Today
         )
             return Problem(400, "Revisá el importe y la fecha del pago.");
-        var ws = await Workspace(db, Subject(http));
+        var ws = await Workspace(db, http);
         await using var tx = await db.Database.BeginTransactionAsync();
         var op = await db
             .FinanceOperations.Include(x => x.Payments)
@@ -267,7 +267,7 @@ public static partial class FinanceEndpoints
             return Results.BadRequest();
         if (string.IsNullOrWhiteSpace(r.Reason) || r.Reason.Length > 240)
             return Problem(400, "Indicá el motivo de la anulación.");
-        var ws = await Workspace(db, Subject(http));
+        var ws = await Workspace(db, http);
         var op = await db.FinanceOperations.SingleOrDefaultAsync(x =>
             x.WorkspaceId == ws.Id && x.Id == id
         );
@@ -336,7 +336,7 @@ public static partial class FinanceEndpoints
             || date > clock.Today
         )
             return Problem(400, "Revisá los datos de la transferencia.");
-        var ws = await Workspace(db, Subject(http));
+        var ws = await Workspace(db, http);
         var old = await db.Transfers.SingleOrDefaultAsync(x =>
             x.WorkspaceId == ws.Id && x.Id == r.Id
         );

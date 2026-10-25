@@ -1,14 +1,22 @@
 using Microsoft.EntityFrameworkCore;
+using EnigmaBudget.Api.Workspaces;
 
 namespace EnigmaBudget.Api.Data;
 
 public sealed class Workspace
 {
     public Guid Id { get; set; } = Guid.NewGuid();
-    public required string OwnerSubject { get; set; }
+    public string? OwnerSubject { get; set; }
+    public required string Name { get; set; }
+    public required string Kind { get; set; }
+    public Guid OwnerUserId { get; set; }
+    public ApplicationUser OwnerUser { get; set; } = null!;
+    public bool IsArchived { get; set; }
+    public int Version { get; set; } = 1;
     public OnboardingDraft? Draft { get; set; }
     public List<BankAccount> Accounts { get; set; } = [];
     public List<PaymentCard> Cards { get; set; } = [];
+    public List<WorkspaceMembership> Memberships { get; set; } = [];
 }
 
 public sealed class OnboardingDraft
@@ -119,6 +127,9 @@ public sealed class TransferRecord
 public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
 {
     public DbSet<Workspace> Workspaces => Set<Workspace>();
+    public DbSet<ApplicationUser> ApplicationUsers => Set<ApplicationUser>();
+    public DbSet<WorkspaceMembership> WorkspaceMemberships => Set<WorkspaceMembership>();
+    public DbSet<WorkspaceAuditEvent> WorkspaceAuditEvents => Set<WorkspaceAuditEvent>();
     public DbSet<OnboardingDraft> Drafts => Set<OnboardingDraft>();
     public DbSet<BankAccount> Accounts => Set<BankAccount>();
     public DbSet<PaymentCard> Cards => Set<PaymentCard>();
@@ -140,7 +151,31 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
 
     protected override void OnModelCreating(ModelBuilder model)
     {
-        model.Entity<Workspace>().HasIndex(x => x.OwnerSubject).IsUnique();
+        model.Entity<Workspace>().HasIndex(x => x.OwnerSubject).IsUnique().HasFilter("\"OwnerSubject\" IS NOT NULL");
+        model.Entity<Workspace>().Property(x => x.Name).HasMaxLength(120);
+        model.Entity<Workspace>().Property(x => x.Kind).HasMaxLength(20);
+        model.Entity<Workspace>().Property(x => x.Version).IsConcurrencyToken();
+        model.Entity<Workspace>().ToTable(table => table.HasCheckConstraint(
+            "CK_Workspaces_KindAndOwnerSubject",
+            "\"Kind\" IN ('Personal','Household') AND ((\"Kind\" = 'Personal' AND \"OwnerSubject\" IS NOT NULL) OR (\"Kind\" <> 'Personal' AND \"OwnerSubject\" IS NULL))"));
+        model.Entity<ApplicationUser>().HasIndex(x => x.Subject).IsUnique();
+        model.Entity<ApplicationUser>().Property(x => x.Subject).HasMaxLength(512);
+        model.Entity<ApplicationUser>().Property(x => x.DisplayName).HasMaxLength(256);
+        model.Entity<ApplicationUser>().Property(x => x.Email).HasMaxLength(320);
+        model.Entity<WorkspaceMembership>().HasKey(x => new { x.WorkspaceId, x.UserId });
+        model.Entity<WorkspaceMembership>().HasIndex(x => new { x.UserId, x.Active });
+        model.Entity<WorkspaceMembership>().Property(x => x.Role).HasMaxLength(20);
+        model.Entity<WorkspaceMembership>().Property(x => x.Version).IsConcurrencyToken();
+        model.Entity<WorkspaceAuditEvent>().Property(x => x.Action).HasMaxLength(80);
+        model.Entity<WorkspaceAuditEvent>().Property(x => x.ResourceType).HasMaxLength(80);
+        model.Entity<WorkspaceAuditEvent>().Property(x => x.ResourceId).HasMaxLength(80);
+        model.Entity<WorkspaceAuditEvent>().Property(x => x.ChangesJson).HasColumnType("jsonb");
+        model.Entity<WorkspaceAuditEvent>().HasIndex(x => new { x.WorkspaceId, x.OccurredAt });
+        model.Entity<Workspace>().HasOne(x => x.OwnerUser).WithMany().HasForeignKey(x => x.OwnerUserId).OnDelete(DeleteBehavior.Restrict);
+        model.Entity<WorkspaceMembership>().HasOne(x => x.Workspace).WithMany(x => x.Memberships).HasForeignKey(x => x.WorkspaceId).OnDelete(DeleteBehavior.Cascade);
+        model.Entity<WorkspaceMembership>().HasOne(x => x.User).WithMany(x => x.Memberships).HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+        model.Entity<WorkspaceAuditEvent>().HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.ActorUserId).OnDelete(DeleteBehavior.SetNull);
+        model.Entity<WorkspaceAuditEvent>().HasOne<Workspace>().WithMany().HasForeignKey(x => x.WorkspaceId).OnDelete(DeleteBehavior.Cascade);
         model.Entity<OnboardingDraft>().HasKey(x => x.WorkspaceId);
         model.Entity<OnboardingDraft>().Property(x => x.Version).IsConcurrencyToken();
         model.Entity<BankAccount>().Property(x => x.OpeningBalance).HasPrecision(18, 2);

@@ -37,7 +37,7 @@ public static partial class FinanceEndpoints
             || r.Currency is not ("ARS" or "USD")
         )
             return Problem(400, "Revisá los datos de la compra.");
-        var ws = await Workspace(db, Subject(http));
+        var ws = await Workspace(db, http);
         var repeated = await db.Purchases.SingleOrDefaultAsync(x =>
             x.WorkspaceId == ws.Id && x.Id == r.Id
         );
@@ -150,14 +150,14 @@ public static partial class FinanceEndpoints
 
     private static async Task<IResult> GetPurchase(HttpContext http, AppDbContext db, Guid id)
     {
-        var ws = await Workspace(db, Subject(http));
+        var ws = await Workspace(db, http);
         var p = await db.Purchases.SingleOrDefaultAsync(x => x.WorkspaceId == ws.Id && x.Id == id);
         return p is null ? Results.NotFound() : Results.Ok(await PurchaseDto(db, p));
     }
 
     private static async Task<IResult> GetPurchases(HttpContext http, AppDbContext db, Guid cardId)
     {
-        var ws = await Workspace(db, Subject(http));
+        var ws = await Workspace(db, http);
         if (!await db.Cards.AnyAsync(x => x.WorkspaceId == ws.Id && x.Id == cardId))
             return Results.NotFound();
         var ps = await db
@@ -212,7 +212,7 @@ public static partial class FinanceEndpoints
         string? currency = null
     )
     {
-        var ws = await Workspace(db, Subject(http));
+        var ws = await Workspace(db, http);
         if (!await db.Cards.AnyAsync(x => x.WorkspaceId == ws.Id && x.Id == cardId))
             return Results.NotFound();
         if (!MoneyRules.IsPeriod(period ?? "") || currency is not ("ARS" or "USD"))
@@ -364,7 +364,7 @@ public static partial class FinanceEndpoints
                 )
         )
             return Problem(400, "Revisá el resumen y sus ajustes.");
-        var ws = await Workspace(db, Subject(http));
+        var ws = await Workspace(db, http);
         if (!await db.Cards.AnyAsync(x => x.WorkspaceId == ws.Id && x.Id == cardId))
             return Results.NotFound();
         var s = await db.CardStatements.SingleOrDefaultAsync(x =>
@@ -437,7 +437,7 @@ public static partial class FinanceEndpoints
     {
         if (!await Csrf(http, csrf))
             return Results.BadRequest();
-        var ws = await Workspace(db, Subject(http));
+        var ws = await Workspace(db, http);
         var s = await db.CardStatements.SingleOrDefaultAsync(x =>
             x.WorkspaceId == ws.Id && x.CardId == cardId && x.Id == r.Id
         );
@@ -594,7 +594,7 @@ public static partial class FinanceEndpoints
         )
             return Problem(400, "Revisá los datos del pago.");
 
-        var ws = await Workspace(db, Subject(http));
+        var ws = await Workspace(db, http);
         await using var transaction = await db.Database.BeginTransactionAsync(
             IsolationLevel.Serializable
         );

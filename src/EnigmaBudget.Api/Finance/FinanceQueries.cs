@@ -20,7 +20,7 @@ public static partial class FinanceEndpoints
         period ??= clock.CurrentPeriod;
         if (!MoneyRules.IsPeriod(period ?? ""))
             return Problem(400, "Período inválido.");
-        var ws = await Workspace(db, Subject(http));
+        var ws = await Workspace(db, http);
         var accounts = await db.Accounts.Where(x => x.WorkspaceId == ws.Id).ToArrayAsync();
         var ledgerRows = await db.LedgerEntries.Where(x =>
             x.WorkspaceId == ws.Id
@@ -145,10 +145,10 @@ public static partial class FinanceEndpoints
             })
             .ToArray();
         var balanceArs =
-            accounts.Where(x => x.Currency == "ARS").Sum(x => x.OpeningBalance)
+            accounts.Where(x => x.Currency == "ARS" && x.OpeningDate <= clock.Today).Sum(x => x.OpeningBalance)
             + ledgerRows.Where(x => x.Currency == "ARS").Sum(x => x.Amount);
         var balanceUsd =
-            accounts.Where(x => x.Currency == "USD").Sum(x => x.OpeningBalance)
+            accounts.Where(x => x.Currency == "USD" && x.OpeningDate <= clock.Today).Sum(x => x.OpeningBalance)
             + ledgerRows.Where(x => x.Currency == "USD").Sum(x => x.Amount);
         var expenses = await db
             .FinanceOperations.Where(x =>
