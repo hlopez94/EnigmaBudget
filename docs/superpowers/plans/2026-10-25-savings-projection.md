@@ -246,3 +246,11 @@
 - Do not add a new cash ledger, card-payment allocation table, tenant selector in payloads, client-supplied actor identity, fabricated FX rate, automatic savings transfer, or unrequested commercial policy.
 - After each independent slice, controller/reviewer compares the task's persisted data and response totals against the named tests before integrating. Keep migrations additive and run tests sequentially.
 - Coverage map: authorization/CSRF/idempotency/concurrency → Tasks 2–3; reserve and application accounting/void compensation → Task 3; exchange provider/cache/conversion → Task 4; canonical card/debt/cash minimum/overdue/future opening/horizon → Task 5; shared-receivable privacy and scenarios → Task 6; mobile/drafts/permissions/navigation → Task 7; responsive real-user flows/public provider separation → Task 8.
+
+## Contratos precisados al integrar Tasks 1–3
+
+- `SavingsGoalDto` añade `MonthlyContribution`, `NextContributionDate` y `EstimateExplanation` a los campos calculados descritos arriba. Las estimaciones fuera de calendario usan `BeyondCalendarRange`; posiciones extranjeras con saldo cero no necesitan FX.
+- Task 3 añade la lectura `GET /api/savings/goals/{goalId}/details?historyPage=N`, con posiciones y movimientos paginados de 50, `TotalMovements`, `HasMore` e `IsReversed` contra todas las reversiones. Tasks 7–8 deben usar los IDs retornados tras una recarga. Los pagos reales ya se leen en `OperationDto.Payments` desde `/api/operations`; no hace falta inventar IDs ni otro pago.
+- Task 3 añade el motivo inmutable de reversión y la restricción de los cuatro tipos de movimiento. La compensación de una meta cerrada registra Reversal y Release sin nuevo asiento bancario; para una meta activa o pausada restaura la reserva.
+- Tasks 4 y 7 preservan `BackingDeficit` antes de calcular equivalencias/llegada y muestran las reservas nominales sin afirmar respaldo completo. La referencia de cotización no modifica la moneda ni los asientos originales.
+- El bloqueo común para mutaciones de reservas es espacio → cuentas ordenadas → asignaciones ordenadas → meta → pago. La auditoría financiera de los escritores HTTP actuales se guarda en la misma transacción y proporciona la serialización observada; futuros trabajos financieros deben mantener esa garantía con contexto y actor explícitos.
