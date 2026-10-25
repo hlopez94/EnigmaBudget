@@ -72,8 +72,11 @@ public static class SavingsEstimate
             return new(remaining, false, desiredCount, null, required, "BeyondCalendarRange", "El aporte permitiría alcanzar la meta fuera del rango de fechas disponible.");
         var count = decimal.ToInt32(countValue);
         var firstIndex = FirstOccurrenceIndex(nextDate.Value, today);
+        var completionIndex = (long)firstIndex + count - 1L;
+        if (completionIndex > int.MaxValue)
+            return new(remaining, false, desiredCount, null, required, "BeyondCalendarRange", "El aporte permitiría alcanzar la meta fuera del rango de fechas disponible.");
         DateOnly completion;
-        try { completion = nextDate.Value.AddMonths(checked(firstIndex + count - 1)); }
+        try { completion = nextDate.Value.AddMonths((int)completionIndex); }
         catch (ArgumentOutOfRangeException)
         {
             return new(remaining, false, desiredCount, null, required, "BeyondCalendarRange", "El aporte permitiría alcanzar la meta fuera del rango de fechas disponible.");

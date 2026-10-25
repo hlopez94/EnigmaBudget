@@ -255,6 +255,18 @@ public sealed class SavingsGoalIntegrationTests
     }
 
     [Fact]
+    public void Estimate_count_plus_positive_first_occurrence_index_returns_bounded_range_result()
+    {
+        var estimate = SavingsEstimate.Calculate(2147483647m, 0m, 1m, new DateOnly(2026, 8, 25), null, "Active", new DateOnly(2026, 10, 25));
+
+        Assert.Equal("BeyondCalendarRange", estimate.EstimateStatus);
+        Assert.Equal(2147483647m, estimate.RemainingAmount);
+        Assert.Null(estimate.RequiredContributionCount);
+        Assert.Null(estimate.EstimatedCompletionDate);
+        Assert.Contains("rango de fechas", estimate.Explanation, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task Goal_mutations_require_csrf_validation()
     {
         using var client = await _factory.AuthenticatedClientAsync();
