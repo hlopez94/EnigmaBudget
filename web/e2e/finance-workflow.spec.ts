@@ -243,6 +243,7 @@ test('runs real finance, sharing, and card acceptance from empty completed onboa
   await operationForm
     .locator('[name="opAccount"]')
     .selectOption({ label: 'Cuenta principal · ARS' });
+  const rejectedAccountValue = await operationForm.locator('[name="opAccount"]').inputValue();
   await operationForm.locator('[name="opDate"]').fill(date);
   await operationForm.locator('[name="opDescription"]').fill('Ingreso de prueba');
   await operationForm.locator('[name="opCategory"]').fill('Trabajo');
@@ -251,9 +252,13 @@ test('runs real finance, sharing, and card acceptance from empty completed onboa
   await operationForm.getByRole('button', { name: 'Guardar movimiento' }).click();
   expect((await rejectedOperation).status()).toBe(400);
   await expect(page.getByRole('dialog')).toBeVisible();
+  await expect(operationForm.locator('[name="opKind"]')).toHaveValue('Income');
+  await expect(operationForm.locator('[name="opAccount"]')).toHaveValue(rejectedAccountValue);
+  await expect(operationForm.locator('[name="opDate"]')).toHaveValue(date);
   await expect(operationForm.locator('[name="opDescription"]')).toHaveValue('Ingreso de prueba');
   await expect(operationForm.locator('[name="opCategory"]')).toHaveValue('Trabajo');
   await expect(operationForm.locator('[name="opAmount"]')).toHaveValue('0');
+  await expect(operationForm.locator('[name="opPaid"]')).toBeChecked();
 
   const createIncome = waitForApi(page, 'POST', '/api/operations');
   await operationForm.locator('[name="opAmount"]').fill('1000');
