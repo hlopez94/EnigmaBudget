@@ -176,6 +176,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         model.Entity<WorkspaceInvitation>().Property(x => x.TokenHash).HasMaxLength(32);
         model.Entity<WorkspaceInvitation>().Property(x => x.Version).IsConcurrencyToken();
         model.Entity<WorkspaceInvitation>().HasIndex(x => new { x.WorkspaceId, x.Id }).IsUnique();
+        model.Entity<WorkspaceInvitation>().HasIndex(x => x.IssuedForUserId);
         model.Entity<WorkspaceInvitation>().HasIndex(x => x.TokenHash).IsUnique();
         model.Entity<WorkspaceInvitation>().HasOne<Workspace>().WithMany().HasForeignKey(x => x.WorkspaceId).OnDelete(DeleteBehavior.Cascade);
         model.Entity<WorkspaceInvitation>().HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.AcceptedByUserId).OnDelete(DeleteBehavior.SetNull);

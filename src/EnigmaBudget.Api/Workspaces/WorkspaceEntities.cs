@@ -34,6 +34,8 @@ public sealed class WorkspaceInvitation
     public required string Status { get; set; }
     public DateTimeOffset ExpiresAt { get; set; }
     public int Version { get; set; } = 1;
+    public Guid? IssuedForUserId { get; set; }
+    public int? IssuedForMembershipVersion { get; set; }
     public Guid? AcceptedByUserId { get; set; }
     public Guid? AcceptedMembershipGeneration { get; set; }
 }

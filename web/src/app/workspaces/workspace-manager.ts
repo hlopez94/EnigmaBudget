@@ -95,7 +95,11 @@ export class WorkspaceManager implements OnChanges, OnInit {
   get canManagePrivacy(): boolean { return !!this.activeWorkspace?.permissions.managePrivacy; }
   get isOwnPersonal(): boolean { return this.activeWorkspace?.id === this.personalWorkspaceId; }
   get activeMembers(): WorkspaceMember[] { return this.memberRows.filter(member => member.active); }
-  get pendingInvitations(): WorkspaceInvitation[] { return this.invites.filter(invitation => invitation.status === 'Pending'); }
+  get pendingInvitations(): WorkspaceInvitation[] {
+    const now = Date.now();
+    return this.invites.filter(invitation => invitation.status === 'Pending' && Date.parse(invitation.expiresAt) > now);
+  }
+  get reservedSeats(): number { return this.activeMembers.length + this.pendingInvitations.length; }
   get currentOwner(): boolean { return this.activeWorkspace?.role === 'Owner'; }
 
   label(workspace: Workspace): string {

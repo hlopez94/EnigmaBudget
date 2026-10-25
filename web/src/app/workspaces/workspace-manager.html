@@ -20,7 +20,7 @@
     }
     @if (activeWorkspace?.kind === 'Household' && canManageMembers) {
       <section class="management-card" aria-labelledby="members-title">
-        <div class="section-title"><div><p class="eyebrow">HOGAR · {{ activeMembers.length }} DE 4 LUGARES</p><h3 id="members-title">Integrantes e invitaciones</h3></div></div>
+        <div class="section-title"><div><p class="eyebrow">HOGAR · {{ reservedSeats }} DE 4 LUGARES</p><h3 id="members-title">Integrantes e invitaciones</h3></div></div>
         <p class="helper">Las invitaciones pendientes también reservan un lugar. Crear un Hogar no inicia una suscripción ni confirma un precio.</p>
         @for (member of memberRows; track member.userId) {
           <div class="member-row" [class.inactive]="!member.active">
@@ -46,7 +46,7 @@
         <form class="invite-form" (ngSubmit)="invite()">
           <label>Correo de la persona<input type="email" name="inviteEmail" [(ngModel)]="inviteEmail" required maxlength="320" autocomplete="email" [disabled]="busy || loading"></label>
           <label>Acceso inicial<select name="inviteRole" [(ngModel)]="inviteRole" [disabled]="busy || loading"><option value="Member">Integrante</option><option value="Admin">Administración</option><option value="Reader">Solo lectura</option></select></label>
-          <button class="primary" type="submit" [disabled]="busy || loading || activeMembers.length + pendingInvitations.length >= 4">Crear invitación</button>
+          <button class="primary" type="submit" [disabled]="busy || loading || reservedSeats >= 4">Crear invitación</button>
         </form>
       </section>
     }

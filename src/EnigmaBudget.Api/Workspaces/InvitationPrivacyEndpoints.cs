@@ -46,8 +46,20 @@ public static class InvitationPrivacyEndpoints
         var reserved = await db.WorkspaceMemberships.CountAsync(x => x.WorkspaceId == id && x.Active, http.RequestAborted)
             + await db.WorkspaceInvitations.CountAsync(x => x.WorkspaceId == id && x.Status == "Pending" && x.ExpiresAt > now, http.RequestAborted);
         if (reserved >= 4) return Problem(409, "El Hogar ya alcanzó el límite de cuatro integrantes e invitaciones pendientes.");
+        var recipients = await db.WorkspaceMemberships.AsNoTracking()
+            .Where(x => x.WorkspaceId == id && x.User.Email != null && x.User.Email.ToLower() == normalized)
+            .Select(x => new { x.UserId, x.Version })
+            .Take(2)
+            .ToArrayAsync(http.RequestAborted);
+        if (recipients.Length > 1) return Problem(409, "No se pudo identificar de forma segura a la persona destinataria.");
+        var recipient = recipients.SingleOrDefault();
         var (token, hash) = InvitationService.CreateToken();
-        var invitation = new WorkspaceInvitation { Id = request.Id, WorkspaceId = id, Email = normalized, Role = request.Role, TokenHash = hash, Status = "Pending", ExpiresAt = invitations.ExpiresAt };
+        var invitation = new WorkspaceInvitation
+        {
+            Id = request.Id, WorkspaceId = id, Email = normalized, Role = request.Role, TokenHash = hash,
+            Status = "Pending", ExpiresAt = invitations.ExpiresAt,
+            IssuedForUserId = recipient?.UserId, IssuedForMembershipVersion = recipient?.Version,
+        };
         db.WorkspaceInvitations.Add(invitation);
         db.WorkspaceAuditEvents.Add(Audit(context.User.Id, id, "invitation.created", invitation.Id));
         mutation.MarkChanged();
@@ -122,6 +134,7 @@ public static class InvitationPrivacyEndpoints
         await using var mutation = lease;
         var invitation = await db.WorkspaceInvitations.SingleOrDefaultAsync(x => x.WorkspaceId == invitationHeader.WorkspaceId && x.TokenHash.SequenceEqual(hash), http.RequestAborted);
         if (invitation is null || invitation.Email != InvitationService.NormalizeEmail(email)) return Problem(403, "La invitación no corresponde al correo verificado de esta sesión.");
+        if (invitation.IssuedForUserId is Guid issuedForUserId && issuedForUserId != actor.Id) return NotFound();
         var membership = await db.WorkspaceMemberships.SingleOrDefaultAsync(x => x.WorkspaceId == mutation.Workspace.Id && x.UserId == actor.Id, http.RequestAborted);
         if (invitation.Status == "Accepted")
         {
@@ -132,6 +145,9 @@ public static class InvitationPrivacyEndpoints
         }
         if (invitation.Status != "Pending" || invitation.ExpiresAt <= invitations.Now || mutation.Workspace.IsArchived) return NotFound();
         var wasActive = membership is { Active: true };
+        if (membership is { Active: false } &&
+            (invitation.IssuedForUserId != actor.Id || invitation.IssuedForMembershipVersion is null || invitation.IssuedForMembershipVersion != membership.Version))
+            return NotFound();
         var now = invitations.Now;
         var occupied = await db.WorkspaceMemberships.CountAsync(x => x.WorkspaceId == mutation.Workspace.Id && x.Active, http.RequestAborted)
             + await db.WorkspaceInvitations.CountAsync(x => x.WorkspaceId == mutation.Workspace.Id && x.Status == "Pending" && x.ExpiresAt > now && x.Id != invitation.Id, http.RequestAborted);
@@ -144,10 +160,6 @@ public static class InvitationPrivacyEndpoints
         {
             membership = new WorkspaceMembership { WorkspaceId = mutation.Workspace.Id, UserId = actor.Id, Role = invitation.Role, Active = true, JoinedAt = invitations.Now, ActivationGeneration = Guid.NewGuid() };
             db.WorkspaceMemberships.Add(membership);
-        }
-        else if (membership.Role != "Owner" && membership.Role != invitation.Role)
-        {
-            membership.Role = invitation.Role; membership.Version++;
         }
         invitation.Status = "Accepted";
         invitation.AcceptedByUserId = actor.Id;

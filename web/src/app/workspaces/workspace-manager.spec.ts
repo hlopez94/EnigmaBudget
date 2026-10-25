@@ -11,6 +11,26 @@ const readerPersonal: Workspace = {
 };
 
 describe('workspace management permissions', () => {
+  it('counts active members and only unexpired pending reservations for the capacity heading and invite limit', () => {
+    const household = { ...readerPersonal, id: 'household', name: 'Casa', kind: 'Household' as const };
+    const manager = new WorkspaceManager({} as ApiService, { markForCheck: vi.fn() } as never);
+    manager.activeWorkspace = household;
+    manager.memberRows = [
+      { userId: 'owner', displayName: 'Titular', role: 'Owner', active: true, version: 1 },
+      { userId: 'member', displayName: 'Integrante', role: 'Member', active: true, version: 1 },
+      { userId: 'inactive', displayName: 'Antiguo integrante', role: 'Member', active: false, version: 2 },
+    ];
+    manager.invites = [
+      { id: 'reserved', email: 'pending@example.test', role: 'Member', status: 'Pending', expiresAt: new Date(Date.now() + 60_000).toISOString(), version: 1, shareUrl: null },
+      { id: 'expired', email: 'expired@example.test', role: 'Member', status: 'Pending', expiresAt: new Date(Date.now() - 60_000).toISOString(), version: 1, shareUrl: null },
+    ];
+
+    expect(manager.pendingInvitations.map(invitation => invitation.id)).toEqual(['reserved']);
+    expect(manager.activeMembers.length + manager.pendingInvitations.length).toBe(3);
+    expect(manager.reservedSeats).toBe(3);
+    expect(manager.reservedSeats).toBe(manager.activeMembers.length + manager.pendingInvitations.length);
+  });
+
   it('labels a granted Personal by owner without fetching management-only member details', async () => {
     const api = {
       workspace: vi.fn().mockResolvedValue(readerPersonal), members: vi.fn(), invitations: vi.fn(), personalSharing: vi.fn(),

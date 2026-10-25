@@ -10,6 +10,149 @@ namespace EnigmaBudget.Api.Tests;
 public sealed class WorkspaceInvitationPrivacyIntegrationTests
 {
     [Fact]
+    public async Task Older_admin_invitation_cannot_reverse_a_later_reader_demotion_or_change_household_finances()
+    {
+        using var factory = new ApiFactory(timeProvider: new FixedTimeProvider(DateTimeOffset.Parse("2026-10-25T12:00:00Z")));
+        using var owner = VerifiedClient(factory, "authority-owner", "owner@example.test");
+        using var member = VerifiedClient(factory, "authority-member", "member@example.test");
+        await owner.GetAsync("/api/auth/session");
+        await member.GetAsync("/api/auth/session");
+        await AddCsrfAsync(owner);
+        await AddCsrfAsync(member);
+        var household = await CreateHouseholdAsync(owner);
+        owner.DefaultRequestHeaders.Add("X-Workspace-Id", household.Id.ToString());
+        var originalAccountId = Guid.NewGuid();
+        Assert.Equal(HttpStatusCode.OK, (await owner.PostAsJsonAsync("/api/accounts", new
+        {
+            id = originalAccountId, name = "Caja del hogar", bankName = "Banco", currency = "ARS",
+            openingBalance = "1234.50", openingDate = "2026-10-25",
+        })).StatusCode);
+
+        var oldAdminInvite = await CreateInvitationAsync(owner, household.Id, "member@example.test", "Admin");
+        var joiningInvite = await CreateInvitationAsync(owner, household.Id, "member@example.test", "Member");
+        var joined = await PostTokenAsync(member, TokenFrom(joiningInvite.ShareUrl));
+        Assert.Equal(HttpStatusCode.OK, joined.StatusCode);
+        var memberId = await UserIdAsync(factory, "authority-member");
+        Assert.Equal(HttpStatusCode.NoContent, (await owner.PutAsJsonAsync($"/api/workspaces/{household.Id}/members/{memberId}", new { version = 1, role = "Reader" })).StatusCode);
+
+        var oldAccept = await PostTokenAsync(member, TokenFrom(oldAdminInvite.ShareUrl));
+        Assert.Equal(HttpStatusCode.OK, oldAccept.StatusCode);
+        using (var accepted = JsonDocument.Parse(await oldAccept.Content.ReadAsStringAsync()))
+            Assert.Equal("Reader", accepted.RootElement.GetProperty("role").GetString());
+
+        await using (var inspect = Db(factory))
+        {
+            var current = await inspect.WorkspaceMemberships.SingleAsync(x => x.WorkspaceId == household.Id && x.UserId == memberId);
+            Assert.True(current.Active);
+            Assert.Equal("Reader", current.Role);
+            Assert.Equal(2, current.Version);
+            Assert.Equal("Accepted", await inspect.WorkspaceInvitations.Where(x => x.Id == oldAdminInvite.Id).Select(x => x.Status).SingleAsync());
+            Assert.Equal(1, await inspect.Accounts.CountAsync(x => x.WorkspaceId == household.Id));
+            Assert.Equal(1234.50m, await inspect.Accounts.Where(x => x.Id == originalAccountId).Select(x => x.OpeningBalance).SingleAsync());
+        }
+        member.DefaultRequestHeaders.Add("X-Workspace-Id", household.Id.ToString());
+        Assert.Equal(HttpStatusCode.OK, (await member.GetAsync("/api/accounts")).StatusCode);
+        var attemptedWrite = await member.PostAsJsonAsync("/api/accounts", new
+        {
+            id = Guid.NewGuid(), name = "Cuenta no autorizada", bankName = "Banco", currency = "ARS",
+            openingBalance = "1.00", openingDate = "2026-10-25",
+        });
+        Assert.Equal(HttpStatusCode.Forbidden, attemptedWrite.StatusCode);
+        await using var afterWrite = Db(factory);
+        Assert.Equal(1, await afterWrite.Accounts.CountAsync(x => x.WorkspaceId == household.Id));
+        Assert.Equal(1234.50m, await afterWrite.Accounts.Where(x => x.Id == originalAccountId).Select(x => x.OpeningBalance).SingleAsync());
+    }
+
+    [Fact]
+    public async Task Invitation_issued_before_removal_cannot_reactivate_member_but_fresh_invite_rejoins_without_personal_consent()
+    {
+        using var factory = new ApiFactory(timeProvider: new FixedTimeProvider(DateTimeOffset.Parse("2026-10-25T12:00:00Z")));
+        using var owner = VerifiedClient(factory, "removal-authority-owner", "owner@example.test");
+        using var member = VerifiedClient(factory, "removal-authority-member", "member@example.test");
+        await owner.GetAsync("/api/auth/session");
+        await member.GetAsync("/api/auth/session");
+        await AddCsrfAsync(owner);
+        await AddCsrfAsync(member);
+        var memberPersonalId = (await member.GetFromJsonAsync<JsonElement[]>("/api/workspaces"))!
+            .Single(x => x.GetProperty("kind").GetString() == "Personal").GetProperty("id").GetGuid();
+        member.DefaultRequestHeaders.Add("X-Workspace-Id", memberPersonalId.ToString());
+        var memberPersonalAccountId = Guid.NewGuid();
+        Assert.Equal(HttpStatusCode.OK, (await member.PostAsJsonAsync("/api/accounts", new
+        {
+            id = memberPersonalAccountId, name = "Cuenta privada", bankName = "Banco", currency = "ARS",
+            openingBalance = "321.09", openingDate = "2026-10-25",
+        })).StatusCode);
+        member.DefaultRequestHeaders.Remove("X-Workspace-Id");
+        var household = await CreateHouseholdAsync(owner);
+        owner.DefaultRequestHeaders.Add("X-Workspace-Id", household.Id.ToString());
+        var originalAccountId = Guid.NewGuid();
+        Assert.Equal(HttpStatusCode.OK, (await owner.PostAsJsonAsync("/api/accounts", new
+        {
+            id = originalAccountId, name = "Caja del hogar", bankName = "Banco", currency = "ARS",
+            openingBalance = "987.65", openingDate = "2026-10-25",
+        })).StatusCode);
+
+        var firstInvite = await CreateInvitationAsync(owner, household.Id, "member@example.test", "Member");
+        Assert.Equal(HttpStatusCode.OK, (await PostTokenAsync(member, TokenFrom(firstInvite.ShareUrl))).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await member.PutAsJsonAsync($"/api/personal-sharing/{household.Id}", new { version = 1, enabled = true })).StatusCode);
+        owner.DefaultRequestHeaders.Remove("X-Workspace-Id");
+        owner.DefaultRequestHeaders.Add("X-Workspace-Id", memberPersonalId.ToString());
+        Assert.Equal(HttpStatusCode.OK, (await owner.GetAsync("/api/accounts")).StatusCode);
+        owner.DefaultRequestHeaders.Remove("X-Workspace-Id");
+        owner.DefaultRequestHeaders.Add("X-Workspace-Id", household.Id.ToString());
+        var pendingBeforeRemoval = await CreateInvitationAsync(owner, household.Id, "member@example.test", "Admin");
+        var memberId = await UserIdAsync(factory, "removal-authority-member");
+        using (var remove = new HttpRequestMessage(HttpMethod.Delete, $"/api/workspaces/{household.Id}/members/{memberId}")
+        {
+            Content = JsonContent.Create(new { version = 1 }),
+        })
+        {
+            remove.Headers.Add("X-CSRF-TOKEN", owner.DefaultRequestHeaders.GetValues("X-CSRF-TOKEN").Single());
+            Assert.Equal(HttpStatusCode.NoContent, (await owner.SendAsync(remove)).StatusCode);
+        }
+
+        var staleAccept = await PostTokenAsync(member, TokenFrom(pendingBeforeRemoval.ShareUrl));
+        Assert.Equal(HttpStatusCode.NotFound, staleAccept.StatusCode);
+        member.DefaultRequestHeaders.Add("X-Workspace-Id", household.Id.ToString());
+        Assert.Equal(HttpStatusCode.NotFound, (await member.GetAsync("/api/accounts")).StatusCode);
+        await using (var verifyRemoval = Db(factory))
+        {
+            var current = await verifyRemoval.WorkspaceMemberships.SingleAsync(x => x.WorkspaceId == household.Id && x.UserId == memberId);
+            Assert.False(current.Active);
+            Assert.Equal("Member", current.Role);
+            Assert.Equal(2, current.Version);
+            Assert.Equal(1, await verifyRemoval.Accounts.CountAsync(x => x.WorkspaceId == household.Id));
+            Assert.Equal(987.65m, await verifyRemoval.Accounts.Where(x => x.Id == originalAccountId).Select(x => x.OpeningBalance).SingleAsync());
+        }
+
+        var freshInvite = await CreateInvitationAsync(owner, household.Id, "member@example.test", "Reader");
+        var freshAccept = await PostTokenAsync(member, TokenFrom(freshInvite.ShareUrl));
+        Assert.Equal(HttpStatusCode.OK, freshAccept.StatusCode);
+        using (var accepted = JsonDocument.Parse(await freshAccept.Content.ReadAsStringAsync()))
+            Assert.Equal("Reader", accepted.RootElement.GetProperty("role").GetString());
+        Assert.Equal(HttpStatusCode.OK, (await member.GetAsync("/api/accounts")).StatusCode);
+        member.DefaultRequestHeaders.Remove("X-Workspace-Id");
+        member.DefaultRequestHeaders.Add("X-Workspace-Id", memberPersonalId.ToString());
+        Assert.Equal(HttpStatusCode.OK, (await member.GetAsync("/api/accounts")).StatusCode);
+        owner.DefaultRequestHeaders.Remove("X-Workspace-Id");
+        owner.DefaultRequestHeaders.Add("X-Workspace-Id", memberPersonalId.ToString());
+        Assert.Equal(HttpStatusCode.NotFound, (await owner.GetAsync("/api/accounts")).StatusCode);
+        var privacy = await member.GetFromJsonAsync<JsonElement[]>("/api/personal-sharing");
+        var grant = Assert.Single(privacy!, x => x.GetProperty("householdId").GetGuid() == household.Id);
+        Assert.False(grant.GetProperty("enabled").GetBoolean());
+        Assert.Empty(grant.GetProperty("sharedWithUserIds").EnumerateArray());
+        await using var verifyRejoin = Db(factory);
+        var rejoined = await verifyRejoin.WorkspaceMemberships.SingleAsync(x => x.WorkspaceId == household.Id && x.UserId == memberId);
+        Assert.True(rejoined.Active);
+        Assert.Equal("Reader", rejoined.Role);
+        Assert.Equal(3, rejoined.Version);
+        Assert.Equal(1, await verifyRejoin.Accounts.CountAsync(x => x.WorkspaceId == household.Id));
+        Assert.Equal(987.65m, await verifyRejoin.Accounts.Where(x => x.Id == originalAccountId).Select(x => x.OpeningBalance).SingleAsync());
+        Assert.Empty(await verifyRejoin.PersonalReadGrantAudience.Where(x => x.PersonalWorkspaceId == memberPersonalId && x.HouseholdWorkspaceId == household.Id).ToArrayAsync());
+        Assert.Equal(321.09m, await verifyRejoin.Accounts.Where(x => x.Id == memberPersonalAccountId).Select(x => x.OpeningBalance).SingleAsync());
+    }
+
+    [Fact]
     public async Task Invitation_requires_csrf_and_current_verified_recipient_even_when_database_profile_is_verified()
     {
         using var factory = new ApiFactory();
@@ -381,9 +524,9 @@ public sealed class WorkspaceInvitationPrivacyIntegrationTests
         return (await response.Content.ReadFromJsonAsync<WorkspaceDto>())!;
     }
 
-    private static async Task<InvitationDto> CreateInvitationAsync(HttpClient owner, Guid householdId, string email)
+    private static async Task<InvitationDto> CreateInvitationAsync(HttpClient owner, Guid householdId, string email, string role = "Reader")
     {
-        using var response = await owner.PostAsJsonAsync($"/api/workspaces/{householdId}/invitations", new { id = Guid.NewGuid(), email, role = "Reader" });
+        using var response = await owner.PostAsJsonAsync($"/api/workspaces/{householdId}/invitations", new { id = Guid.NewGuid(), email, role });
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         return (await response.Content.ReadFromJsonAsync<InvitationDto>())!;
     }
@@ -404,4 +547,8 @@ public sealed class WorkspaceInvitationPrivacyIntegrationTests
 
     private sealed record WorkspaceDto(Guid Id, string Name, string Kind, string Role, int Version);
     private sealed record InvitationDto(Guid Id, string Email, string Role, string Status, DateTimeOffset ExpiresAt, int Version, string ShareUrl);
+    private sealed class FixedTimeProvider(DateTimeOffset utcNow) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => utcNow;
+    }
 }

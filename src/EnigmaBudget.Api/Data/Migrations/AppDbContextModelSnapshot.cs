@@ -887,6 +887,12 @@ namespace EnigmaBudget.Api.Data.Migrations
                     b.Property<Guid?>("AcceptedMembershipGeneration")
                         .HasColumnType("uuid");
 
+                    b.Property<int?>("IssuedForMembershipVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("IssuedForUserId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Email")
                         .IsRequired()
                         .HasMaxLength(320)
@@ -920,6 +926,8 @@ namespace EnigmaBudget.Api.Data.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("AcceptedByUserId");
+
+                    b.HasIndex("IssuedForUserId");
 
                     b.HasIndex("TokenHash")
                         .IsUnique();
