@@ -16,6 +16,8 @@ web/android/app/src/main/assets/capacitor.plugins.json
 **/playwright-report/
 **/test-results/
 artifacts/
+/scripts/build/
+/scripts/.gradle/
 src/EnigmaBudget.Api/wwwroot/
 .env
 .env.*

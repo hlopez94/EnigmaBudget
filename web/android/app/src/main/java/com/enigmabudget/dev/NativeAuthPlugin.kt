@@ -72,7 +72,7 @@ class NativeAuthPlugin : Plugin() {
 
     @PluginMethod
     fun invitationHost(call: PluginCall) = execute(call) {
-        val host = BuildConfig.APP_LINKS_HOST.takeIf { it.isNotBlank() }
+        val host = AppLinksPolicy.validate(BuildConfig.APP_LINKS_HOST)
         call.resolve(JSObject().put("host", host))
     }
 

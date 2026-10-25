@@ -314,6 +314,65 @@ public sealed class NativeAuthIntegrationTests
     }
 
     [Fact]
+    public async Task Development_native_session_can_read_and_write_only_its_workspace_then_refresh_replay_and_logout_revoke_it()
+    {
+        using var factory = NativeFactory(new MutableTimeProvider(DateTimeOffset.Parse("2026-10-25T12:00:00Z")));
+        using var client = HttpsClient(factory);
+        var first = await DevelopmentLoginAsync(client);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", first.AccessToken);
+
+        using var me = JsonDocument.Parse(await (await client.GetAsync("/api/me")).Content.ReadAsStringAsync());
+        Assert.False(string.IsNullOrWhiteSpace(me.RootElement.GetProperty("id").GetString()));
+        using var workspaceList = JsonDocument.Parse(await (await client.GetAsync("/api/workspaces")).Content.ReadAsStringAsync());
+        var personalWorkspaceId = workspaceList.RootElement.EnumerateArray().Single().GetProperty("id").GetGuid();
+        client.DefaultRequestHeaders.Add("X-Workspace-Id", personalWorkspaceId.ToString());
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/accounts")).StatusCode);
+
+        var accountId = Guid.NewGuid();
+        using var account = await client.PostAsJsonAsync("/api/accounts", new
+        {
+            id = accountId, name = "Caja de aceptación", bankName = "Banco", currency = "ARS",
+            openingBalance = "100.00", openingDate = "2026-10-01",
+        });
+        Assert.Equal(HttpStatusCode.OK, account.StatusCode);
+        using var operation = await client.PostAsJsonAsync("/api/operations", new
+        {
+            id = Guid.NewGuid(), kind = "Expense", accountId, date = "2026-10-11",
+            description = "Compra de prueba", category = "Comida", amount = "12.50", paid = true,
+        });
+        Assert.Equal(HttpStatusCode.OK, operation.StatusCode);
+        using var finance = await client.GetAsync("/api/finance?period=2026-10");
+        Assert.Equal(HttpStatusCode.OK, finance.StatusCode);
+
+        using var stranger = HttpsClient(factory);
+        var strangerTokens = await DevelopmentLoginAsync(stranger, "native-stranger-key");
+        stranger.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", strangerTokens.AccessToken);
+        var strangerWorkspaces = await stranger.GetFromJsonAsync<JsonElement[]>("/api/workspaces");
+        using var unauthorizedWorkspace = new HttpRequestMessage(HttpMethod.Get, "/api/accounts");
+        unauthorizedWorkspace.Headers.Authorization = new AuthenticationHeaderValue("Bearer", first.AccessToken);
+        unauthorizedWorkspace.Headers.Add("X-Workspace-Id", strangerWorkspaces!.Single().GetProperty("id").GetGuid().ToString());
+        using var denied = await client.SendAsync(unauthorizedWorkspace);
+        Assert.Equal(HttpStatusCode.NotFound, denied.StatusCode);
+
+        using var rotated = await client.PostAsJsonAsync("/api/auth/native/refresh", new { refreshToken = first.RefreshToken });
+        Assert.Equal(HttpStatusCode.OK, rotated.StatusCode);
+        var second = await rotated.Content.ReadFromJsonAsync<TokenDto>();
+        using var replay = await client.PostAsJsonAsync("/api/auth/native/refresh", new { refreshToken = first.RefreshToken });
+        Assert.Equal(HttpStatusCode.Unauthorized, replay.StatusCode);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", second!.AccessToken);
+        using var revokedAfterReplay = await client.GetAsync("/api/auth/native/session");
+        Assert.Equal(HttpStatusCode.Unauthorized, revokedAfterReplay.StatusCode);
+
+        client.DefaultRequestHeaders.Remove("X-Workspace-Id");
+        var logoutTokens = await DevelopmentLoginAsync(client);
+        using var logout = await client.PostAsJsonAsync("/api/auth/native/logout", new { refreshToken = logoutTokens.RefreshToken });
+        Assert.Equal(HttpStatusCode.NoContent, logout.StatusCode);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", logoutTokens.AccessToken);
+        using var afterLogout = await client.GetAsync("/api/auth/native/session");
+        Assert.Equal(HttpStatusCode.Unauthorized, afterLogout.StatusCode);
+    }
+
+    [Fact]
     public async Task Native_development_requires_both_opt_ins_and_is_404_in_production()
     {
         using var noOptIn = new ApiFactory(extraConfiguration: new Dictionary<string, string?> { ["Authentication:DevelopmentLoginEnabled"] = "false", ["Authentication:Native:DevelopmentLoginEnabled"] = "true" });
@@ -394,13 +453,17 @@ public sealed class NativeAuthIntegrationTests
         {
             ["Authentication:Native:DevelopmentLoginEnabled"] = "true",
             ["Authentication:Native:Google:Audiences:0"] = googleAudience,
+            ["Authentication:DevelopmentUsers:Users:0:Key"] = "native-stranger-key",
+            ["Authentication:DevelopmentUsers:Users:0:Subject"] = "native-stranger-subject",
+            ["Authentication:DevelopmentUsers:Users:0:DisplayName"] = "Usuario nativo distinto",
+            ["Authentication:DevelopmentUsers:Users:0:Email"] = "native-stranger@example.test",
         });
     private static HttpClient HttpsClient(WebApplicationFactory<Program> factory) => factory.CreateClient(new WebApplicationFactoryClientOptions { BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false });
     private static AppDbContext Db(ApiFactory factory) => new(new DbContextOptionsBuilder<AppDbContext>().UseNpgsql(factory.TestConnection).Options);
 
-    private static async Task<TokenDto> DevelopmentLoginAsync(HttpClient client)
+    private static async Task<TokenDto> DevelopmentLoginAsync(HttpClient client, string? key = null)
     {
-        using var response = await client.PostAsJsonAsync("/api/auth/native/development", new { key = (string?)null });
+        using var response = await client.PostAsJsonAsync("/api/auth/native/development", new { key });
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         return (await response.Content.ReadFromJsonAsync<TokenDto>())!;
     }

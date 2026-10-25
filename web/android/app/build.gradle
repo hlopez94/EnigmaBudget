@@ -1,5 +1,7 @@
 apply plugin: 'com.android.application'
 apply plugin: 'org.jetbrains.kotlin.android'
+apply from: rootProject.file('../../scripts/app-links-policy.gradle')
+def configuredInviteHost = validateAppLinksHost(System.getenv('ENIGMABUDGET_APP_LINKS_HOST'))
 
 android {
     namespace = "com.enigmabudget.dev"
@@ -13,11 +15,11 @@ android {
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         def apiBase = System.getenv('ENIGMABUDGET_API_BASE_URL') ?: ''
         def googleServerClientId = System.getenv('ENIGMABUDGET_GOOGLE_SERVER_CLIENT_ID') ?: ''
-        def configuredInviteHost = System.getenv('ENIGMABUDGET_APP_LINKS_HOST')?.trim() ?: ''
+        def inviteHostValue = configuredInviteHost ?: ''
         def allowLocalHttp = System.getenv('ENIGMABUDGET_ALLOW_LOCAL_HTTP') == 'true'
         buildConfigField 'String', 'API_BASE_URL', '"' + apiBase.replace('\\', '\\\\').replace('"', '\\"') + '"'
         buildConfigField 'String', 'GOOGLE_SERVER_CLIENT_ID', '"' + googleServerClientId.replace('\\', '\\\\').replace('"', '\\"') + '"'
-        buildConfigField 'String', 'APP_LINKS_HOST', '"' + configuredInviteHost.replace('\\', '\\\\').replace('"', '\\"') + '"'
+        buildConfigField 'String', 'APP_LINKS_HOST', '"' + inviteHostValue.replace('\\', '\\\\').replace('"', '\\"') + '"'
         buildConfigField 'boolean', 'ALLOW_LOCAL_HTTP', allowLocalHttp.toString()
         manifestPlaceholders = [allowLocalHttp: allowLocalHttp.toString()]
         aaptOptions {
@@ -27,7 +29,6 @@ android {
         }
     }
     buildFeatures { buildConfig true }
-    def configuredInviteHost = System.getenv('ENIGMABUDGET_APP_LINKS_HOST')?.trim()
     if (configuredInviteHost) {
         flavorDimensions += 'inviteLinks'
         productFlavors {
