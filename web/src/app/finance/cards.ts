@@ -1,6 +1,6 @@
 import { ChangeDetectorRef, Component, Input, OnChanges, SimpleChanges } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { CardAdjustment, Currency, FinanceOverview, Purchase, Statement } from '../core/api.models';
+import { CardAdjustment, Currency, FinanceCatalog, FinanceOverview, Purchase, Statement, FinanceCategoryOption, FinanceMerchantOption } from '../core/api.models';
 import { ApiService } from '../core/api.service';
 import { toMinorUnits } from '../onboarding/draft';
 import {
@@ -27,6 +27,7 @@ export class FinanceCards extends FinanceActions implements OnChanges {
   selectedCardId = '';
   statement: Statement | null = null;
   purchases: Purchase[] = [];
+  catalog: FinanceCatalog = { categories: [], merchants: [], incomeSources: [] };
   cardDraft = {
     name: '',
     bankName: '',
@@ -49,6 +50,8 @@ export class FinanceCards extends FinanceActions implements OnChanges {
     date: financeToday(),
     description: '',
     category: '',
+    categoryId: '',
+    merchantId: '',
     currency: 'ARS' as Currency,
     totalAmount: '',
     installmentCount: 1,
@@ -82,10 +85,11 @@ export class FinanceCards extends FinanceActions implements OnChanges {
     this.selectedCardId = '';
     this.statement = null;
     this.purchases = [];
+    this.catalog = { categories: [], merchants: [], incomeSources: [] };
     this.cardDraft = { name: '', bankName: '', closingDay: '', dueDay: '', statementDebtArs: '0', statementDebtUsd: '0', asOfDate: financeToday() };
     this.cardEdit = { id: '', name: '', bankName: '', closingDay: '', dueDay: '', isArchived: false, version: 0 };
     this.cardEditOriginal = null;
-    this.purchaseDraft = { date: financeToday(), description: '', category: '', currency: 'ARS', totalAmount: '', installmentCount: 1, firstPeriod: financePeriod(), groupId: '' };
+    this.purchaseDraft = { date: financeToday(), description: '', category: '', categoryId: '', merchantId: '', currency: 'ARS', totalAmount: '', installmentCount: 1, firstPeriod: financePeriod(), groupId: '' };
     this.statementDraft = { currency: 'ARS', dueDate: '', actualTotal: '', adjustments: [] };
     this.statementDraftOriginal = '';
     this.cardPayment = { accountId: '', date: financeToday(), amount: '', appliedAmount: '', currency: 'ARS' };
@@ -99,6 +103,8 @@ export class FinanceCards extends FinanceActions implements OnChanges {
   get activeAccounts() {
     return this.accounts.filter((account) => !account.isArchived);
   }
+  get activeCategories(): FinanceCategoryOption[] { return this.catalog.categories.filter((item) => !item.isArchived && item.kind === 'Expense'); }
+  get activeMerchants(): FinanceMerchantOption[] { return this.catalog.merchants.filter((item) => !item.isArchived); }
   get cardPaymentCurrenciesDiffer(): boolean {
     const account = this.accounts.find((item) => item.id === this.cardPayment.accountId);
     return !!account && !!this.statement && account.currency !== this.statement.currency;
@@ -112,11 +118,18 @@ export class FinanceCards extends FinanceActions implements OnChanges {
   override hasPendingDraft(): boolean {
     const cardEditChanged = !!this.cardEditOriginal && (this.cardEdit.name !== this.cardEditOriginal.name || this.cardEdit.bankName !== this.cardEditOriginal.bankName || this.cardEdit.closingDay !== this.cardEditOriginal.closingDay || this.cardEdit.dueDay !== this.cardEditOriginal.dueDay || this.cardEdit.isArchived !== this.cardEditOriginal.isArchived);
     const statementChanged = this.statementDraftOriginal !== '' && JSON.stringify(this.statementDraft) !== this.statementDraftOriginal;
-    return this.cardDraft.name.trim() !== '' || this.cardDraft.bankName.trim() !== '' || this.cardDraft.statementDebtArs !== '0' || this.cardDraft.statementDebtUsd !== '0' || this.purchaseDraft.description.trim() !== '' || this.purchaseDraft.category.trim() !== '' || this.purchaseDraft.totalAmount.trim() !== '' || this.purchaseDraft.groupId !== '' || this.cardPayment.amount.trim() !== '' || this.cardPayment.appliedAmount.trim() !== '' || this.cardPayment.accountId !== '' || cardEditChanged || statementChanged;
+    return this.cardDraft.name.trim() !== '' || this.cardDraft.bankName.trim() !== '' || this.cardDraft.statementDebtArs !== '0' || this.cardDraft.statementDebtUsd !== '0' || this.purchaseDraft.description.trim() !== '' || this.purchaseDraft.category.trim() !== '' || this.purchaseDraft.categoryId !== '' || this.purchaseDraft.merchantId !== '' || this.purchaseDraft.totalAmount.trim() !== '' || this.purchaseDraft.groupId !== '' || this.cardPayment.amount.trim() !== '' || this.cardPayment.appliedAmount.trim() !== '' || this.cardPayment.accountId !== '' || cardEditChanged || statementChanged;
   }
   openForm(form: 'create' | 'purchase' | 'statement' | 'payment'): void {
     if (form === 'create' ? !this.allowed('manageResources') : !this.allowed('recordFinance')) return;
     this.activeForm = form;
+    if (form === 'purchase' || form === 'statement') void this.loadCatalog();
+  }
+  private async loadCatalog(): Promise<void> {
+    if (!this.api.financeCatalog) return;
+    const epoch = this.captureContext();
+    try { const catalog = await this.api.financeCatalog(); if (this.isCurrentContext(epoch)) this.catalog = catalog; }
+    catch (error) { if (this.isCurrentContext(epoch)) this.showLoadError(error); }
   }
   closeForm(): void {
     if (!this.saving) this.activeForm = '';
@@ -258,9 +271,12 @@ export class FinanceCards extends FinanceActions implements OnChanges {
       cardId: this.selectedCardId,
       ...draft,
       category: draft.category || null,
+      categoryId: draft.categoryId || null,
+      merchantId: draft.merchantId || null,
       totalAmount: this.decimal(draft.totalAmount),
       groupId: draft.groupId || null,
     };
+    if (!draft.categoryId) { this.error = 'Elegí una categoría.'; this.changeDetector.markForCheck(); return; }
     if (
       !(await this.runMutation(
         () => this.api.createPurchase({ id: this.requestId('purchase', payload), ...payload }),
@@ -273,6 +289,8 @@ export class FinanceCards extends FinanceActions implements OnChanges {
       date: financeToday(),
       description: '',
       category: '',
+      categoryId: '',
+      merchantId: '',
       currency: 'ARS',
       totalAmount: '',
       installmentCount: 1,
@@ -286,11 +304,17 @@ export class FinanceCards extends FinanceActions implements OnChanges {
   async saveStatement(): Promise<void> {
     if (!this.allowed('recordFinance')) return;
     if (!this.selectedCardId) return;
+    if (this.statementDraft.adjustments.some((adjustment) => !adjustment.categoryId)) {
+      this.error = 'Elegí una categoría para cada ajuste.';
+      this.changeDetector.markForCheck();
+      return;
+    }
     const statement = this.statement;
     const adjustments = this.statementDraft.adjustments.map((adjustment) => ({
       id: adjustment.id || financeId(),
       description: adjustment.description,
       category: adjustment.category || null,
+      categoryId: adjustment.categoryId || null,
       amount: this.decimal(adjustment.amount),
     }));
     const payload = {
@@ -320,7 +344,7 @@ export class FinanceCards extends FinanceActions implements OnChanges {
   addStatementAdjustment(): void {
     this.statementDraft.adjustments = [
       ...this.statementDraft.adjustments,
-      { id: financeId(), description: '', category: '', amount: '' },
+      { id: financeId(), description: '', category: '', categoryId: '', amount: '' },
     ];
   }
   removeStatementAdjustment(index: number): void {

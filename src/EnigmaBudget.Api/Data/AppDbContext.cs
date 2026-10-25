@@ -86,6 +86,9 @@ public sealed class FinanceOperation
     public Guid? CategoryId { get; set; }
     public Guid? MerchantId { get; set; }
     public Guid? IncomeSourceId { get; set; }
+    public string? MerchantNameSnapshot { get; set; }
+    public string? IncomeSourceNameSnapshot { get; set; }
+    public string? CatalogSelectionHash { get; set; }
     public string Currency { get; set; } = "";
     public decimal Amount { get; set; }
     public bool IsVoided { get; set; }
@@ -264,6 +267,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             .HasForeignKey(x => x.AccountId)
             .OnDelete(DeleteBehavior.Cascade);
         model.Entity<FinanceOperation>().Property(x => x.Amount).HasPrecision(18, 2);
+        model.Entity<FinanceOperation>().Property(x => x.CatalogSelectionHash).HasMaxLength(64);
         model.Entity<FinanceOperation>().Property(x => x.Version).IsConcurrencyToken();
         model.Entity<FinanceOperation>().HasIndex(x => new { x.WorkspaceId, x.Id }).IsUnique();
         model.Entity<FinanceCategory>().HasKey(x => x.Id);
@@ -333,6 +337,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         model.Entity<MonthlyRule>().Property(x => x.MutationVersion).IsConcurrencyToken();
         model.Entity<RuleWeight>().Property(x => x.Value).HasPrecision(18, 2);
         model.Entity<CardPurchase>().Property(x => x.TotalAmount).HasPrecision(18, 2);
+        model.Entity<CardPurchase>().Property(x => x.CatalogSelectionHash).HasMaxLength(64);
         model.Entity<CardPurchase>().HasOne<FinanceCategory>().WithMany().HasForeignKey(x => new { x.WorkspaceId, x.CategoryId }).HasPrincipalKey(x => new { x.WorkspaceId, x.Id }).OnDelete(DeleteBehavior.Restrict);
         model.Entity<CardPurchase>().HasOne<FinanceMerchant>().WithMany().HasForeignKey(x => new { x.WorkspaceId, x.MerchantId }).HasPrincipalKey(x => new { x.WorkspaceId, x.Id }).OnDelete(DeleteBehavior.Restrict);
         model.Entity<CardInstallment>().Property(x => x.Amount).HasPrecision(18, 2);

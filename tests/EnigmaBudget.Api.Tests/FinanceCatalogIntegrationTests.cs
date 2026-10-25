@@ -12,6 +12,201 @@ namespace EnigmaBudget.Api.Tests;
 public sealed class FinanceCatalogIntegrationTests
 {
     [Fact]
+    public async Task operation_category_and_source_ids_match_workspace_and_kind()
+    {
+        using var factory = new ApiFactory();
+        await MigrateAsync(factory);
+        using var client = await factory.AuthenticatedClientAsync("catalog-operation-selection");
+        var workspaceId = await WorkspaceIdAsync(factory, "catalog-operation-selection");
+        var accountId = Guid.NewGuid();
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/api/accounts", new { id = accountId, name = "Caja", bankName = "Banco", currency = "ARS", openingBalance = "0.00", openingDate = "2026-10-01" })).StatusCode);
+        var categoryId = Guid.NewGuid();
+        var sourceId = Guid.NewGuid();
+        Assert.Equal(HttpStatusCode.Created, (await client.PostAsJsonAsync("/api/finance/catalog/categories", new { id = categoryId, name = "Sueldo", kind = "Income" })).StatusCode);
+        Assert.Equal(HttpStatusCode.Created, (await client.PostAsJsonAsync("/api/finance/catalog/income-sources", new { id = sourceId, name = "Trabajo", kind = "Salary" })).StatusCode);
+
+        var operationId = Guid.NewGuid();
+        var operationRequest = new { id = operationId, kind = "Income", accountId, date = "2026-10-20", description = "Pago", category = "texto ignorado", categoryId, incomeSourceId = sourceId, amount = "25.00", paid = true };
+        using var created = await client.PostAsJsonAsync("/api/operations", operationRequest);
+        Assert.Equal(HttpStatusCode.OK, created.StatusCode);
+        using var createdJson = JsonDocument.Parse(await created.Content.ReadAsStringAsync());
+        Assert.Equal(categoryId, createdJson.RootElement.GetProperty("categoryId").GetGuid());
+        Assert.Equal("Sueldo", createdJson.RootElement.GetProperty("category").GetString());
+        Assert.Equal(sourceId, createdJson.RootElement.GetProperty("incomeSourceId").GetGuid());
+        Assert.Equal("Trabajo", createdJson.RootElement.GetProperty("incomeSourceNameSnapshot").GetString());
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var user = await db.ApplicationUsers.SingleAsync(x => x.Subject == "catalog-operation-selection");
+            var workspace = await db.Workspaces.SingleAsync(x => x.OwnerUserId == user.Id && x.Kind == "Personal");
+            db.FinanceCategories.Single(x => x.WorkspaceId == workspace.Id && x.Id == categoryId).IsArchived = true;
+            db.FinanceIncomeSources.Single(x => x.WorkspaceId == workspace.Id && x.Id == sourceId).IsArchived = true;
+            await db.SaveChangesAsync();
+        }
+        using var replay = await client.PostAsJsonAsync("/api/operations", operationRequest);
+        Assert.Equal(HttpStatusCode.OK, replay.StatusCode);
+        using var replayJson = JsonDocument.Parse(await replay.Content.ReadAsStringAsync());
+        Assert.Equal("Sueldo", replayJson.RootElement.GetProperty("category").GetString());
+        Assert.Equal("Trabajo", replayJson.RootElement.GetProperty("incomeSourceNameSnapshot").GetString());
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            Assert.Equal(1, await db.FinancePayments.CountAsync(x => x.WorkspaceId == workspaceId && x.OperationId == operationId));
+            Assert.Equal(1, await db.LedgerEntries.CountAsync(x => x.WorkspaceId == workspaceId && x.Source == "operation-payment" && x.SourceId == operationId));
+        }
+        using var archivedNewSelection = await client.PostAsJsonAsync("/api/operations", new { id = Guid.NewGuid(), kind = "Income", accountId, date = "2026-10-20", description = "No", categoryId, amount = "1.00", paid = false });
+        Assert.Equal(HttpStatusCode.Conflict, archivedNewSelection.StatusCode);
+
+        using var wrongKind = await client.PostAsJsonAsync("/api/operations", new { id = Guid.NewGuid(), kind = "Expense", accountId, date = "2026-10-20", description = "No", categoryId, amount = "1.00", paid = false });
+        Assert.Equal(HttpStatusCode.BadRequest, wrongKind.StatusCode);
+
+        using var foreignClient = await factory.AuthenticatedClientAsync("catalog-operation-foreign");
+        var foreignCategory = Guid.NewGuid();
+        Assert.Equal(HttpStatusCode.Created, (await foreignClient.PostAsJsonAsync("/api/finance/catalog/categories", new { id = foreignCategory, name = "Ajena", kind = "Income" })).StatusCode);
+        using var foreign = await client.PostAsJsonAsync("/api/operations", new { id = Guid.NewGuid(), kind = "Income", accountId, date = "2026-10-20", description = "No", categoryId = foreignCategory, amount = "1.00", paid = false });
+        Assert.Equal(HttpStatusCode.NotFound, foreign.StatusCode);
+    }
+
+    [Fact]
+    public async Task purchase_merchant_and_category_snapshot_survive_rename_and_selection_replay()
+    {
+        using var factory = new ApiFactory();
+        await MigrateAsync(factory);
+        using var client = await factory.AuthenticatedClientAsync("catalog-purchase-selection");
+        var categoryId = Guid.NewGuid();
+        var merchantId = Guid.NewGuid();
+        Assert.Equal(HttpStatusCode.Created, (await client.PostAsJsonAsync("/api/finance/catalog/categories", new { id = categoryId, name = "Alimentos", kind = "Expense" })).StatusCode);
+        Assert.Equal(HttpStatusCode.Created, (await client.PostAsJsonAsync("/api/finance/catalog/merchants", new { id = merchantId, name = "Mercado", kind = (string?)null })).StatusCode);
+        var cardId = Guid.NewGuid();
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/api/cards", new { id = cardId, name = "Visa", bankName = "Banco", statementDebtArs = "0.00", statementDebtUsd = "0.00", asOfDate = "2026-10-01" })).StatusCode);
+        var purchaseId = Guid.NewGuid();
+        var request = new { id = purchaseId, cardId, date = "2026-10-10", description = "Compra", category = "", categoryId, merchantId, currency = "ARS", totalAmount = "120.00", installmentCount = 2, firstPeriod = "2026-10", groupId = (Guid?)null };
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/api/purchases", request)).StatusCode);
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var workspace = await db.Workspaces.SingleAsync(x => x.OwnerUserId == db.ApplicationUsers.Where(u => u.Subject == "catalog-purchase-selection").Select(u => u.Id).Single());
+            db.FinanceCategories.Single(x => x.WorkspaceId == workspace.Id && x.Id == categoryId).Name = "Comida";
+            db.FinanceCategories.Single(x => x.WorkspaceId == workspace.Id && x.Id == categoryId).IsArchived = true;
+            db.FinanceMerchants.Single(x => x.WorkspaceId == workspace.Id && x.Id == merchantId).Name = "Mercado Nuevo";
+            db.FinanceMerchants.Single(x => x.WorkspaceId == workspace.Id && x.Id == merchantId).IsArchived = true;
+            await db.SaveChangesAsync();
+        }
+        using var replay = await client.PostAsJsonAsync("/api/purchases", request);
+        Assert.Equal(HttpStatusCode.OK, replay.StatusCode);
+        using var purchase = JsonDocument.Parse(await replay.Content.ReadAsStringAsync());
+        Assert.Equal("Alimentos", purchase.RootElement.GetProperty("category").GetString());
+        Assert.Equal("Mercado", purchase.RootElement.GetProperty("merchantNameSnapshot").GetString());
+        Assert.Equal(categoryId, purchase.RootElement.GetProperty("categoryId").GetGuid());
+        var installments = purchase.RootElement.GetProperty("installments").EnumerateArray().ToArray();
+        Assert.Equal(2, installments.Length);
+        Assert.All(installments, installment => Assert.Equal("60.00", installment.GetProperty("amount").GetString()));
+        using var changedSelection = await client.PostAsJsonAsync("/api/purchases", new { id = request.id, cardId = request.cardId, date = request.date, description = request.description, category = request.category, categoryId = request.categoryId, merchantId = Guid.NewGuid(), currency = request.currency, totalAmount = request.totalAmount, installmentCount = request.installmentCount, firstPeriod = request.firstPeriod, groupId = request.groupId });
+        Assert.Equal(HttpStatusCode.Conflict, changedSelection.StatusCode);
+    }
+
+    [Fact]
+    public async Task legacy_string_resolves_without_fuzzy_match_and_income_source_is_only_valid_for_income()
+    {
+        using var factory = new ApiFactory();
+        await MigrateAsync(factory);
+        using var client = await factory.AuthenticatedClientAsync("catalog-legacy-resolution");
+        var workspaceId = await WorkspaceIdAsync(factory, "catalog-legacy-resolution");
+        var accountId = Guid.NewGuid();
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/api/accounts", new { id = accountId, name = "Caja", bankName = "Banco", currency = "ARS", openingBalance = "0.00", openingDate = "2026-10-01" })).StatusCode);
+        var categoryId = Guid.NewGuid();
+        var sourceId = Guid.NewGuid();
+        Assert.Equal(HttpStatusCode.Created, (await client.PostAsJsonAsync("/api/finance/catalog/categories", new { id = categoryId, name = "Comida", kind = "Expense" })).StatusCode);
+        Assert.Equal(HttpStatusCode.Created, (await client.PostAsJsonAsync("/api/finance/catalog/income-sources", new { id = sourceId, name = "Sueldo", kind = "Salary" })).StatusCode);
+        using var exact = await client.PostAsJsonAsync("/api/operations", new { id = Guid.NewGuid(), kind = "Expense", accountId, date = "2026-10-20", description = "Exacta", category = "Comida", amount = "1.00", paid = false });
+        Assert.Equal(HttpStatusCode.OK, exact.StatusCode);
+        using var exactJson = JsonDocument.Parse(await exact.Content.ReadAsStringAsync());
+        Assert.Equal(categoryId, exactJson.RootElement.GetProperty("categoryId").GetGuid());
+        using var fuzzy = await client.PostAsJsonAsync("/api/operations", new { id = Guid.NewGuid(), kind = "Expense", accountId, date = "2026-10-20", description = "No aproximada", category = "Comid", amount = "1.00", paid = false });
+        using var fuzzyJson = JsonDocument.Parse(await fuzzy.Content.ReadAsStringAsync());
+        Assert.NotEqual(categoryId, fuzzyJson.RootElement.GetProperty("categoryId").GetGuid());
+        Assert.Equal("Comid", fuzzyJson.RootElement.GetProperty("category").GetString());
+        using var blank = await client.PostAsJsonAsync("/api/operations", new { id = Guid.NewGuid(), kind = "Expense", accountId, date = "2026-10-20", description = "Sin etiqueta", category = "", amount = "1.00", paid = false });
+        using var blankJson = JsonDocument.Parse(await blank.Content.ReadAsStringAsync());
+        Assert.Equal("", blankJson.RootElement.GetProperty("category").GetString());
+        Assert.NotEqual(Guid.Empty, blankJson.RootElement.GetProperty("categoryId").GetGuid());
+        using var invalidSource = await client.PostAsJsonAsync("/api/operations", new { id = Guid.NewGuid(), kind = "Expense", accountId, date = "2026-10-20", description = "Fuente inválida", category = "", incomeSourceId = sourceId, amount = "1.00", paid = false });
+        Assert.Equal(HttpStatusCode.BadRequest, invalidSource.StatusCode);
+        Assert.Equal(workspaceId, await WorkspaceIdAsync(factory, "catalog-legacy-resolution"));
+    }
+
+    [Fact]
+    public async Task operation_creation_rechecks_record_permission_after_workspace_lock()
+    {
+        using var factory = new ApiFactory();
+        await MigrateAsync(factory);
+        using var owner = await factory.AuthenticatedClientAsync("catalog-finance-gate-owner");
+        using var member = await factory.AuthenticatedClientAsync("catalog-finance-gate-member");
+        var workspaceId = await WorkspaceIdAsync(factory, "catalog-finance-gate-owner");
+        var accountId = Guid.NewGuid();
+        Assert.Equal(HttpStatusCode.OK, (await owner.PostAsJsonAsync("/api/accounts", new { id = accountId, name = "Caja", bankName = "Banco", currency = "ARS", openingBalance = "0.00", openingDate = "2026-10-01" })).StatusCode);
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var user = await db.ApplicationUsers.SingleAsync(x => x.Subject == "catalog-finance-gate-member");
+            db.WorkspaceMemberships.Add(new WorkspaceMembership { WorkspaceId = workspaceId, UserId = user.Id, Role = "Member", JoinedAt = DateTimeOffset.UtcNow });
+            await db.SaveChangesAsync();
+        }
+        member.DefaultRequestHeaders.Add("X-Workspace-Id", workspaceId.ToString());
+        var operationId = Guid.NewGuid();
+        factory.WorkspaceLockBarrier.Arm();
+        var request = member.PostAsJsonAsync("/api/operations", new { id = operationId, kind = "Expense", accountId, date = "2026-10-20", description = "Revocado", category = "", amount = "1.00", paid = true });
+        await factory.WorkspaceLockBarrier.WaitUntilBlockedAsync().WaitAsync(TimeSpan.FromSeconds(10));
+        try
+        {
+            using var scope = factory.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var user = await db.ApplicationUsers.SingleAsync(x => x.Subject == "catalog-finance-gate-member");
+            var membership = await db.WorkspaceMemberships.SingleAsync(x => x.WorkspaceId == workspaceId && x.UserId == user.Id);
+            membership.Role = "Reader";
+            await db.SaveChangesAsync();
+        }
+        finally { factory.WorkspaceLockBarrier.Release(); }
+        using var response = await request;
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        using var verify = factory.Services.CreateScope();
+        var verifyDb = verify.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.False(await verifyDb.FinanceOperations.AnyAsync(x => x.WorkspaceId == workspaceId && x.Id == operationId));
+        Assert.False(await verifyDb.FinancePayments.AnyAsync(x => x.WorkspaceId == workspaceId && x.OperationId == operationId));
+        Assert.False(await verifyDb.LedgerEntries.AnyAsync(x => x.WorkspaceId == workspaceId && x.SourceId == operationId));
+    }
+
+    [Fact]
+    public async Task archive_wins_workspace_gate_before_new_operation_selection()
+    {
+        using var factory = new ApiFactory();
+        await MigrateAsync(factory);
+        using var client = await factory.AuthenticatedClientAsync("catalog-archive-order");
+        var workspaceId = await WorkspaceIdAsync(factory, "catalog-archive-order");
+        var accountId = Guid.NewGuid();
+        var categoryId = Guid.NewGuid();
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/api/accounts", new { id = accountId, name = "Caja", bankName = "Banco", currency = "ARS", openingBalance = "0.00", openingDate = "2026-10-01" })).StatusCode);
+        Assert.Equal(HttpStatusCode.Created, (await client.PostAsJsonAsync("/api/finance/catalog/categories", new { id = categoryId, name = "Hogar", kind = "Expense" })).StatusCode);
+        var operationId = Guid.NewGuid();
+        factory.WorkspaceLockBarrier.Arm();
+        var operationTask = client.PostAsJsonAsync("/api/operations", new { id = operationId, kind = "Expense", accountId, date = "2026-10-20", description = "Luego archivada", categoryId, amount = "2.00", paid = true });
+        await factory.WorkspaceLockBarrier.WaitUntilBlockedAsync().WaitAsync(TimeSpan.FromSeconds(10));
+        try
+        {
+            using var archive = await client.SendAsync(new HttpRequestMessage(HttpMethod.Delete, $"/api/finance/catalog/categories/{categoryId}") { Content = JsonContent.Create(new { requestId = Guid.NewGuid(), version = 1 }) });
+            Assert.Equal(HttpStatusCode.OK, archive.StatusCode);
+        }
+        finally { factory.WorkspaceLockBarrier.Release(); }
+        using var response = await operationTask;
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        using var verify = factory.Services.CreateScope();
+        var db = verify.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.False(await db.FinanceOperations.AnyAsync(x => x.WorkspaceId == workspaceId && x.Id == operationId));
+        Assert.False(await db.FinancePayments.AnyAsync(x => x.WorkspaceId == workspaceId && x.OperationId == operationId));
+        Assert.False(await db.LedgerEntries.AnyAsync(x => x.WorkspaceId == workspaceId && x.SourceId == operationId));
+    }
+
+    [Fact]
     public async Task catalog_create_replay_and_changed_raw_payload_are_workspace_scoped()
     {
         using var factory = new ApiFactory();

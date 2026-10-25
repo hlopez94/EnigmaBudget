@@ -172,7 +172,12 @@ const createOperation = async (
   await form.locator('[name="opAccount"]').selectOption({ label: input.accountLabel });
   await form.locator('[name="opDate"]').fill(input.date);
   await form.locator('[name="opDescription"]').fill(input.description);
-  await form.locator('[name="opCategory"]').fill('Prueba de aceptación');
+  await form.locator('[name="opCategory"]').selectOption({ label: 'Sin clasificar' });
+  if (input.kind === 'Income') {
+    await form.locator('[name="sourceCreateName"]').fill('Fuente de prueba');
+    await form.locator('[name="sourceCreateKind"]').selectOption('Salary');
+    await form.getByRole('button', { name: 'Crear fuente y continuar' }).click();
+  }
   await form.locator('[name="opAmount"]').fill(input.amount);
   if (input.paid) await form.locator('[name="opPaid"]').check();
   else await form.locator('[name="opPaid"]').uncheck();

@@ -50,6 +50,8 @@ public sealed class CardPurchase
     public string Category { get; set; } = "";
     public Guid? CategoryId { get; set; }
     public Guid? MerchantId { get; set; }
+    public string? MerchantNameSnapshot { get; set; }
+    public string? CatalogSelectionHash { get; set; }
     public string Currency { get; set; } = "ARS";
     public decimal TotalAmount { get; set; }
     public int InstallmentCount { get; set; }

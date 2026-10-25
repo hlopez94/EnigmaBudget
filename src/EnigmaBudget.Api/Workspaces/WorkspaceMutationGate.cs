@@ -10,9 +10,9 @@ namespace EnigmaBudget.Api.Workspaces;
 /// </summary>
 public sealed class WorkspaceMutationGate(AppDbContext db)
 {
-    public async Task<(WorkspaceMutationLease? Lease, int FailureStatus)> AcquireAsync(Guid workspaceId, CancellationToken cancellationToken = default)
+    public async Task<(WorkspaceMutationLease? Lease, int FailureStatus)> AcquireAsync(Guid workspaceId, CancellationToken cancellationToken = default, System.Data.IsolationLevel isolationLevel = System.Data.IsolationLevel.ReadCommitted)
     {
-        var transaction = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.ReadCommitted, cancellationToken);
+        var transaction = await db.Database.BeginTransactionAsync(isolationLevel, cancellationToken);
         try
         {
             var workspace = await db.Workspaces

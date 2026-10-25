@@ -47,7 +47,10 @@ public sealed record OperationCreate(
     string Description,
     string? Category,
     string Amount,
-    bool Paid
+    bool Paid,
+    Guid? CategoryId = null,
+    Guid? MerchantId = null,
+    Guid? IncomeSourceId = null
 );
 
 public sealed record PaymentCreate(Guid Id, Guid AccountId, string Date, string Amount);
@@ -101,7 +104,9 @@ public sealed record PurchaseCreate(
     string TotalAmount,
     int InstallmentCount,
     string FirstPeriod,
-    Guid? GroupId
+    Guid? GroupId,
+    Guid? CategoryId = null,
+    Guid? MerchantId = null
 );
 
 public sealed record CollectionCreate(
@@ -125,7 +130,7 @@ public sealed record StatementSave(
     AdjustmentCreate[] Adjustments
 );
 
-public sealed record AdjustmentCreate(Guid Id, string Description, string? Category, string Amount);
+public sealed record AdjustmentCreate(Guid Id, string Description, string? Category, string Amount, Guid? CategoryId = null);
 
 public sealed record CardPaymentCreate(
     Guid Id,
@@ -152,7 +157,12 @@ public sealed record OperationDto(
     string PendingAmount,
     string Status,
     int Version,
-    PaymentDto[] Payments
+    PaymentDto[] Payments,
+    Guid? CategoryId = null,
+    Guid? MerchantId = null,
+    Guid? IncomeSourceId = null,
+    string? MerchantNameSnapshot = null,
+    string? IncomeSourceNameSnapshot = null
 );
 
 public sealed record CatalogCreate(Guid Id, string Name, string? Kind = null);

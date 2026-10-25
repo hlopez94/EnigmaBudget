@@ -256,7 +256,10 @@ test('runs real finance, sharing, and card acceptance from empty completed onboa
   const rejectedAccountValue = await operationForm.locator('[name="opAccount"]').inputValue();
   await operationForm.locator('[name="opDate"]').fill(date);
   await operationForm.locator('[name="opDescription"]').fill('Ingreso de prueba');
-  await operationForm.locator('[name="opCategory"]').fill('Trabajo');
+  await operationForm.locator('[name="opCategory"]').selectOption({ label: 'Sin clasificar' });
+  await operationForm.locator('[name="sourceCreateName"]').fill('Ingreso E2E');
+  await operationForm.locator('[name="sourceCreateKind"]').selectOption('Salary');
+  await operationForm.getByRole('button', { name: 'Crear fuente y continuar' }).click();
   await operationForm.locator('[name="opAmount"]').fill('0');
   await operationForm.locator('[name="opPaid"]').check();
   await operationForm.getByRole('button', { name: 'Guardar movimiento' }).click();
@@ -266,7 +269,8 @@ test('runs real finance, sharing, and card acceptance from empty completed onboa
   await expect(operationForm.locator('[name="opAccount"]')).toHaveValue(rejectedAccountValue);
   await expect(operationForm.locator('[name="opDate"]')).toHaveValue(date);
   await expect(operationForm.locator('[name="opDescription"]')).toHaveValue('Ingreso de prueba');
-  await expect(operationForm.locator('[name="opCategory"]')).toHaveValue('Trabajo');
+  await expect(operationForm.locator('[name="opCategory"]')).not.toHaveValue('');
+  await expect(operationForm.locator('[name="opIncomeSource"]')).not.toHaveValue('');
   await expect(operationForm.locator('[name="opAmount"]')).toHaveValue('0');
   await expect(operationForm.locator('[name="opPaid"]')).toBeChecked();
 
@@ -283,7 +287,7 @@ test('runs real finance, sharing, and card acceptance from empty completed onboa
     .selectOption({ label: 'Cuenta principal · ARS' });
   await operationForm.locator('[name="opDate"]').fill(date);
   await operationForm.locator('[name="opDescription"]').fill('Gasto de prueba');
-  await operationForm.locator('[name="opCategory"]').fill('Comida');
+  await operationForm.locator('[name="opCategory"]').selectOption({ label: 'Sin clasificar' });
   await operationForm.locator('[name="opAmount"]').fill('100');
   await operationForm.locator('[name="opPaid"]').check();
   await operationForm.getByRole('button', { name: 'Guardar movimiento' }).click();
@@ -416,7 +420,7 @@ test('runs real finance, sharing, and card acceptance from empty completed onboa
   await page.setViewportSize({ width: 390, height: 844 });
   const purchase = waitForApi(page, 'POST', '/api/purchases');
   await purchaseForm.locator('[name="purchaseDescription"]').fill('Compra familiar');
-  await purchaseForm.locator('[name="purchaseCategory"]').fill('Hogar');
+  await purchaseForm.locator('[name="purchaseCategory"]').selectOption({ label: 'Sin clasificar' });
   await purchaseForm.locator('[name="purchaseDate"]').fill(date);
   await purchaseForm.locator('[name="purchaseCurrency"]').selectOption('ARS');
   await purchaseForm.locator('[name="purchaseTotal"]').fill('120000');

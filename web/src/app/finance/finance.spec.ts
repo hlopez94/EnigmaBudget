@@ -422,6 +422,9 @@ describe('finance workspace regressions', () => {
       date: '2026-10-24',
       description: 'Supermercado',
       category: 'Comida',
+      categoryId: 'category-food',
+      merchantId: 'merchant-market',
+      incomeSourceId: '',
       amount: '1200.50',
       paid: false,
     };
@@ -436,7 +439,7 @@ describe('finance workspace regressions', () => {
     rejectSave = false;
     await operations.saveOperation();
     expect(api.createOperation).toHaveBeenLastCalledWith(
-      expect.objectContaining({ amount: '1200.50', paid: false }),
+      expect.objectContaining({ amount: '1200.50', paid: false, categoryId: 'category-food', merchantId: 'merchant-market' }),
     );
     expect(api.createOperation.mock.calls[1][0].id).toBe(attemptedId);
     expect(refresh).toHaveBeenCalledTimes(1);
@@ -448,11 +451,99 @@ describe('finance workspace regressions', () => {
       date: '2026-10-24',
       description: 'Supermercado',
       category: 'Comida',
+      categoryId: 'category-food',
+      merchantId: 'merchant-market',
+      incomeSourceId: '',
       amount: '1200.50',
       paid: false,
     };
     await operations.saveOperation();
     expect(api.createOperation.mock.calls[2][0].id).not.toBe(attemptedId);
+  });
+
+  it('offers only active categories and keeps structured selection in the retry draft', async () => {
+    const api = { createOperation: vi.fn().mockRejectedValue(new Error('No disponible')) };
+    const operations = new FinanceOperations(
+      api as unknown as ApiService,
+      { markForCheck: vi.fn() } as unknown as import('@angular/core').ChangeDetectorRef,
+    );
+    operations.overview = { accounts: [{ id: 'account', isArchived: false }] } as never;
+    operations.refreshOverview = vi.fn().mockResolvedValue(undefined);
+    operations.catalog = {
+      categories: [
+        { categoryId: 'active', itemId: 'active', name: 'Comida', kind: 'Expense', isArchived: false, isDefault: false, version: 1 },
+        { categoryId: 'archived', itemId: 'archived', name: 'Vieja', kind: 'Expense', isArchived: true, isDefault: false, version: 1 },
+      ],
+      merchants: [],
+      incomeSources: [],
+    } as never;
+    operations.operationDraft = {
+      kind: 'Expense', accountId: 'account', date: '2026-10-24', description: 'Compra',
+      category: '', categoryId: 'active', merchantId: '', incomeSourceId: '', amount: '10', paid: false,
+    };
+
+    await operations.saveOperation();
+
+    expect(operations.activeCategories.map((item) => item.categoryId)).toEqual(['active']);
+    expect(api.createOperation).toHaveBeenCalledWith(expect.objectContaining({ categoryId: 'active', merchantId: null }));
+    expect(operations.operationDraft.categoryId).toBe('active');
+  });
+
+  it('preserves the income movement when creating its required source fails', async () => {
+    const api = { createIncomeSource: vi.fn().mockRejectedValue(new Error('No disponible')) };
+    const operations = new FinanceOperations(
+      api as unknown as ApiService,
+      { markForCheck: vi.fn() } as unknown as import('@angular/core').ChangeDetectorRef,
+    );
+    operations.operationDraft = {
+      kind: 'Income', accountId: 'account', date: '2026-10-24', description: 'Honorarios',
+      category: '', categoryId: 'income-category', merchantId: '', incomeSourceId: '', amount: '750', paid: false,
+    };
+    operations.sourceCreateName = 'Trabajo independiente';
+    operations.sourceCreateKind = 'IndependentWork';
+
+    await operations.createSourceFromMovement();
+
+    expect(operations.operationDraft).toMatchObject({ description: 'Honorarios', categoryId: 'income-category', incomeSourceId: '' });
+    expect(operations.sourceCreateName).toBe('Trabajo independiente');
+    expect(operations.error).toBe('No disponible');
+  });
+
+  it('ignores a catalog response that arrives after the workspace changes', async () => {
+    let resolveCatalog!: (value: never) => void;
+    const api = { financeCatalog: vi.fn(() => new Promise<never>((resolve) => { resolveCatalog = resolve; })) };
+    const operations = new FinanceOperations(
+      api as unknown as ApiService,
+      { markForCheck: vi.fn() } as unknown as import('@angular/core').ChangeDetectorRef,
+    );
+    operations.openForm('operation');
+    operations.invalidateContext();
+    resolveCatalog({ categories: [{ itemId: 'old', name: 'Anterior', kind: 'Expense', isArchived: false, isDefault: false, version: 1 }], merchants: [], incomeSources: [] } as never);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(operations.catalog.categories).toEqual([]);
+  });
+
+  it('sends purchase catalog IDs and retains the draft when saving fails', async () => {
+    const api = { createPurchase: vi.fn().mockRejectedValue(new Error('Conflicto')) };
+    const cards = new FinanceCards(
+      api as unknown as ApiService,
+      { markForCheck: vi.fn() } as unknown as import('@angular/core').ChangeDetectorRef,
+    );
+    cards.selectedCardId = 'card';
+    cards.catalog = {
+      categories: [{ itemId: 'active', name: 'Hogar', kind: 'Expense', isArchived: false, isDefault: false, version: 1 }, { itemId: 'old', name: 'Archivada', kind: 'Expense', isArchived: true, isDefault: false, version: 1 }],
+      merchants: [{ merchantId: 'merchant', name: 'Tienda', isArchived: false, version: 1 }],
+      incomeSources: [],
+    };
+    cards.purchaseDraft = { date: '2026-10-24', description: 'Mesa', category: '', categoryId: 'active', merchantId: 'merchant', currency: 'ARS', totalAmount: '500', installmentCount: 1, firstPeriod: '2026-10', groupId: '' };
+
+    await cards.savePurchase();
+
+    expect(cards.activeCategories.map((category) => category.itemId)).toEqual(['active']);
+    expect(api.createPurchase).toHaveBeenCalledWith(expect.objectContaining({ categoryId: 'active', merchantId: 'merchant' }));
+    expect(cards.purchaseDraft.description).toBe('Mesa');
   });
 
   it('refreshes the selected period after changing it without losing the selection', async () => {
@@ -652,6 +743,9 @@ describe('finance workspace regressions', () => {
       date: '2026-10-24',
       description: 'Luz',
       category: '',
+      categoryId: 'category-light',
+      merchantId: '',
+      incomeSourceId: '',
       amount: '900,25',
       paid: false,
     };

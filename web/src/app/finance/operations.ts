@@ -1,6 +1,6 @@
 import { ChangeDetectorRef, Component, Input } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { FinanceOverview, Operation } from '../core/api.models';
+import { FinanceCatalog, FinanceOverview, Operation, FinanceCategoryOption, FinanceMerchantOption, FinanceIncomeSourceOption } from '../core/api.models';
 import { ApiService } from '../core/api.service';
 import { toMinorUnits } from '../onboarding/draft';
 import { FinanceActions, financeToday, RefreshFinanceOverview } from './finance-actions';
@@ -19,12 +19,18 @@ export class FinanceOperations extends FinanceActions {
   @Input() period = '';
   @Input({ required: true }) refreshOverview!: RefreshFinanceOverview;
   historyFilterAccount = '';
+  catalog: FinanceCatalog = { categories: [], merchants: [], incomeSources: [] };
+  sourceCreateName = '';
+  sourceCreateKind: FinanceIncomeSourceOption['kind'] = 'Salary';
   operationDraft = {
     kind: 'Expense' as 'Income' | 'Expense',
     accountId: '',
     date: financeToday(),
     description: '',
     category: '',
+    categoryId: '',
+    merchantId: '',
+    incomeSourceId: '',
     amount: '',
     paid: true,
   };
@@ -46,7 +52,9 @@ export class FinanceOperations extends FinanceActions {
   protected override resetForContextChange(): void {
     this.activeForm = '';
     this.historyFilterAccount = '';
-    this.operationDraft = { kind: 'Expense', accountId: '', date: financeToday(), description: '', category: '', amount: '', paid: true };
+    this.operationDraft = { kind: 'Expense', accountId: '', date: financeToday(), description: '', category: '', categoryId: '', merchantId: '', incomeSourceId: '', amount: '', paid: true };
+    this.catalog = { categories: [], merchants: [], incomeSources: [] };
+    this.sourceCreateName = '';
     this.payment = { operationId: '', accountId: '', amount: '', date: financeToday() };
     this.transferDraft = { fromAccountId: '', toAccountId: '', date: financeToday(), amount: '', destinationAmount: '' };
   }
@@ -56,6 +64,11 @@ export class FinanceOperations extends FinanceActions {
   get activeAccounts() {
     return this.accounts.filter((account) => !account.isArchived);
   }
+  get activeCategories(): FinanceCategoryOption[] {
+    return this.catalog.categories.filter((item) => !item.isArchived && item.kind === this.operationDraft.kind);
+  }
+  get activeMerchants(): FinanceMerchantOption[] { return this.catalog.merchants.filter((item) => !item.isArchived); }
+  get activeIncomeSources(): FinanceIncomeSourceOption[] { return this.catalog.incomeSources.filter((item) => !item.isArchived); }
   get transferCurrenciesDiffer(): boolean {
     const source = this.accounts.find((account) => account.id === this.transferDraft.fromAccountId);
     const destination = this.accounts.find(
@@ -67,11 +80,25 @@ export class FinanceOperations extends FinanceActions {
     return this.overview?.operations ?? [];
   }
   override hasPendingDraft(): boolean {
-    return this.operationDraft.description.trim() !== '' || this.operationDraft.category.trim() !== '' || this.operationDraft.amount.trim() !== '' || this.operationDraft.kind !== 'Expense' || !this.operationDraft.paid || this.payment.amount.trim() !== '' || this.payment.accountId.trim() !== '' || this.transferDraft.fromAccountId !== '' || this.transferDraft.toAccountId !== '' || this.transferDraft.amount.trim() !== '' || this.transferDraft.destinationAmount.trim() !== '';
+    return this.operationDraft.description.trim() !== '' || this.operationDraft.category.trim() !== '' || this.operationDraft.categoryId !== '' || this.operationDraft.merchantId !== '' || this.operationDraft.incomeSourceId !== '' || this.sourceCreateName.trim() !== '' || this.operationDraft.amount.trim() !== '' || this.operationDraft.kind !== 'Expense' || !this.operationDraft.paid || this.payment.amount.trim() !== '' || this.payment.accountId.trim() !== '' || this.transferDraft.fromAccountId !== '' || this.transferDraft.toAccountId !== '' || this.transferDraft.amount.trim() !== '' || this.transferDraft.destinationAmount.trim() !== '';
   }
   openForm(form: 'operation' | 'transfer'): void {
     if (!this.allowed('recordFinance')) return;
     this.activeForm = form;
+    if (form === 'operation') void this.loadCatalog();
+  }
+  changeOperationKind(kind: 'Income' | 'Expense'): void {
+    this.operationDraft.kind = kind;
+    this.operationDraft.categoryId = '';
+    if (kind === 'Expense') this.operationDraft.incomeSourceId = '';
+  }
+  private async loadCatalog(): Promise<void> {
+    if (!this.api.financeCatalog) return;
+    const epoch = this.captureContext();
+    try {
+      const catalog = await this.api.financeCatalog();
+      if (this.isCurrentContext(epoch)) this.catalog = catalog;
+    } catch (error) { if (this.isCurrentContext(epoch)) this.showLoadError(error); }
   }
   closeForm(): void {
     if (!this.saving) this.activeForm = '';
@@ -93,8 +120,16 @@ export class FinanceOperations extends FinanceActions {
     const payload = {
       ...draft,
       amount: this.decimal(draft.amount),
-      category: draft.category || null,
+      category: draft.categoryId ? null : draft.category || null,
+      categoryId: draft.categoryId || null,
+      merchantId: draft.merchantId || null,
+      incomeSourceId: draft.kind === 'Income' ? draft.incomeSourceId || null : null,
     };
+    if (!draft.categoryId || (draft.kind === 'Income' && !draft.incomeSourceId)) {
+      this.error = draft.kind === 'Income' ? 'Elegí una categoría y una fuente de ingreso.' : 'Elegí una categoría.';
+      this.changeDetector.markForCheck();
+      return;
+    }
     const request = { id: this.requestId('operation', payload), ...payload };
     if (
       !(await this.runMutation(() => this.api.createOperation(request), 'Movimiento registrado.'))
@@ -107,11 +142,30 @@ export class FinanceOperations extends FinanceActions {
       date: financeToday(),
       description: '',
       category: '',
+      categoryId: '',
+      merchantId: '',
+      incomeSourceId: '',
       amount: '',
       paid: true,
     };
     this.activeForm = '';
     await this.refreshOverview();
+  }
+
+  async createSourceFromMovement(): Promise<void> {
+    if (!this.allowed('manageResources')) return;
+    const name = this.sourceCreateName.trim();
+    if (!name) { this.error = 'Ingresá el nombre de la fuente de ingreso.'; return; }
+    const payload = { name, kind: this.sourceCreateKind };
+    const request = { id: this.requestId('income-source-create', payload), ...payload };
+    const result: { source: FinanceIncomeSourceOption | null } = { source: null };
+    if (!(await this.runMutation(async () => { result.source = await this.api.createIncomeSource(request); }, 'Fuente de ingreso creada.'))) return;
+    this.releaseRequestId('income-source-create', payload);
+    if (result.source) {
+      this.catalog = { ...this.catalog, incomeSources: [...this.catalog.incomeSources, result.source] };
+      this.operationDraft.incomeSourceId = result.source.incomeSourceId;
+      this.sourceCreateName = '';
+    }
   }
 
   async payOperation(operation: Operation): Promise<void> {

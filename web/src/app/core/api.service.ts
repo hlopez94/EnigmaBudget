@@ -8,6 +8,8 @@ import {
   CardSummary,
   CompleteDraftRequest,
   FinanceOverview,
+  FinanceCatalog,
+  FinanceIncomeSourceOption,
   Group,
   OnboardingState,
   Operation,
@@ -223,6 +225,12 @@ export class ApiService {
   }
   createOperation(input: Record<string, unknown>): Promise<Operation> {
     return this.financeMutate('/api/operations', { method: 'POST', body: JSON.stringify(input) });
+  }
+  financeCatalog(): Promise<FinanceCatalog> {
+    return this.financeRequest('/api/finance/catalog');
+  }
+  createIncomeSource(input: Record<string, unknown>): Promise<FinanceIncomeSourceOption> {
+    return this.financeMutate('/api/finance/catalog/income-sources', { method: 'POST', body: JSON.stringify(input) });
   }
   payOperation(id: string, input: Record<string, unknown>): Promise<Operation> {
     return this.financeMutate(`/api/operations/${id}/payments`, {

@@ -144,6 +144,11 @@ export interface Operation {
   date: string;
   description: string;
   category: string;
+  categoryId?: string | null;
+  merchantId?: string | null;
+  incomeSourceId?: string | null;
+  merchantNameSnapshot?: string | null;
+  incomeSourceNameSnapshot?: string | null;
   amount: string;
   currency: Currency;
   paidAmount: string;
@@ -210,6 +215,7 @@ export interface CardAdjustment {
   id: string;
   description: string;
   category: string | null;
+  categoryId?: string | null;
   amount: string;
 }
 export interface CardPayment {
@@ -246,12 +252,30 @@ export interface Purchase {
   date: string;
   description: string;
   category: string;
+  categoryId?: string | null;
+  merchantId?: string | null;
+  merchantNameSnapshot?: string | null;
   currency: Currency;
   totalAmount: string;
   installmentCount: number;
   firstPeriod: string;
   groupId: string | null;
   installments: Installment[];
+}
+export interface FinanceCategoryOption {
+  itemId: string;
+  name: string;
+  kind: OperationKind;
+  isArchived: boolean;
+  isDefault: boolean;
+  version: number;
+}
+export interface FinanceMerchantOption { merchantId: string; name: string; isArchived: boolean; version: number; }
+export interface FinanceIncomeSourceOption { incomeSourceId: string; name: string; kind: 'Salary' | 'Extra' | 'AnnualBonus' | 'IndependentWork' | 'Other'; isArchived: boolean; version: number; }
+export interface FinanceCatalog {
+  categories: FinanceCategoryOption[];
+  merchants: FinanceMerchantOption[];
+  incomeSources: FinanceIncomeSourceOption[];
 }
 export interface FinanceOverview {
   period: string;

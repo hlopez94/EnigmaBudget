@@ -17,6 +17,8 @@ public static partial class FinanceEndpoints
         AppDbContext db,
         IAntiforgery csrf,
         BusinessClock clock,
+        WorkspaceAccessService access,
+        WorkspaceMutationGate mutationGate,
         OperationCreate r
     )
     {
@@ -38,33 +40,38 @@ public static partial class FinanceEndpoints
             )
         )
             return Problem(400, "Revisá los datos del movimiento.");
-        var ws = await Workspace(db, http);
-        var account = await db.Accounts.SingleOrDefaultAsync(x =>
-            x.WorkspaceId == ws.Id && x.Id == r.AccountId
-        );
-        if (account is null)
-            return Results.NotFound();
-        if (account.IsArchived)
-            return Problem(409, "La cuenta está archivada.");
-        if (r.Paid && (date > clock.Today || date < account.OpeningDate))
-            return Problem(
-                400,
-                "La fecha de un movimiento confirmado debe estar entre el alta de la cuenta y hoy."
-            );
-        var prior = await db
-            .FinanceOperations.Include(x => x.Payments)
-            .SingleOrDefaultAsync(x => x.WorkspaceId == ws.Id && x.Id == r.Id);
+        var initial = FinanceWorkspaceFilter.Get(http)!;
+        WorkspaceMutationLease? lease;
+        int lockStatus;
+        try
+        {
+            (lease, lockStatus) = await mutationGate.AcquireAsync(initial.Workspace.Id, http.RequestAborted);
+        }
+        catch (Exception ex) when (IsPersistenceConflict(ex)) { return Problem(409, "El espacio cambió durante el movimiento."); }
+        if (lease is null) return Problem(lockStatus, "El espacio no existe.");
+        await using var mutation = lease;
+        var (context, authorizationStatus) = await access.ResolveWithinLockedWorkspaceAsync(http.User, mutation.Workspace, WorkspacePermissions.RecordFinance, http.RequestAborted);
+        if (context is null) return Problem(authorizationStatus, "No tenés permiso para registrar movimientos.");
+        var ws = mutation.Workspace;
+        var account = await db.Accounts.SingleOrDefaultAsync(x => x.WorkspaceId == ws.Id && x.Id == r.AccountId, http.RequestAborted);
+        if (account is null) return Results.NotFound();
+        var selectionHash = CatalogSelectionResolver.SelectionHash(r.CategoryId, r.MerchantId, r.IncomeSourceId);
+        var prior = await db.FinanceOperations.Include(x => x.Payments).SingleOrDefaultAsync(x => x.WorkspaceId == ws.Id && x.Id == r.Id, http.RequestAborted);
         if (prior is not null)
-            return
-                prior.Amount == amount
-                && prior.AccountId == r.AccountId
-                && prior.Kind == r.Kind
-                && prior.Date == date
-                && prior.Description == r.Description.Trim()
-                && prior.Category == (r.Category?.Trim() ?? "")
-                && prior.InitiallyPaid == r.Paid
+        {
+            var categoryMatches = r.CategoryId.HasValue || prior.Category == (r.Category?.Trim() ?? "");
+            return prior.Amount == amount && prior.AccountId == r.AccountId && prior.Kind == r.Kind
+                && prior.Date == date && prior.Description == r.Description.Trim()
+                && prior.InitiallyPaid == r.Paid && categoryMatches
+                && prior.CatalogSelectionHash == selectionHash
                 ? Results.Ok(await Operation(db, prior))
                 : Problem(409, "El identificador ya se usó con otros datos.");
+        }
+        if (account.IsArchived) return Problem(409, "La cuenta está archivada.");
+        if (r.Paid && (date > clock.Today || date < account.OpeningDate))
+            return Problem(400, "La fecha de un movimiento confirmado debe estar entre el alta de la cuenta y hoy.");
+        var resolved = await CatalogSelectionResolver.ResolveOperationAsync(db, ws.Id, r.Kind, r.Category, r.CategoryId, r.MerchantId, r.IncomeSourceId, http.RequestAborted);
+        if (resolved.FailureStatus != 0) return Problem(resolved.FailureStatus, resolved.FailureDetail!);
         var op = new FinanceOperation
         {
             Id = r.Id,
@@ -73,7 +80,13 @@ public static partial class FinanceEndpoints
             AccountId = r.AccountId,
             Date = date,
             Description = r.Description.Trim(),
-            Category = r.Category?.Trim() ?? "",
+            Category = resolved.CategoryName,
+            CategoryId = resolved.CategoryId,
+            MerchantId = resolved.MerchantId,
+            MerchantNameSnapshot = resolved.MerchantName,
+            IncomeSourceId = resolved.IncomeSourceId,
+            IncomeSourceNameSnapshot = resolved.IncomeSourceName,
+            CatalogSelectionHash = resolved.SelectionHash,
             Currency = account.Currency,
             Amount = amount,
             InitiallyPaid = r.Paid,
@@ -103,7 +116,13 @@ public static partial class FinanceEndpoints
                 )
             );
         }
-        await db.SaveChangesAsync();
+        try
+        {
+            mutation.MarkChanged();
+            await db.SaveChangesAsync(http.RequestAborted);
+            await mutation.CommitAsync(http.RequestAborted);
+        }
+        catch (Exception ex) when (IsPersistenceConflict(ex)) { return Problem(409, "El espacio cambió durante el movimiento."); }
         return Results.Ok(await Operation(db, op));
     }
 
@@ -156,7 +175,12 @@ public static partial class FinanceEndpoints
                             p.Date.ToString("yyyy-MM-dd"),
                             F(p.Amount)
                         ))
-                        .ToArray()
+                        .ToArray(),
+                    x.CategoryId,
+                    x.MerchantId,
+                    x.IncomeSourceId,
+                    x.MerchantNameSnapshot,
+                    x.IncomeSourceNameSnapshot
                 );
             })
             .ToArray();
@@ -432,7 +456,12 @@ public static partial class FinanceEndpoints
                     x.Date.ToString("yyyy-MM-dd"),
                     F(x.Amount)
                 ))
-                .ToArray()
+                .ToArray(),
+            op.CategoryId,
+            op.MerchantId,
+            op.IncomeSourceId,
+            op.MerchantNameSnapshot,
+            op.IncomeSourceNameSnapshot
         );
     }
 

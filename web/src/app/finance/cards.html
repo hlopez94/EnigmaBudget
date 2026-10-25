@@ -207,11 +207,11 @@
                 maxlength="240"
                 [disabled]="saving" /></label
             ><label
-              >Categoría<input
-                name="purchaseCategory"
-                [(ngModel)]="purchaseDraft.category"
-                maxlength="80"
-                [disabled]="saving" /></label
+              >Categoría<select name="purchaseCategory" [(ngModel)]="purchaseDraft.categoryId" required [disabled]="saving">
+                <option value="" disabled>Elegir categoría</option>
+                @for (category of activeCategories; track category.itemId) { <option [value]="category.itemId">{{ category.name }}</option> }
+              </select></label
+            ><label>Comercio (opcional)<select name="purchaseMerchant" [(ngModel)]="purchaseDraft.merchantId" [disabled]="saving"><option value="">Sin comercio</option>@for (merchant of activeMerchants; track merchant.merchantId) { <option [value]="merchant.merchantId">{{ merchant.name }}</option> }</select></label
             ><label
               >Fecha<input
                 name="purchaseDate"
@@ -337,12 +337,7 @@
                       [disabled]="saving || statement.state === 'Confirmed'"
                   /></label>
                   <label
-                    >Categoría<input
-                      [name]="'adjustmentCategory-' + index"
-                      [(ngModel)]="adjustment.category"
-                      maxlength="80"
-                      [disabled]="saving || statement.state === 'Confirmed'"
-                  /></label>
+                    >Categoría<select [name]="'adjustmentCategory-' + index" [(ngModel)]="adjustment.categoryId" required [disabled]="saving || statement.state === 'Confirmed'"><option value="" disabled>Elegir categoría</option>@for (category of activeCategories; track category.itemId) { <option [value]="category.itemId">{{ category.name }}</option> }</select></label>
                   <label
                     >Importe (+cargo / −crédito)<input
                       [name]="'adjustmentAmount-' + index"

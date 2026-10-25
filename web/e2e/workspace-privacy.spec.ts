@@ -159,7 +159,7 @@ test('real Alice, Bob and Reader contexts enforce Household scope, personal cons
   await expenseForm.locator('[name="opAccount"]').selectOption({ label: 'Cuenta compartida · ARS' });
   await expenseForm.locator('[name="opDate"]').fill(date);
   await expenseForm.locator('[name="opDescription"]').fill('Compra del Hogar');
-  await expenseForm.locator('[name="opCategory"]').fill('Comida');
+  await expenseForm.locator('[name="opCategory"]').selectOption({ label: 'Sin clasificar' });
   await expenseForm.locator('[name="opAmount"]').fill('125.50');
   await expenseForm.locator('[name="opPaid"]').check();
   const expense = waitForApi(alice, 'POST', '/api/operations');

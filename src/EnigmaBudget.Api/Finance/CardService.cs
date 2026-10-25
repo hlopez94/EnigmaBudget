@@ -4,6 +4,7 @@ using System.Security.Claims;
 using EnigmaBudget.Api.Data;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.EntityFrameworkCore;
+using EnigmaBudget.Api.Workspaces;
 using Npgsql;
 
 namespace EnigmaBudget.Api.Finance;
@@ -14,6 +15,8 @@ public static partial class FinanceEndpoints
         HttpContext http,
         AppDbContext db,
         IAntiforgery csrf,
+        WorkspaceAccessService access,
+        WorkspaceMutationGate mutationGate,
         PurchaseCreate r
     )
     {
@@ -37,23 +40,32 @@ public static partial class FinanceEndpoints
             || r.Currency is not ("ARS" or "USD")
         )
             return Problem(400, "Revisá los datos de la compra.");
-        var ws = await Workspace(db, http);
-        var repeated = await db.Purchases.SingleOrDefaultAsync(x =>
-            x.WorkspaceId == ws.Id && x.Id == r.Id
-        );
+        var initial = FinanceWorkspaceFilter.Get(http)!;
+        WorkspaceMutationLease? lease;
+        int lockStatus;
+        try
+        {
+            (lease, lockStatus) = await mutationGate.AcquireAsync(initial.Workspace.Id, http.RequestAborted, IsolationLevel.Serializable);
+        }
+        catch (Exception ex) when (IsPersistenceConflict(ex)) { return Problem(409, "La tarjeta cambió durante la compra."); }
+        if (lease is null) return Problem(lockStatus, "El espacio no existe.");
+        await using var mutation = lease;
+        var (context, authorizationStatus) = await access.ResolveWithinLockedWorkspaceAsync(http.User, mutation.Workspace, WorkspacePermissions.RecordFinance, http.RequestAborted);
+        if (context is null) return Problem(authorizationStatus, "No tenés permiso para registrar compras.");
+        var ws = mutation.Workspace;
+        var selectionHash = CatalogSelectionResolver.SelectionHash(r.CategoryId, r.MerchantId);
+        var repeated = await db.Purchases.SingleOrDefaultAsync(x => x.WorkspaceId == ws.Id && x.Id == r.Id, http.RequestAborted);
         if (repeated is not null)
-            return
-                repeated.CardId == r.CardId
-                && repeated.TotalAmount == total
-                && repeated.Date == date
-                && repeated.Description == r.Description.Trim()
-                && repeated.Category == (r.Category?.Trim() ?? "")
-                && repeated.Currency == r.Currency
-                && repeated.InstallmentCount == r.InstallmentCount
-                && repeated.FirstPeriod == r.FirstPeriod
-                && repeated.GroupId == r.GroupId
+        {
+            var categoryMatches = r.CategoryId.HasValue || repeated.Category == (r.Category?.Trim() ?? "");
+            return repeated.CardId == r.CardId && repeated.TotalAmount == total && repeated.Date == date
+                && repeated.Description == r.Description.Trim() && categoryMatches
+                && repeated.Currency == r.Currency && repeated.InstallmentCount == r.InstallmentCount
+                && repeated.FirstPeriod == r.FirstPeriod && repeated.GroupId == r.GroupId
+                && repeated.CatalogSelectionHash == selectionHash
                 ? Results.Ok(await PurchaseDto(db, repeated))
                 : Problem(409, "El identificador ya se usó con otros datos.");
+        }
         var card = await db.Cards.SingleOrDefaultAsync(x =>
             x.WorkspaceId == ws.Id && x.Id == r.CardId
         );
@@ -92,9 +104,8 @@ public static partial class FinanceEndpoints
         var cents = decimal.ToInt64(total * 100);
         if (cents < r.InstallmentCount)
             return Problem(400, "El total no alcanza para cuotas positivas.");
-        await using var transaction = await db.Database.BeginTransactionAsync(
-            IsolationLevel.Serializable
-        );
+        var resolved = await CatalogSelectionResolver.ResolvePurchaseAsync(db, ws.Id, r.Category, r.CategoryId, r.MerchantId, http.RequestAborted);
+        if (resolved.FailureStatus != 0) return Problem(resolved.FailureStatus, resolved.FailureDetail!);
         var p = new CardPurchase
         {
             Id = r.Id,
@@ -103,7 +114,11 @@ public static partial class FinanceEndpoints
             GroupId = r.GroupId,
             Date = date,
             Description = r.Description.Trim(),
-            Category = r.Category?.Trim() ?? "",
+            Category = resolved.CategoryName,
+            CategoryId = resolved.CategoryId,
+            MerchantId = resolved.MerchantId,
+            MerchantNameSnapshot = resolved.MerchantName,
+            CatalogSelectionHash = resolved.SelectionHash,
             Currency = r.Currency,
             TotalAmount = total,
             InstallmentCount = r.InstallmentCount,
@@ -137,12 +152,12 @@ public static partial class FinanceEndpoints
         }
         try
         {
-            await db.SaveChangesAsync();
-            await transaction.CommitAsync();
+            mutation.MarkChanged();
+            await db.SaveChangesAsync(http.RequestAborted);
+            await mutation.CommitAsync(http.RequestAborted);
         }
         catch (Exception ex) when (IsPersistenceConflict(ex))
         {
-            await transaction.RollbackAsync();
             return Problem(409, "La tarjeta cambió durante la compra.");
         }
         return Results.Ok(await PurchaseDto(db, p));
@@ -195,6 +210,9 @@ public static partial class FinanceEndpoints
             date = p.Date.ToString("yyyy-MM-dd"),
             description = p.Description,
             category = p.Category,
+            categoryId = p.CategoryId,
+            merchantId = p.MerchantId,
+            merchantNameSnapshot = p.MerchantNameSnapshot,
             currency = p.Currency,
             totalAmount = F(p.TotalAmount),
             installmentCount = p.InstallmentCount,
@@ -288,6 +306,7 @@ public static partial class FinanceEndpoints
                     id = x.Id,
                     description = x.Description,
                     category = x.Category,
+                    categoryId = x.CategoryId,
                     amount = F(x.Amount),
                 }),
                 payments = paymentRows
@@ -312,6 +331,8 @@ public static partial class FinanceEndpoints
         HttpContext http,
         AppDbContext db,
         IAntiforgery csrf,
+        WorkspaceAccessService access,
+        WorkspaceMutationGate mutationGate,
         Guid cardId,
         StatementSave r
     )
@@ -339,7 +360,13 @@ public static partial class FinanceEndpoints
                 )
         )
             return Problem(400, "Revisá el resumen y sus ajustes.");
-        var ws = await Workspace(db, http);
+        var initial = FinanceWorkspaceFilter.Get(http)!;
+        var (lease, lockStatus) = await mutationGate.AcquireAsync(initial.Workspace.Id, http.RequestAborted);
+        if (lease is null) return Problem(lockStatus, "El espacio no existe.");
+        await using var mutation = lease;
+        var (context, authorizationStatus) = await access.ResolveWithinLockedWorkspaceAsync(http.User, mutation.Workspace, WorkspacePermissions.RecordFinance, http.RequestAborted);
+        if (context is null) return Problem(authorizationStatus, "No tenés permiso para guardar resúmenes.");
+        var ws = mutation.Workspace;
         if (!await db.Cards.AnyAsync(x => x.WorkspaceId == ws.Id && x.Id == cardId))
             return Results.NotFound();
         var s = await db.CardStatements.SingleOrDefaultAsync(x =>
@@ -378,6 +405,9 @@ public static partial class FinanceEndpoints
             : DateOnly.ParseExact(r.DueDate, "yyyy-MM-dd", Invariant);
         s.ActualTotal = total;
         foreach (var a in r.Adjustments)
+        {
+            var resolved = await CatalogSelectionResolver.ResolveOperationAsync(db, ws.Id, "Expense", a.Category, a.CategoryId, null, null, http.RequestAborted);
+            if (resolved.FailureStatus != 0) return Problem(resolved.FailureStatus, resolved.FailureDetail!);
             db.StatementAdjustments.Add(
                 new StatementAdjustment
                 {
@@ -385,11 +415,19 @@ public static partial class FinanceEndpoints
                     WorkspaceId = ws.Id,
                     StatementId = s.Id,
                     Description = a.Description.Trim(),
-                    Category = a.Category?.Trim() ?? "",
+                    Category = resolved.CategoryName,
+                    CategoryId = resolved.CategoryId,
                     Amount = decimal.Parse(a.Amount, Invariant),
                 }
             );
-        await db.SaveChangesAsync();
+        }
+        try
+        {
+            mutation.MarkChanged();
+            await db.SaveChangesAsync(http.RequestAborted);
+            await mutation.CommitAsync(http.RequestAborted);
+        }
+        catch (Exception ex) when (IsPersistenceConflict(ex)) { return Problem(409, "El resumen cambió mientras se guardaba."); }
         return Results.Ok(
             new
             {

@@ -167,6 +167,10 @@ namespace EnigmaBudget.Api.Data.Migrations
                     b.Property<Guid>("CardId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("CatalogSelectionHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
                     b.Property<string>("Category")
                         .IsRequired()
                         .HasColumnType("text");
@@ -197,6 +201,9 @@ namespace EnigmaBudget.Api.Data.Migrations
 
                     b.Property<Guid?>("MerchantId")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("MerchantNameSnapshot")
+                        .HasColumnType("text");
 
                     b.Property<decimal>("TotalAmount")
                         .HasPrecision(18, 2)
@@ -269,6 +276,10 @@ namespace EnigmaBudget.Api.Data.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
 
+                    b.Property<string>("CatalogSelectionHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
                     b.Property<string>("Category")
                         .IsRequired()
                         .HasColumnType("text");
@@ -290,6 +301,9 @@ namespace EnigmaBudget.Api.Data.Migrations
                     b.Property<Guid?>("IncomeSourceId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("IncomeSourceNameSnapshot")
+                        .HasColumnType("text");
+
                     b.Property<bool>("InitiallyPaid")
                         .HasColumnType("boolean");
 
@@ -302,6 +316,9 @@ namespace EnigmaBudget.Api.Data.Migrations
 
                     b.Property<Guid?>("MerchantId")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("MerchantNameSnapshot")
+                        .HasColumnType("text");
 
                     b.Property<int>("Version")
                         .IsConcurrencyToken()
