@@ -60,6 +60,7 @@ public static partial class FinanceEndpoints
             cardDebtUsd = 0,
             cardCreditArs = 0,
             cardCreditUsd = 0;
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
         foreach (var card in cards)
         {
             var installmentsForCard = await db
@@ -69,14 +70,14 @@ public static partial class FinanceEndpoints
                 .CardPayments.Where(x => x.WorkspaceId == ws.Id && x.CardId == card.Id)
                 .ToArrayAsync();
             var ars =
-                card.StatementDebtArs
+                CurrentCardOpeningDebt(card, "ARS", today)
                 + installmentsForCard.Where(x => x.Currency == "ARS").Sum(x => x.Amount)
                 + confirmedAdjustments
                     .Where(x => x.CardId == card.Id && x.Currency == "ARS")
                     .Sum(x => x.Amount)
                 - paymentsForCard.Where(x => x.Currency == "ARS").Sum(x => x.AppliedAmount);
             var usd =
-                card.StatementDebtUsd
+                CurrentCardOpeningDebt(card, "USD", today)
                 + installmentsForCard.Where(x => x.Currency == "USD").Sum(x => x.Amount)
                 + confirmedAdjustments
                     .Where(x => x.CardId == card.Id && x.Currency == "USD")
@@ -220,5 +221,12 @@ public static partial class FinanceEndpoints
                 },
             }
         );
+    }
+
+    private static decimal CurrentCardOpeningDebt(PaymentCard card, string currency, DateOnly today)
+    {
+        if (card.AsOfDate > today)
+            return 0m;
+        return currency == "ARS" ? card.StatementDebtArs : card.StatementDebtUsd;
     }
 }

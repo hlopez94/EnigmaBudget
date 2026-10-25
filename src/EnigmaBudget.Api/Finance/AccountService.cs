@@ -216,6 +216,7 @@ public static partial class FinanceEndpoints
             .OrderBy(x => x.Name)
             .ToArrayAsync();
         var output = new List<object>();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
         foreach (var card in cards)
         {
             var installments = await db
@@ -247,10 +248,7 @@ public static partial class FinanceEndpoints
                 .ToArrayAsync();
             decimal Net(string currency)
             {
-                var opening =
-                    card.AsOfDate <= DateOnly.FromDateTime(DateTime.UtcNow)
-                        ? (currency == "ARS" ? card.StatementDebtArs : card.StatementDebtUsd)
-                        : 0m;
+                var opening = CurrentCardOpeningDebt(card, currency, today);
                 return opening
                     + installments.Where(x => x.Currency == currency).Sum(x => x.Total)
                     + adjustments.Where(x => x.Currency == currency).Sum(x => x.Total)

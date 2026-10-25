@@ -10,6 +10,100 @@ public sealed class CardCycleIntegrationTests : IDisposable
     public void Dispose() => _factory.Dispose();
 
     [Fact]
+    public async Task Future_card_opening_is_excluded_consistently_from_current_debt_views()
+    {
+        using var client = await _factory.AuthenticatedClientAsync();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var pastDate = today.AddDays(-2).ToString("yyyy-MM-dd");
+        var todayDate = today.ToString("yyyy-MM-dd");
+        var futureDate = today.AddDays(2).ToString("yyyy-MM-dd");
+        var pastCard = Guid.NewGuid();
+        var todayCard = Guid.NewGuid();
+        var futureCard = Guid.NewGuid();
+        var account = Guid.NewGuid();
+
+        async Task CreateCard(Guid id, string name, string ars, string usd, string asOfDate)
+        {
+            var response = await client.PostAsJsonAsync(
+                "/api/cards",
+                new
+                {
+                    id,
+                    name,
+                    bankName = "Banco",
+                    closingDay = 10,
+                    dueDay = 20,
+                    statementDebtArs = ars,
+                    statementDebtUsd = usd,
+                    asOfDate,
+                }
+            );
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        }
+
+        await CreateCard(pastCard, "Pasada", "100.00", "0.00", pastDate);
+        await CreateCard(todayCard, "Hoy", "40.00", "3.00", todayDate);
+        await CreateCard(futureCard, "Futura", "150.00", "25.00", futureDate);
+
+        Assert.Equal(
+            HttpStatusCode.OK,
+            (
+                await client.PostAsJsonAsync(
+                    "/api/accounts",
+                    new
+                    {
+                        id = account,
+                        name = "Caja",
+                        bankName = "Banco",
+                        currency = "ARS",
+                        openingBalance = "1000.00",
+                        openingDate = pastDate,
+                    }
+                )
+            ).StatusCode
+        );
+        Assert.Equal(
+            HttpStatusCode.OK,
+            (
+                await client.PostAsJsonAsync(
+                    $"/api/cards/{pastCard}/payments",
+                    new
+                    {
+                        id = Guid.NewGuid(),
+                        accountId = account,
+                        date = todayDate,
+                        amount = "130.00",
+                        currency = "ARS",
+                        appliedAmount = "130.00",
+                        statementId = (Guid?)null,
+                    }
+                )
+            ).StatusCode
+        );
+
+        var cards = await client.GetFromJsonAsync<CardDebtSummary[]>("/api/cards");
+        Assert.Equal("0.00", Assert.Single(cards!, x => x.Id == futureCard).DebtArs);
+        Assert.Equal("0.00", Assert.Single(cards!, x => x.Id == futureCard).DebtUsd);
+        Assert.Equal("40.00", Assert.Single(cards!, x => x.Id == todayCard).DebtArs);
+        Assert.Equal("3.00", Assert.Single(cards!, x => x.Id == todayCard).DebtUsd);
+        Assert.Equal("0.00", Assert.Single(cards!, x => x.Id == pastCard).DebtArs);
+        Assert.Equal("30.00", Assert.Single(cards!, x => x.Id == pastCard).CreditArs);
+
+        var period = today.ToString("yyyy-MM");
+        using var finance = System.Text.Json.JsonDocument.Parse(
+            await client.GetStringAsync($"/api/finance?period={period}")
+        );
+        var overview = finance.RootElement;
+        var futureOverviewCard = overview.GetProperty("cards").EnumerateArray()
+            .Single(x => x.GetProperty("id").GetGuid() == futureCard);
+        Assert.Equal("0.00", futureOverviewCard.GetProperty("debtArs").GetString());
+        Assert.Equal("0.00", futureOverviewCard.GetProperty("debtUsd").GetString());
+        Assert.Equal("40.00", overview.GetProperty("totals").GetProperty("cardDebtArs").GetString());
+        Assert.Equal("3.00", overview.GetProperty("totals").GetProperty("cardDebtUsd").GetString());
+        Assert.Equal("30.00", overview.GetProperty("totals").GetProperty("cardCreditArs").GetString());
+    }
+
+    [Fact]
     public async Task Statement_reconciles_once_and_partial_card_payments_reduce_pending_amount()
     {
         using var client = await _factory.AuthenticatedClientAsync();
@@ -404,6 +498,8 @@ public sealed class CardCycleIntegrationTests : IDisposable
     private sealed record SavedStatement(Guid Id, int Version);
 
     private sealed record CardSummary(string DebtArs, string CreditArs);
+
+    private sealed record CardDebtSummary(Guid Id, string DebtArs, string DebtUsd, string CreditArs);
 
     private sealed record BankAccountBalance(string CurrentBalance);
 }
