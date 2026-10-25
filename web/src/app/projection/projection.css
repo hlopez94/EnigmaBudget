@@ -1,5 +1,5 @@
 :host{display:block;color:var(--ink,#22291f)}:host[hidden]{display:none!important}
-.projection-screen{gap:14px}.projection-screen .helper{margin:9px 0 0}
+.projection-screen .helper{margin:9px 0 0}
 .projection-screen>.panel{padding:18px 20px}.rate-card{padding:16px}.rate-state>div{display:grid;gap:4px}
 .projection-screen .primary{color:#fff}
 .controls-panel{padding:16px 18px}.projection-controls{display:grid;grid-template-columns:minmax(130px,.7fr) minmax(150px,1fr) minmax(170px,1.2fr) auto;gap:11px;align-items:end}.projection-controls>label,.day-picker label{display:grid;gap:6px;color:#546052;font-size:12px;font-weight:600}.projection-controls input,.projection-controls select,.day-picker input,.day-picker select{width:100%;min-width:0;min-height:42px;border:1px solid #cfd8cd;border-radius:8px;padding:9px;background:white;color:#263126;font:inherit;font-size:13px}.control-actions{display:flex;flex-wrap:wrap;gap:7px}.control-actions button{min-height:40px;padding:8px 10px;font-size:11px}

@@ -19,7 +19,7 @@ import { DialogModule } from '@openng/optimus-ui/dialog';
     [appendTo]="'body'"
     [breakpoints]="{ '767px': '100vw' }"
     [style]="{ width: 'min(620px, calc(100vw - 32px))' }"
-    [styleClass]="'finance-action-dialog'"
+    [styleClass]="'finance-action-dialog ' + visualVariant"
     (visibleChange)="visibilityChanged($event)"
     (onHide)="restoreFocus()"
     ><ng-content
@@ -40,6 +40,7 @@ export class ActionDialog {
     return this.isOpen;
   }
   @Input() dismissible = true;
+  @Input() visualVariant = '';
   @Output() closed = new EventEmitter<void>();
   private isOpen = false;
   private returnFocusTarget: HTMLElement | null = null;
