@@ -36,7 +36,46 @@ describe('NativeApiFetcher', () => {
     expect(h.plugin.dispatchRequest).not.toHaveBeenCalled();
   });
 
-  it('rechecks after preparing an unauthorized retry and never dispatches it after a context change', async () => {
+  it('Native_request_aborts_when_user_changes_during_prepare_refresh', async () => {
+    const h = harness();
+    h.plugin.prepareRequest = vi.fn(async () => {
+      h.change({ epoch: 2, userId: 'user-2', workspaceId: null });
+      return permit;
+    });
+    await expect(new NativeApiFetcher(h.plugin, h.reader).fetcher('/api/me')).rejects.toBeInstanceOf(NativeRequestChangedError);
+    expect(h.plugin.prepareRequest).toHaveBeenCalledOnce();
+    expect(h.plugin.dispatchRequest).not.toHaveBeenCalled();
+  });
+
+  it('Native_request_aborts_when_workspace_changes_during_prepare_refresh', async () => {
+    const h = harness();
+    h.plugin.prepareRequest = vi.fn(async () => {
+      h.change({ epoch: 2, userId: 'user-1', workspaceId: 'workspace-2' });
+      return permit;
+    });
+    await expect(new NativeApiFetcher(h.plugin, h.reader).fetcher('/api/finance')).rejects.toBeInstanceOf(NativeRequestChangedError);
+    expect(h.plugin.dispatchRequest).not.toHaveBeenCalled();
+  });
+
+  it('Native_write_is_not_retried_after_unknown_timeout', async () => {
+    const h = harness();
+    h.plugin.dispatchRequest = vi.fn(async () => { throw new TypeError('socket timed out after write'); });
+    const fetcher = new NativeApiFetcher(h.plugin, h.reader);
+    await expect(fetcher.fetcher('/api/operations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{"amount":"12.34"}' })).rejects.toThrow('socket timed out');
+    expect(h.plugin.dispatchRequest).toHaveBeenCalledOnce();
+    expect(h.plugin.prepareUnauthorizedRetry).not.toHaveBeenCalled();
+  });
+
+  it('blocks generic auth routes and uses only the captured workspace header', async () => {
+    const h = harness();
+    const fetcher = new NativeApiFetcher(h.plugin, h.reader);
+    await expect(fetcher.fetcher('/api/auth/native/refresh', { method: 'POST' })).rejects.toThrow(/puente privado/i);
+    expect(h.plugin.prepareRequest).not.toHaveBeenCalled();
+    await fetcher.fetcher('/api/finance', { headers: { 'X-Workspace-Id': 'attacker-space' } });
+    expect(h.plugin.prepareRequest).toHaveBeenCalledWith(expect.objectContaining({ request: expect.objectContaining({ headers: expect.objectContaining({ 'X-Workspace-Id': 'workspace-1' }) }) }));
+  });
+
+  it('Native_401_retry_aborts_when_epoch_changes', async () => {
     const h = harness();
     h.plugin.dispatchRequest = vi.fn(async () => ({ status: 401, headers: { 'www-authenticate': 'Bearer error="invalid_token"' }, body: '{}' }));
     h.plugin.prepareUnauthorizedRetry = vi.fn(async () => {

@@ -12,6 +12,9 @@
     }
   </header>
   <main>
+    @if (notice) {
+      <p-message severity="info" [text]="notice" />
+    }
     @if (busy) {
       <section class="loading" aria-live="polite">
         <span class="loader-dot"></span>
@@ -25,7 +28,7 @@
         <p-button label="Intentar de nuevo" (onClick)="load()" />
       </section>
     } @else if (session && !session.authenticated) {
-      <app-sign-in [session]="session" (signedIn)="signedIn()" />
+      <app-sign-in [session]="session" (signedIn)="signedIn()" (identityInvalidated)="clearPrivateUiFromSignIn()" />
     } @else if (session?.authenticated && showSetup) {
       <div class="setup-return">
         <button type="button" (click)="showSetup = false">Volver a finanzas</button>

@@ -2,11 +2,28 @@ import '@angular/compiler';
 import { describe, expect, it, vi } from 'vitest';
 import { ApiService } from './api.service';
 import { WorkspaceContext } from './workspace-context';
+import { AuthEpoch } from './auth-epoch';
 
 const response = (body: unknown): Response =>
   ({ ok: true, status: 200, json: async () => body }) as Response;
 
 describe('workspace context boundaries', () => {
+  it('Auth_epoch_advances_on_identity_and_workspace_changes', () => {
+    const epoch = new AuthEpoch();
+    const signedIn = epoch.snapshot();
+    epoch.advance('user-a', null);
+    const user = epoch.snapshot();
+    epoch.advance('user-a', 'space-a');
+    const workspace = epoch.snapshot();
+    epoch.advance('user-b', null);
+    const changedUser = epoch.snapshot();
+    epoch.advance(null, null);
+    const loggedOut = epoch.snapshot();
+    expect([user.epoch, workspace.epoch, changedUser.epoch, loggedOut.epoch]).toEqual([1, 2, 3, 4]);
+    expect(epoch.isCurrent(signedIn)).toBe(false);
+    expect(epoch.isCurrent(workspace)).toBe(false);
+    expect(epoch.isCurrent(loggedOut)).toBe(true);
+  });
   it('captures the selected workspace on financial dispatch and leaves management unscoped', async () => {
     const calls: Array<{ url: string; init?: RequestInit }> = [];
     const api = new ApiService((async (input: RequestInfo | URL, init?: RequestInit) => {

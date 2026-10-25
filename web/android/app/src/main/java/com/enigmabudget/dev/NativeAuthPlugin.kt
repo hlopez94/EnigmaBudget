@@ -16,11 +16,7 @@ import com.getcapacitor.PluginCall
 import com.getcapacitor.PluginMethod
 import com.getcapacitor.annotation.CapacitorPlugin
 import org.json.JSONObject
-import java.io.BufferedReader
-import java.io.InputStreamReader
-import java.net.HttpURLConnection
 import java.net.URI
-import java.net.URL
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CompletableFuture
@@ -32,6 +28,7 @@ import java.util.concurrent.TimeUnit
 class NativeAuthPlugin : Plugin() {
     private val executor = boundedExecutor("native-auth")
     private val protectedTransport by lazy { NativeAsyncHttpTransport(OkHttpNativeHttpClient()) }
+    private val privateAuthClient by lazy { OkHttpPrivateAuthClient() }
     private val logoutExecutor = ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, java.util.concurrent.SynchronousQueue(), { runnable ->
         Thread(runnable, "native-logout-${UUID.randomUUID()}").apply { isDaemon = true }
     }, ThreadPoolExecutor.AbortPolicy())
@@ -71,6 +68,12 @@ class NativeAuthPlugin : Plugin() {
         val options = readAuthOptions()
         call.resolve(JSObject().put("googleConfigured", options.googleConfigured)
             .put("developmentLoginEnabled", options.developmentLoginEnabled))
+    }
+
+    @PluginMethod
+    fun invitationHost(call: PluginCall) = execute(call) {
+        val host = BuildConfig.APP_LINKS_HOST.takeIf { it.isNotBlank() }
+        call.resolve(JSObject().put("host", host))
     }
 
     @PluginMethod
@@ -193,14 +196,9 @@ class NativeAuthPlugin : Plugin() {
     @PluginMethod
     fun logoutResult(call: PluginCall) = execute(call) {
         val id = call.getString("attempt") ?: ""
-        var revoked = false
         val result = logoutResults[id]
-        if (result != null) {
-            try {
-                revoked = result.get(3, TimeUnit.SECONDS)
-            } catch (_: Exception) { revoked = false }
-            logoutResults.remove(id, result)
-        }
+        val revoked = awaitLogoutRevocation(result)
+        if (result != null) logoutResults.remove(id, result)
         call.resolve(JSObject().put("serverRevoked", revoked))
     }
 
@@ -253,24 +251,9 @@ class NativeAuthPlugin : Plugin() {
         val headers = mutableMapOf("accept" to "application/json")
         if (body != null) headers["content-type"] = "application/json"
         if (bearer != null) headers["authorization"] = "Bearer $bearer"
-        return http(uri.toString(), method, headers, body?.toString(), timeoutMillis)
-    }
-
-    private fun http(url: String, method: String, headers: Map<String, String>, body: String?, timeoutMillis: Int = 8_000): NativeApiResponse {
-        val connection = URL(url).openConnection() as HttpURLConnection
-        try {
-            connection.instanceFollowRedirects = false
-            connection.connectTimeout = timeoutMillis; connection.readTimeout = timeoutMillis
-            connection.requestMethod = method
-            connection.useCaches = false
-            headers.forEach { (key, value) -> connection.setRequestProperty(key, value) }
-            if (body != null) { connection.doOutput = true; connection.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) } }
-            val status = connection.responseCode
-            val stream = if (status >= 400) connection.errorStream else connection.inputStream
-            val responseBody = stream?.use { BufferedReader(InputStreamReader(it, Charsets.UTF_8)).readText() }.orEmpty()
-            val responseHeaders = connection.headerFields.filterKeys { it != null }.mapKeys { it.key.lowercase() }.mapValues { it.value.joinToString(", ") }
-            return NativeApiResponse(status, responseHeaders, responseBody)
-        } finally { connection.disconnect() }
+        val response = privateAuthClient.execute(uri.toString(), method, headers, body?.toString(), timeoutMillis)
+        if (response.status in 300..399) throw NativeHttpFailure(response.status)
+        return response
     }
 
     private fun getGoogleIdToken(nonce: String): String {

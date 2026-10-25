@@ -17,6 +17,7 @@ vi.mock('@capacitor/app', () => ({ App: {
 } }));
 
 import { NativeInvitationLinks } from './native-invitation-links';
+import { App } from '@capacitor/app';
 
 describe('NativeInvitationLinks', () => {
   beforeEach(() => {
@@ -24,6 +25,8 @@ describe('NativeInvitationLinks', () => {
     native.callback = null;
     native.launchUrl = null;
     native.remove.mockClear();
+    vi.mocked(App.addListener).mockClear();
+    vi.mocked(App.getLaunchUrl).mockClear();
     window.history.replaceState(null, '', '/');
   });
 
@@ -74,5 +77,58 @@ describe('NativeInvitationLinks', () => {
     native.isPlatform = false;
     await listener.start('invites.example.test', () => undefined);
     expect(native.callback).toBeNull();
+  });
+
+  it('keeps one listener across repeated start calls and removes the previous host on restart', async () => {
+    const received: string[] = [];
+    const callback = (token: string) => received.push(token);
+    const links = new NativeInvitationLinks();
+    await links.start('invites.example.test', callback);
+    const oldListenerCallback = native.callback;
+    await links.start('invites.example.test', callback);
+    expect(App.addListener).toHaveBeenCalledTimes(1);
+    await links.start('second.example.test', callback);
+    expect(native.remove).toHaveBeenCalledOnce();
+    oldListenerCallback?.({ url: 'https://invites.example.test/invitar#invite=old-host' });
+    native.callback?.({ url: 'https://second.example.test/invitar#invite=new-host' });
+    links.setAuthenticated(true);
+    await Promise.resolve();
+    expect(received).toEqual(['new-host']);
+    await links.stop();
+    await links.stop();
+    expect(native.remove).toHaveBeenCalledTimes(2);
+  });
+
+  it('removes a listener whose registration finishes after stop was requested', async () => {
+    let finishRegistration!: (value: never) => void;
+    const registration = new Promise<never>(resolve => { finishRegistration = resolve; });
+    vi.mocked(App.addListener).mockImplementationOnce(() => registration);
+    const removeLateListener = vi.fn(async () => undefined);
+    const links = new NativeInvitationLinks();
+    const starting = links.start('invites.example.test', () => undefined);
+    await Promise.resolve();
+    const stopping = links.stop();
+    finishRegistration({ remove: removeLateListener } as never);
+    await Promise.all([starting, stopping]);
+    expect(removeLateListener).toHaveBeenCalledOnce();
+    expect(App.getLaunchUrl).not.toHaveBeenCalled();
+  });
+
+  it('does not restore a failed invitation delivery after logout changes identity generation', async () => {
+    let rejectDelivery!: (reason: Error) => void;
+    const delivery = new Promise<void>((_resolve, reject) => { rejectDelivery = reject; });
+    const receive = vi.fn(() => delivery);
+    const links = new NativeInvitationLinks();
+    await links.start('invites.example.test', receive);
+    native.callback?.({ url: 'https://invites.example.test/invitar#invite=private-token' });
+    links.setAuthenticated(true);
+    expect(receive).toHaveBeenCalledOnce();
+    links.setAuthenticated(false);
+    rejectDelivery(new Error('old identity'));
+    await Promise.resolve();
+    links.setAuthenticated(true);
+    await Promise.resolve();
+    expect(receive).toHaveBeenCalledOnce();
+    await links.stop();
   });
 });

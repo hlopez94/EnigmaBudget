@@ -15,6 +15,7 @@ import java.net.ServerSocket
 import java.net.Socket
 import java.net.SocketTimeoutException
 import java.net.URI
+import java.net.CookieHandler
 import java.util.concurrent.CancellationException
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
@@ -23,6 +24,39 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 class OkHttpNativeHttpClientTest {
+    @Test fun PrivateAuthUsesNoProcessCookiesAndNeverReplaysOneShotWrites() {
+        val priorCookieHandler = CookieHandler.getDefault()
+        CookieHandler.setDefault(object : CookieHandler() {
+            override fun get(uri: URI, requestHeaders: Map<String, List<String>>): Map<String, List<String>> = mapOf("Cookie" to listOf("ambient-sentinel=secret"))
+            override fun put(uri: URI, responseHeaders: Map<String, List<String>>) = Unit
+        })
+        try {
+            ScriptedServer { _, _ -> response(503, "Retry-After: 0\r\n") }.use { server ->
+                val result = OkHttpPrivateAuthClient().execute(
+                    server.url("/api/auth/native/refresh"), "POST",
+                    mapOf("accept" to "application/json", "content-type" to "application/json", "authorization" to "Bearer private-secret"),
+                    "{\"refreshToken\":\"one-shot-secret\"}", 2_000,
+                )
+                assertEquals(503, result.status)
+                assertEquals(listOf("/api/auth/native/refresh"), server.paths.toList())
+                assertFalse(server.headers.any { it.contains("ambient-sentinel") || it.contains("Cookie:", true) })
+            }
+            ScriptedServer { _, _ -> null }.use { server ->
+                org.junit.Assert.assertThrows(java.io.IOException::class.java) {
+                    OkHttpPrivateAuthClient().execute(
+                        server.url("/api/auth/native/exchange"), "POST",
+                        mapOf("accept" to "application/json", "content-type" to "application/json"),
+                        "{\"idToken\":\"one-shot-secret\"}", 2_000,
+                    )
+                }
+                Thread.sleep(100)
+                assertEquals(listOf("/api/auth/native/exchange"), server.paths.toList())
+            }
+        } finally {
+            CookieHandler.setDefault(priorCookieHandler)
+        }
+    }
+
     @Test fun DoesNotReplay503RetryAfterZeroOrSocketFailure() {
         ScriptedServer { _, _ -> response(503, "Retry-After: 0\r\n") }.use { server ->
             val client = newNativeOkHttpClient()
@@ -128,6 +162,7 @@ class OkHttpNativeHttpClientTest {
         private val serverSocket = ServerSocket(0, 32, InetAddress.getByName("127.0.0.1"))
         private val stop = CountDownLatch(1)
         val paths = CopyOnWriteArrayList<String>()
+        val headers = CopyOnWriteArrayList<String>()
         val blockerAccepted = CountDownLatch(1)
         private val releaseBlocker = CountDownLatch(1)
         private val thread = Thread(::serve, "native-http-test-server").apply { isDaemon = true; start() }
@@ -145,7 +180,11 @@ class OkHttpNativeHttpClientTest {
                     val reader = BufferedReader(InputStreamReader(client.getInputStream(), Charsets.US_ASCII))
                     val firstLine = reader.readLine() ?: return@use
                     val path = firstLine.split(' ').getOrNull(1).orEmpty()
-                    while (reader.readLine()?.isNotEmpty() == true) { }
+                    while (true) {
+                        val line = reader.readLine() ?: break
+                        if (line.isEmpty()) break
+                        headers += line
+                    }
                     paths += path
                     val bytes = responder(path, this) ?: return@use
                     try { client.getOutputStream().apply { write(bytes); flush() } } catch (_: Exception) { }

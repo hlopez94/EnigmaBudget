@@ -1,4 +1,6 @@
 import { Inject, Injectable, InjectionToken, Optional } from '@angular/core';
+import { Capacitor } from '@capacitor/core';
+import { NativeAuthCoordinator } from './native-auth-coordinator';
 import {
   Account,
   AccountSummary,
@@ -40,7 +42,7 @@ export class ApiService {
   private selectedWorkspaceId: string | null = null;
   private pendingInviteToken: string | null = null;
 
-  constructor(@Optional() @Inject(API_FETCHER) fetcher?: Fetcher) {
+  constructor(@Optional() @Inject(API_FETCHER) fetcher?: Fetcher, @Optional() private readonly nativeAuth?: NativeAuthCoordinator) {
     this.fetcher = fetcher ?? ((...args) => fetch(...args));
   }
 
@@ -51,7 +53,10 @@ export class ApiService {
   clearWorkspace(): void {
     this.selectedWorkspaceId = null;
   }
+  get isNativeAndroid(): boolean { return Capacitor.getPlatform() === 'android'; }
+  captureNativeInvitation(token: string): void { if (this.isNativeAndroid) this.pendingInviteToken = token; }
   capturePendingInvitation(): string | null {
+    if (this.isNativeAndroid) return this.pendingInviteToken;
     const fragment = window.location.hash;
     const match = /^#invite=([^&]+)$/.exec(fragment);
     if (match) {
@@ -66,28 +71,46 @@ export class ApiService {
   pendingInvitation(): string | null { return this.pendingInviteToken; }
   clearPendingInvitation(): void {
     this.pendingInviteToken = null;
+    if (this.isNativeAndroid) return;
     try { sessionStorage.removeItem('enigma-budget:pending-invite'); } catch { /* No persisted value to clear. */ }
   }
 
   async session(): Promise<SessionInfo> {
+    if (this.isNativeAndroid && this.nativeAuth) return this.nativeAuth.restore();
     const session = await this.request<SessionInfo>('/api/auth/session');
     this.csrfToken = session.csrfToken;
     return session;
   }
-  async signInDevelopment(key?: string): Promise<SessionInfo> {
+  async signInDevelopment(key?: string, onIdentityInvalidated: () => void = () => undefined): Promise<SessionInfo> {
+    if (this.isNativeAndroid && this.nativeAuth) {
+      await this.nativeAuth.signInDevelopment(key, onIdentityInvalidated);
+      return this.nativeAuth.restore();
+    }
     if (!this.csrfToken) await this.session();
     await this.mutate<void>('/api/auth/development', { method: 'POST', body: JSON.stringify(key ? { key } : {}) });
     return this.session();
   }
-  signInGoogle(): void {
+  async signInGoogle(onIdentityInvalidated: () => void = () => undefined): Promise<void> {
+    if (this.isNativeAndroid && this.nativeAuth) return this.nativeAuth.signInGoogle(onIdentityInvalidated);
+    onIdentityInvalidated();
     window.location.assign('/api/auth/google');
   }
-  async logout(): Promise<void> {
+  async logout(onLocalClear: () => void = () => undefined): Promise<boolean> {
+    if (this.isNativeAndroid && this.nativeAuth) {
+      return this.nativeAuth.logout(() => {
+        this.csrfToken = '';
+        this.clearWorkspace();
+        this.clearPendingInvitation();
+        onLocalClear();
+      });
+    }
     await this.mutate<void>('/api/auth/logout', { method: 'POST', body: '{}' });
     this.csrfToken = '';
     this.clearWorkspace();
     this.clearPendingInvitation();
     await this.session();
+    onLocalClear();
+    return true;
   }
   me(): Promise<{ id: string; displayName: string; email: string | null; emailVerified: boolean; personalWorkspaceId: string }> {
     return this.request('/api/me');

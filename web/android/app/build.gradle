@@ -13,9 +13,11 @@ android {
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         def apiBase = System.getenv('ENIGMABUDGET_API_BASE_URL') ?: ''
         def googleServerClientId = System.getenv('ENIGMABUDGET_GOOGLE_SERVER_CLIENT_ID') ?: ''
+        def configuredInviteHost = System.getenv('ENIGMABUDGET_APP_LINKS_HOST')?.trim() ?: ''
         def allowLocalHttp = System.getenv('ENIGMABUDGET_ALLOW_LOCAL_HTTP') == 'true'
         buildConfigField 'String', 'API_BASE_URL', '"' + apiBase.replace('\\', '\\\\').replace('"', '\\"') + '"'
         buildConfigField 'String', 'GOOGLE_SERVER_CLIENT_ID', '"' + googleServerClientId.replace('\\', '\\\\').replace('"', '\\"') + '"'
+        buildConfigField 'String', 'APP_LINKS_HOST', '"' + configuredInviteHost.replace('\\', '\\\\').replace('"', '\\"') + '"'
         buildConfigField 'boolean', 'ALLOW_LOCAL_HTTP', allowLocalHttp.toString()
         manifestPlaceholders = [allowLocalHttp: allowLocalHttp.toString()]
         aaptOptions {

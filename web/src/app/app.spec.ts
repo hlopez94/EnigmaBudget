@@ -33,6 +33,7 @@ describe('application startup', () => {
     const api = {
       logout: vi.fn().mockResolvedValue(undefined),
       clearWorkspace: vi.fn(),
+      clearPendingInvitation: vi.fn(),
       capturePendingInvitation: vi.fn().mockReturnValue(null),
       session: vi.fn().mockResolvedValue({ authenticated: false, displayName: null, googleConfigured: false, developmentLoginEnabled: false, developmentUsers:[], csrfToken: '' }),
     };
@@ -59,5 +60,44 @@ describe('application startup', () => {
 
     expect(app.pendingInviteToken).toBe('new-invite-token');
     expect(markForCheck).toHaveBeenCalled();
+  });
+
+  it('ignores a delayed restore after a newer load has cleared the prior private state', async () => {
+    let finishOld!: (value: SessionInfo) => void;
+    const oldSession = new Promise<SessionInfo>(resolve => { finishOld = resolve; });
+    const api = {
+      session: vi.fn().mockReturnValueOnce(oldSession).mockResolvedValueOnce({ authenticated: false, displayName: null, googleConfigured: false, developmentLoginEnabled: false, developmentUsers: [], csrfToken: '' }),
+      clearWorkspace: vi.fn(), clearPendingInvitation: vi.fn(),
+    };
+    const app = new App(api as unknown as ApiService, { markForCheck: vi.fn() } as never);
+    app.currentUserId = 'prior-user';
+    app.state = { completed: true } as never;
+    const oldLoad = app.load();
+    await app.load();
+    finishOld({ authenticated: true, displayName: 'Viejo', googleConfigured: false, developmentLoginEnabled: false, developmentUsers: [], csrfToken: '' });
+    await oldLoad;
+    expect(app.currentUserId).toBe('');
+    expect(app.state).toBeNull();
+    expect(app.session?.authenticated).toBe(false);
+  });
+
+  it('invalidates the old native workspace before loading an identity change', async () => {
+    let app!: App;
+    const api = {
+      session: vi.fn().mockResolvedValue({ authenticated: true, displayName: 'Nueva', googleConfigured: false, developmentLoginEnabled: false, developmentUsers: [], csrfToken: '' }),
+      me: vi.fn(async () => { expect(app.currentUserId).toBe(''); return { id: 'new-user', displayName: 'Nueva', email: null, emailVerified: false, personalWorkspaceId: 'new-space' }; }),
+      workspaces: vi.fn().mockResolvedValue([{ id: 'new-space' }]), selectWorkspace: vi.fn(), clearWorkspace: vi.fn(), clearPendingInvitation: vi.fn(),
+      loadOnboarding: vi.fn().mockResolvedValue({ completed: false }),
+    };
+    const nativeAuth = { isNative: true, prepareForegroundRestore: vi.fn().mockResolvedValue(true), activateWorkspace: vi.fn().mockResolvedValue(true) };
+    const epoch = { snapshot: () => ({ epoch: 4, userId: 'new-user', workspaceId: null }) };
+    app = new App(api as unknown as ApiService, { markForCheck: vi.fn() } as never, new WorkspaceContext(), nativeAuth as never, epoch as never);
+    app.currentUserId = 'old-user';
+    app.state = { completed: true } as never;
+    await app.load();
+    expect(nativeAuth.prepareForegroundRestore).toHaveBeenCalledWith('old-user');
+    expect(nativeAuth.activateWorkspace).toHaveBeenCalledWith('new-user', 'new-space');
+    expect(app.currentUserId).toBe('new-user');
+    expect(app.state).toEqual({ completed: false });
   });
 });

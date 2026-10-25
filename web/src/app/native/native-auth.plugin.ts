@@ -19,6 +19,8 @@ export interface NativeSessionInfo {
   displayName: string | null;
 }
 
+export interface NativeInvitationHost { host: string | null; }
+
 export interface NativeApiRequest {
   url: string;
   method: string;
@@ -33,6 +35,7 @@ export interface NativeApiResponse {
 }
 
 export interface NativeAuthPlugin {
+  invitationHost(): Promise<NativeInvitationHost>;
   authOptions(): Promise<NativeAuthOptions>;
   sessionInfo(): Promise<NativeSessionInfo>;
   signInGoogle(): Promise<void>;
@@ -47,6 +50,7 @@ export interface NativeAuthPlugin {
 }
 
 interface NativeAuthBridge {
+  invitationHost(): Promise<NativeInvitationHost>;
   authOptions(): Promise<NativeAuthOptions>;
   sessionInfo(): Promise<NativeSessionInfo>;
   signInGoogle(): Promise<void>;
@@ -62,6 +66,7 @@ interface NativeAuthBridge {
 
 const bridge = registerPlugin<NativeAuthBridge>('NativeAuth');
 export const NativeAuth: NativeAuthPlugin = {
+  invitationHost: () => bridge.invitationHost(),
   authOptions: () => bridge.authOptions(),
   sessionInfo: () => bridge.sessionInfo(),
   signInGoogle: () => bridge.signInGoogle(),

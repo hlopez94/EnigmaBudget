@@ -8,7 +8,7 @@ export class WorkspaceContext {
   generation = 0;
   saving = false;
 
-  restore(userId: string, availableIds: string[], fallbackId: string): string {
+  restore(userId: string, availableIds: string[], fallbackId: string, commit = true): string {
     this.preferenceKey = `enigma-budget:workspace:${userId}`;
     let selected: string | null = null;
     let preferenceRead = false;
@@ -20,7 +20,7 @@ export class WorkspaceContext {
     }
     const next = selected ? (availableIds.includes(selected) ? selected : '') : fallbackId;
     if (!preferenceRead && selected === null) this.preferenceKey = null;
-    this.select(next);
+    if (commit) this.select(next);
     return next;
   }
 

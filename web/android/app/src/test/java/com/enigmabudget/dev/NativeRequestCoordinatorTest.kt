@@ -13,7 +13,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 class NativeRequestCoordinatorTest {
-    @Test fun Context_change_invalidates_prepared_permit() {
+    @Test fun Native_request_aborts_when_context_changes_after_permit_before_dispatch() {
         val source = FakeCredentials()
         var sent = 0
         val coordinator = NativeRequestCoordinator(NativeRequestGate("https://api.example.test"), source, NativeHttpTransport { _, _ ->
