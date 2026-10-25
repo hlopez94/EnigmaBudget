@@ -6,7 +6,7 @@ Contrato del próximo bloque; no declara estos endpoints ya disponibles. JSON ca
 
 X-Workspace-Id selecciona un espacio y nunca autoriza por sí mismo. Sin cabecera se usa el Personal propio; inválida/ajena404, permiso insuficiente403, versión obsoleta409. No se vuelve al Personal silenciosamente. Onboarding permanece siempre en el Personal propio, independientemente de esa cabecera.
 
-WorkspaceDto: `{id,name,kind:'Personal'|'Household',role:'Owner'|'Admin'|'Member'|'Reader',isSharedPersonalRead,isArchived,version,permissions:{read,recordFinance,manageResources,correctHistory,manageMembers,managePrivacy}}`.
+WorkspaceDto: `{id,name,kind:'Personal'|'Household',role:'Owner'|'Admin'|'Member'|'Reader',isSharedPersonalRead,isArchived,version,permissions:{read,readGroups,recordFinance,manageResources,correctHistory,manageMembers,managePrivacy}}`.
 
 GET /api/me: `{id,displayName,email:null|string,emailVerified,personalWorkspaceId}`. El subject interno no se toma del cliente ni se fusiona por email.
 
@@ -18,7 +18,8 @@ GET /api/workspaces/{id} devuelve WorkspaceDto. PUT: `{version,name,isArchived}`
 
 | Operación | Permiso requerido |
 |---|---|
-| Consultas financieras | read |
+| Consultas financieras generales | read |
+| Detalles de grupos y sus reglas/participantes/cobros | readGroups; una concesión PersonalReadGrant no lo otorga |
 | Registrar ingreso/gasto, pagos/cobros, transferencia, compra, borrador/confirmación/pago de resumen | recordFinance |
 | Alta/edición/archivo de cuentas y tarjetas, crear grupo y cambiar/confirmar sus reglas | manageResources |
 | Ajuste de saldo y anulación de operación confirmada | correctHistory |
@@ -26,6 +27,8 @@ GET /api/workspaces/{id} devuelve WorkspaceDto. PUT: `{version,name,isArchived}`
 | Consentimiento de lectura personal | managePrivacy, siempre del propietario del Personal |
 
 Owner/Admin tienen lectura, registro, recursos, corrección y miembros en el espacio. Member lee y registra actividad; Reader solo lee. El Owner del Personal tiene su privacidad; un Admin familiar nunca la obtiene por su rol. La titularidad de facturación se implementará separada de estos permisos.
+
+Una concesión PersonalReadGrant permite ver las finanzas del titular, pero no los detalles de sus grupos independientes. GETgroups/receivables exige readGroups y el panorama servido mediante la concesión omite arrays de grupos/participantes/cobros identificables. Una referencia groupId en una compra no concede acceso al grupo. Los miembros del Hogar tampoco heredan membresía de grupos externos.
 
 El contexto financiero común reemplaza las consultas por OwnerSubject en cada handler. Aprobar una cabecera y luego seguir consultando el Personal sería incorrecto. Rechazos no crean efectos financieros ni modifican datos ajenos.
 
