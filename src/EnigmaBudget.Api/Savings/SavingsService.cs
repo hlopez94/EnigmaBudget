@@ -4,6 +4,7 @@ using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
 using EnigmaBudget.Api.Data;
+using EnigmaBudget.Api.ExchangeRates;
 using EnigmaBudget.Api.Finance;
 using EnigmaBudget.Api.Workspaces;
 using Microsoft.EntityFrameworkCore;
@@ -123,7 +124,18 @@ public sealed class SavingsService(AppDbContext db, BusinessClock clock, Workspa
             .OrderBy(x => x.Currency).ThenBy(x => x.Id).ToArrayAsync(cancellationToken);
         var balances = await balanceQuery.GetAsync(context.Workspace.Id, cancellationToken);
         var deficits = balances.Where(x => decimal.Parse(x.BackingDeficit, Invariant) > 0m).Select(x => x.AccountId).ToHashSet();
-        return goals.Select(g => ToDto(g, allocations.Where(a => a.GoalId == g.Id), allocations.Where(a => a.GoalId == g.Id).Any(a => deficits.Contains(a.AccountId)))).ToArray();
+        var choices = await db.SavingsGoalRateChoices.AsNoTracking().Where(x => x.WorkspaceId == context.Workspace.Id && goals.Select(g => g.Id).Contains(x.GoalId)).ToDictionaryAsync(x => x.GoalId, cancellationToken);
+        var snapshotIds = choices.Values.Where(x => x.SnapshotId.HasValue).Select(x => x.SnapshotId!.Value).Distinct().ToArray();
+        var snapshots = await db.ExchangeRateSnapshots.AsNoTracking().Where(x => snapshotIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, cancellationToken);
+        var result = new List<SavingsGoalDto>(goals.Length);
+        foreach (var goal in goals)
+        {
+            choices.TryGetValue(goal.Id, out var choice);
+            ExchangeRateSnapshot? snapshot = null;
+            if (choice?.SnapshotId is { } snapshotId) snapshots.TryGetValue(snapshotId, out snapshot);
+            result.Add(ToDto(goal, allocations.Where(a => a.GoalId == goal.Id), allocations.Where(a => a.GoalId == goal.Id).Any(a => deficits.Contains(a.AccountId)), choice, snapshot));
+        }
+        return result.ToArray();
     }
 
     public async Task<(SavingsGoalDetailsDto? Result, int Status, string? Error)> GetDetailsAsync(WorkspaceRequestContext context, Guid goalId, int historyPage, CancellationToken ct)
@@ -261,26 +273,42 @@ public sealed class SavingsService(AppDbContext db, BusinessClock clock, Workspa
     private static SavingsCommand Command(Guid workspaceId, Guid requestId, string kind, string hash, Guid result, DateTimeOffset now) =>
         new() { WorkspaceId = workspaceId, RequestId = requestId, CommandKind = kind, PayloadHash = hash, ResultResourceId = result, OccurredAt = now };
 
-    private SavingsGoalDto ToDto(SavingsGoal goal, IEnumerable<SavingsAllocation> source, bool hasBackingDeficit = false)
+    private SavingsGoalDto ToDto(SavingsGoal goal, IEnumerable<SavingsAllocation> source, bool hasBackingDeficit = false,
+        SavingsGoalRateChoiceEntity? selected = null, ExchangeRateSnapshot? snapshot = null)
     {
         var allocations = source.ToArray();
         var backing = allocations.GroupBy(x => x.Currency).OrderBy(x => x.Key).Select(x => new BackingAmountDto(x.Key, F(x.Sum(a => a.ReservedAmount)))).ToArray();
+        var rate = selected?.Mode == "Manual" ? selected.ManualArsPerUsd : selected?.Side == "Compra" ? snapshot?.Buy : selected?.Side == "Venta" ? snapshot?.Sell : null;
+        var rateChoice = rate is null ? null : new GoalRateChoiceDto(selected!.Mode, selected.SnapshotId, selected.House, selected.Side,
+            rate.Value.ToString("0.00000000", Invariant), snapshot?.ProviderUpdatedAt.ToString("O", Invariant), snapshot?.FetchedAt.ToString("O", Invariant), selected.ManualReason,
+            snapshot is not null && clock.UtcNow - snapshot.FetchedAt > TimeSpan.FromMinutes(5));
         if (hasBackingDeficit)
             return new(goal.Id, goal.Name, goal.TargetCurrency, F(goal.TargetAmount), D(goal.DesiredDate), goal.State, M(goal.MonthlyContribution), D(goal.NextContributionDate),
-                false, backing, null, null, null, null, null, null, "BackingDeficit", "Una cuenta que respalda esta meta tiene menos efectivo que el total reservado; la estimación queda pendiente hasta corregir el respaldo.", goal.Version);
-        var sameCurrency = allocations.Where(x => x.ReservedAmount != 0m).All(x => x.Currency == goal.TargetCurrency);
-        if (!sameCurrency)
+                false, backing, rateChoice, null, null, null, null, null, "BackingDeficit", "Una cuenta que respalda esta meta tiene menos efectivo que el total reservado; la estimación queda pendiente hasta corregir el respaldo.", goal.Version);
+        var hasForeign = allocations.Any(x => x.ReservedAmount != 0m && x.Currency != goal.TargetCurrency);
+        if (hasForeign && rate is null)
             return new(goal.Id, goal.Name, goal.TargetCurrency, F(goal.TargetAmount), D(goal.DesiredDate), goal.State, M(goal.MonthlyContribution), D(goal.NextContributionDate),
-                false, backing, null, null, null, null, null, null, "RateRequired", "Hay reservas en otra moneda. Elegí una cotización explícita para calcular el equivalente.", goal.Version);
-        var saved = allocations.Sum(x => x.ReservedAmount);
+                false, backing, rateChoice, null, null, null, null, null, "RateRequired", "Hay reservas en otra moneda. Elegí una cotización explícita para calcular el equivalente.", goal.Version);
+        decimal saved = 0m;
+        foreach (var allocation in allocations)
+        {
+            if (allocation.Currency == goal.TargetCurrency) saved += allocation.ReservedAmount;
+            else if (allocation.ReservedAmount != 0m && rate is { } selectedRate)
+                saved += ExchangeRateMath.Convert(allocation.ReservedAmount, allocation.Currency, goal.TargetCurrency, selectedRate, selected!.Mode == "Manual" ? "Venta" : selected.Side!);
+        }
+        saved = decimal.Round(saved, 2, MidpointRounding.AwayFromZero);
         var estimate = SavingsEstimate.Calculate(goal.TargetAmount, saved, goal.MonthlyContribution, goal.NextContributionDate, goal.DesiredDate, goal.State, clock.Today);
         return new(goal.Id, goal.Name, goal.TargetCurrency, F(goal.TargetAmount), D(goal.DesiredDate), goal.State, M(goal.MonthlyContribution), D(goal.NextContributionDate),
-            estimate.Reached, backing, null, F(saved), F(estimate.RemainingAmount), M(estimate.RequiredMonthlyContribution), estimate.RequiredContributionCount,
+            estimate.Reached, backing, rateChoice, F(saved), F(estimate.RemainingAmount), M(estimate.RequiredMonthlyContribution), estimate.RequiredContributionCount,
             D(estimate.EstimatedCompletionDate), estimate.EstimateStatus, estimate.Explanation, goal.Version);
     }
 
-    private async Task<SavingsGoalDto> ToDtoWithBackingAsync(SavingsGoal goal, IEnumerable<SavingsAllocation> source, CancellationToken ct) =>
-        ToDto(goal, source, await balanceQuery.GoalHasDeficitAsync(goal.WorkspaceId, goal.Id, ct));
+    private async Task<SavingsGoalDto> ToDtoWithBackingAsync(SavingsGoal goal, IEnumerable<SavingsAllocation> source, CancellationToken ct)
+    {
+        var selected = await db.SavingsGoalRateChoices.AsNoTracking().SingleOrDefaultAsync(x => x.WorkspaceId == goal.WorkspaceId && x.GoalId == goal.Id, ct);
+        var snapshot = selected?.SnapshotId is { } id ? await db.ExchangeRateSnapshots.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id, ct) : null;
+        return ToDto(goal, source, await balanceQuery.GoalHasDeficitAsync(goal.WorkspaceId, goal.Id, ct), selected, snapshot);
+    }
 
     private static bool ValidGoal(string? name, string? currency, string? target, string? desired, string? monthly, string? next) =>
         !string.IsNullOrWhiteSpace(name) && name.Trim().Length <= 120 && currency is "ARS" or "USD" && ParseAmount(target) is > 0m

@@ -755,6 +755,116 @@ namespace EnigmaBudget.Api.Data.Migrations
                         });
                 });
 
+            modelBuilder.Entity("EnigmaBudget.Api.ExchangeRates.ExchangeRateRefreshCommand", b =>
+                {
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("RequestId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("WorkspaceId", "RequestId");
+
+                    b.ToTable("ExchangeRateRefreshCommands");
+                });
+
+            modelBuilder.Entity("EnigmaBudget.Api.ExchangeRates.ExchangeRateSnapshot", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal?>("Buy")
+                        .HasPrecision(18, 8)
+                        .HasColumnType("numeric(18,8)");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)");
+
+                    b.Property<DateTimeOffset>("FetchedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("House")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<DateTimeOffset>("ProviderUpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal?>("Sell")
+                        .HasPrecision(18, 8)
+                        .HasColumnType("numeric(18,8)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Currency", "House", "ProviderUpdatedAt", "Buy", "Sell")
+                        .IsUnique();
+
+                    b.ToTable("ExchangeRateSnapshots", t =>
+                        {
+                            t.HasCheckConstraint("CK_ExchangeRateSnapshots_Usd", "\"Currency\" = 'USD' AND (\"Buy\" IS NULL OR \"Buy\" > 0) AND (\"Sell\" IS NULL OR \"Sell\" > 0) AND (\"Buy\" IS NOT NULL OR \"Sell\" IS NOT NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("EnigmaBudget.Api.ExchangeRates.SavingsGoalRateChoiceEntity", b =>
+                {
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("GoalId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("House")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<decimal?>("ManualArsPerUsd")
+                        .HasPrecision(18, 8)
+                        .HasColumnType("numeric(18,8)");
+
+                    b.Property<string>("ManualReason")
+                        .HasMaxLength(240)
+                        .HasColumnType("character varying(240)");
+
+                    b.Property<string>("Mode")
+                        .IsRequired()
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)");
+
+                    b.Property<string>("Side")
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)");
+
+                    b.Property<Guid?>("SnapshotId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
+
+                    b.HasKey("WorkspaceId", "GoalId");
+
+                    b.HasIndex("SnapshotId");
+
+                    b.ToTable("SavingsGoalRateChoices", t =>
+                        {
+                            t.HasCheckConstraint("CK_SavingsGoalRateChoices_Mode", "(\"Mode\" = 'Manual' AND \"SnapshotId\" IS NULL AND \"House\" IS NULL AND \"Side\" IS NULL AND \"ManualArsPerUsd\" > 0 AND \"ManualReason\" IS NOT NULL) OR (\"Mode\" = 'Snapshot' AND \"SnapshotId\" IS NOT NULL AND \"House\" IS NOT NULL AND \"Side\" IN ('Compra','Venta') AND \"ManualArsPerUsd\" IS NULL AND \"ManualReason\" IS NULL)");
+                        });
+                });
+
             modelBuilder.Entity("EnigmaBudget.Api.Identity.NativeAuthChallenge", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1428,6 +1538,36 @@ namespace EnigmaBudget.Api.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("OwnerUser");
+                });
+
+            modelBuilder.Entity("EnigmaBudget.Api.ExchangeRates.ExchangeRateRefreshCommand", b =>
+                {
+                    b.HasOne("EnigmaBudget.Api.Data.Workspace", null)
+                        .WithMany()
+                        .HasForeignKey("WorkspaceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("EnigmaBudget.Api.ExchangeRates.SavingsGoalRateChoiceEntity", b =>
+                {
+                    b.HasOne("EnigmaBudget.Api.ExchangeRates.ExchangeRateSnapshot", null)
+                        .WithMany()
+                        .HasForeignKey("SnapshotId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("EnigmaBudget.Api.Data.Workspace", null)
+                        .WithMany()
+                        .HasForeignKey("WorkspaceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("EnigmaBudget.Api.Savings.SavingsGoal", null)
+                        .WithOne()
+                        .HasForeignKey("EnigmaBudget.Api.ExchangeRates.SavingsGoalRateChoiceEntity", "WorkspaceId", "GoalId")
+                        .HasPrincipalKey("EnigmaBudget.Api.Savings.SavingsGoal", "WorkspaceId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("EnigmaBudget.Api.Identity.NativeRefreshToken", b =>

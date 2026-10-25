@@ -7,6 +7,7 @@ using EnigmaBudget.Api.Onboarding;
 using EnigmaBudget.Api.Storage;
 using EnigmaBudget.Api.Finance;
 using EnigmaBudget.Api.Savings;
+using EnigmaBudget.Api.ExchangeRates;
 using EnigmaBudget.Api.Workspaces;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -32,6 +33,12 @@ builder.Services.AddScoped<PrivacyGrantService>();
 builder.Services.AddScoped<SavingsService>();
 builder.Services.AddScoped<SavingsAccountBalanceQuery>();
 builder.Services.AddScoped<SavingsAllocationService>();
+builder.Services.AddScoped<ExchangeRateService>();
+builder.Services.AddSingleton<ExchangeRateRefreshCoordinator>();
+if (builder.Configuration.GetValue("ExchangeRates:AutomaticRefreshEnabled", true))
+    builder.Services.AddHostedService<ExchangeRateRefreshHostedService>();
+builder.Services.AddHttpClient<DolarApiClient>(client => { client.Timeout = TimeSpan.FromSeconds(5); })
+    .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false, UseCookies = false, UseProxy = false });
 builder.Services.AddScoped<NativeSessionService>();
 builder.Services.AddSingleton<IGoogleIdTokenValidator, GoogleNativeIdTokenValidator>();
 builder.Services.AddOptions<NativeAuthConfiguration>().Bind(builder.Configuration.GetSection(NativeAuthConfiguration.SectionName))
@@ -227,6 +234,7 @@ api.MapPost("/onboarding/complete", async (HttpContext http, AppDbContext db, Wo
 });
 api.MapFinanceEndpoints();
 api.MapSavingsEndpoints();
+api.MapExchangeRateEndpoints();
 app.MapWorkspaceEndpoints();
 app.Run();
 

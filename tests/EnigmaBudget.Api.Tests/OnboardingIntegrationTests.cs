@@ -391,18 +391,20 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
     private readonly string _environment;
     private readonly TimeProvider? _timeProvider;
     private readonly IReadOnlyDictionary<string, string?>? _extraConfiguration;
+    private readonly Func<HttpMessageHandler>? _exchangeRateHandlerFactory;
     public QueuedGoogleValidator GoogleValidator { get; }
     public SaveChangesBarrierInterceptor SaveBarrier { get; } = new();
     public WorkspaceLockCommandBarrierInterceptor WorkspaceLockBarrier { get; } = new();
     public WorkspaceAuditInsertProbeInterceptor WorkspaceAuditInsertProbe { get; } = new();
     public SavingsLedgerReadBarrierInterceptor SavingsLedgerReadBarrier { get; } = new();
     internal string TestConnection => _connection;
-    public ApiFactory(bool relaxSecureCookiesForTests = true, string environment = "Development", TimeProvider? timeProvider = null, IReadOnlyDictionary<string, string?>? extraConfiguration = null, QueuedGoogleValidator? googleValidator = null)
+    public ApiFactory(bool relaxSecureCookiesForTests = true, string environment = "Development", TimeProvider? timeProvider = null, IReadOnlyDictionary<string, string?>? extraConfiguration = null, QueuedGoogleValidator? googleValidator = null, Func<HttpMessageHandler>? exchangeRateHandlerFactory = null)
     {
         _relaxSecureCookiesForTests = relaxSecureCookiesForTests;
         _environment = environment;
         _timeProvider = timeProvider;
         _extraConfiguration = extraConfiguration;
+        _exchangeRateHandlerFactory = exchangeRateHandlerFactory;
         GoogleValidator = googleValidator ?? new QueuedGoogleValidator();
         var testConnection = Environment.GetEnvironmentVariable("ENIGMABUDGET_TEST_CONNECTION");
         if (string.IsNullOrWhiteSpace(testConnection)) throw new InvalidOperationException("Set ENIGMABUDGET_TEST_CONNECTION to an isolated PostgreSQL test database.");
@@ -421,6 +423,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
                 services.AddSingleton(_timeProvider);
             }
             services.AddSingleton(SaveBarrier);
+            services.AddHttpClient<EnigmaBudget.Api.ExchangeRates.DolarApiClient>()
+                .ConfigurePrimaryHttpMessageHandler(() => _exchangeRateHandlerFactory?.Invoke() ?? new HttpClientHandler { UseCookies = false, AllowAutoRedirect = false });
             services.AddDbContext<AppDbContext>((serviceProvider, options) => options.AddInterceptors(serviceProvider.GetRequiredService<SaveChangesBarrierInterceptor>(), WorkspaceLockBarrier, WorkspaceAuditInsertProbe, SavingsLedgerReadBarrier));
             services.AddAuthentication(o => { o.DefaultScheme = "TestOrCookie"; o.DefaultAuthenticateScheme = "TestOrCookie"; o.DefaultChallengeScheme = "TestOrCookie"; }).AddPolicyScheme("TestOrCookie", "Test identity or cookie", o => o.ForwardDefaultSelector = context => context.Request.Headers.ContainsKey("Authorization") ? NativeBearerHandler.SchemeName : context.Request.Headers.ContainsKey("X-Test-Identity") ? "TestIdentity" : CookieAuthenticationDefaults.AuthenticationScheme).AddScheme<AuthenticationSchemeOptions, TestIdentityHandler>("TestIdentity", _ => { });
             services.RemoveAll<IGoogleIdTokenValidator>();
@@ -438,7 +442,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
             ["ConnectionStrings:Default"] = _connection,
             ["Authentication:DevelopmentLoginEnabled"] = "true",
             ["Authentication:Google:ClientId"] = "",
-            ["Authentication:Google:ClientSecret"] = ""
+            ["Authentication:Google:ClientSecret"] = "",
+            ["ExchangeRates:AutomaticRefreshEnabled"] = "false"
             };
             if (_extraConfiguration is not null)
                 foreach (var item in _extraConfiguration) values[item.Key] = item.Value;

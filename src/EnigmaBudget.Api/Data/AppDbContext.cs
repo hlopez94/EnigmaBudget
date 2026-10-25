@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using EnigmaBudget.Api.Workspaces;
 using EnigmaBudget.Api.Identity;
 using EnigmaBudget.Api.Savings;
+using EnigmaBudget.Api.ExchangeRates;
 
 namespace EnigmaBudget.Api.Data;
 
@@ -163,6 +164,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<SavingsCommand> SavingsCommands => Set<SavingsCommand>();
     public DbSet<ProjectionScenario> ProjectionScenarios => Set<ProjectionScenario>();
     public DbSet<ProjectionAssumption> ProjectionAssumptions => Set<ProjectionAssumption>();
+    public DbSet<ExchangeRateSnapshot> ExchangeRateSnapshots => Set<ExchangeRateSnapshot>();
+    public DbSet<SavingsGoalRateChoiceEntity> SavingsGoalRateChoices => Set<SavingsGoalRateChoiceEntity>();
+    public DbSet<ExchangeRateRefreshCommand> ExchangeRateRefreshCommands => Set<ExchangeRateRefreshCommand>();
 
     protected override void OnModelCreating(ModelBuilder model)
     {
@@ -379,5 +383,27 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         model.Entity<ProjectionAssumption>().Property(x => x.Version).IsConcurrencyToken().HasDefaultValue(1);
         model.Entity<ProjectionAssumption>().HasOne<Workspace>().WithMany().HasForeignKey(x => x.WorkspaceId).OnDelete(DeleteBehavior.Cascade);
         model.Entity<ProjectionAssumption>().HasOne<ProjectionScenario>().WithMany().HasForeignKey(x => new { x.WorkspaceId, x.ScenarioId }).HasPrincipalKey(x => new { x.WorkspaceId, x.Id }).OnDelete(DeleteBehavior.Cascade);
+
+        model.Entity<ExchangeRateSnapshot>().HasKey(x => x.Id);
+        model.Entity<ExchangeRateSnapshot>().Property(x => x.Currency).HasMaxLength(3);
+        model.Entity<ExchangeRateSnapshot>().Property(x => x.House).HasMaxLength(80);
+        model.Entity<ExchangeRateSnapshot>().Property(x => x.Name).HasMaxLength(120);
+        model.Entity<ExchangeRateSnapshot>().Property(x => x.Buy).HasPrecision(18, 8);
+        model.Entity<ExchangeRateSnapshot>().Property(x => x.Sell).HasPrecision(18, 8);
+        model.Entity<ExchangeRateSnapshot>().HasIndex(x => new { x.Currency, x.House, x.ProviderUpdatedAt, x.Buy, x.Sell }).IsUnique();
+        model.Entity<ExchangeRateSnapshot>().ToTable(table => table.HasCheckConstraint("CK_ExchangeRateSnapshots_Usd", "\"Currency\" = 'USD' AND (\"Buy\" IS NULL OR \"Buy\" > 0) AND (\"Sell\" IS NULL OR \"Sell\" > 0) AND (\"Buy\" IS NOT NULL OR \"Sell\" IS NOT NULL)"));
+        model.Entity<SavingsGoalRateChoiceEntity>().HasKey(x => new { x.WorkspaceId, x.GoalId });
+        model.Entity<SavingsGoalRateChoiceEntity>().Property(x => x.Mode).HasMaxLength(12);
+        model.Entity<SavingsGoalRateChoiceEntity>().Property(x => x.House).HasMaxLength(80);
+        model.Entity<SavingsGoalRateChoiceEntity>().Property(x => x.Side).HasMaxLength(8);
+        model.Entity<SavingsGoalRateChoiceEntity>().Property(x => x.ManualArsPerUsd).HasPrecision(18, 8);
+        model.Entity<SavingsGoalRateChoiceEntity>().Property(x => x.ManualReason).HasMaxLength(240);
+        model.Entity<SavingsGoalRateChoiceEntity>().Property(x => x.Version).IsConcurrencyToken().HasDefaultValue(1);
+        model.Entity<SavingsGoalRateChoiceEntity>().ToTable(table => table.HasCheckConstraint("CK_SavingsGoalRateChoices_Mode", "(\"Mode\" = 'Manual' AND \"SnapshotId\" IS NULL AND \"House\" IS NULL AND \"Side\" IS NULL AND \"ManualArsPerUsd\" > 0 AND \"ManualReason\" IS NOT NULL) OR (\"Mode\" = 'Snapshot' AND \"SnapshotId\" IS NOT NULL AND \"House\" IS NOT NULL AND \"Side\" IN ('Compra','Venta') AND \"ManualArsPerUsd\" IS NULL AND \"ManualReason\" IS NULL)"));
+        model.Entity<SavingsGoalRateChoiceEntity>().HasOne<Workspace>().WithMany().HasForeignKey(x => x.WorkspaceId).OnDelete(DeleteBehavior.Cascade);
+        model.Entity<SavingsGoalRateChoiceEntity>().HasOne<SavingsGoal>().WithOne().HasForeignKey<SavingsGoalRateChoiceEntity>(x => new { x.WorkspaceId, x.GoalId }).HasPrincipalKey<SavingsGoal>(x => new { x.WorkspaceId, x.Id }).OnDelete(DeleteBehavior.Cascade);
+        model.Entity<SavingsGoalRateChoiceEntity>().HasOne<ExchangeRateSnapshot>().WithMany().HasForeignKey(x => x.SnapshotId).OnDelete(DeleteBehavior.Restrict);
+        model.Entity<ExchangeRateRefreshCommand>().HasKey(x => new { x.WorkspaceId, x.RequestId });
+        model.Entity<ExchangeRateRefreshCommand>().HasOne<Workspace>().WithMany().HasForeignKey(x => x.WorkspaceId).OnDelete(DeleteBehavior.Cascade);
     }
 }
