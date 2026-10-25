@@ -5,6 +5,16 @@ namespace EnigmaBudget.Api.Tests;
 public sealed class WorkspaceAuthorizationTests
 {
     [Theory]
+    [InlineData("GET", "/api/budgets", WorkspacePermissions.Read)]
+    [InlineData("POST", "/api/budgets", WorkspacePermissions.ManageResources)]
+    [InlineData("PUT", "/api/budgets/123", WorkspacePermissions.ManageResources)]
+    public void Budget_routes_require_read_or_manage_resources(string method, string path, string expected)
+    {
+        var routeClassifier = typeof(FinanceWorkspaceFilter).GetMethod("RequiredPermission", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
+        Assert.Equal(expected, routeClassifier.Invoke(null, [method, new Microsoft.AspNetCore.Http.PathString(path)]));
+    }
+
+    [Theory]
     [InlineData("GET", "/api/savings/goals", WorkspacePermissions.Read)]
     [InlineData("POST", "/api/projection/calculate", WorkspacePermissions.Read)]
     [InlineData("GET", "/api/projection/scenarios", WorkspacePermissions.Read)]
