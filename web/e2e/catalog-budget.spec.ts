@@ -278,7 +278,7 @@ test('live_budget_shows_operation_and_installment_once', async ({ page }) => {
   await page.getByRole('button', { name: 'Definir límite' }).click();
   const budgetForm = page.locator('form').filter({ has: page.locator('[name="limitDraft"]') });
   await budgetForm.locator('[name="categoryId"]').selectOption(category.itemId);
-  await budgetForm.locator('[name="limitDraft"]').fill('1000');
+  await budgetForm.locator('[name="limitDraft"]').fill('1000,00');
   await screenshotOne(page, 'budget-create-dialog-390x844.png');
   await budgetForm.getByRole('button', { name: 'Guardar límite' }).click();
   expect((await createBudget).status()).toBe(201);

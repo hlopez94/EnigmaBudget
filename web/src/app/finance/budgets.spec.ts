@@ -19,6 +19,36 @@ describe('monthly budget screen', () => {
     expect(screen.consumptionAmount(response[0] as never)).toBe('150.50');
   });
 
+  it('normalizes Spanish decimal commas for budget creation and updates', async () => {
+    const category = { itemId: 'cat-1', name: 'Alimentos', kind: 'Expense', isArchived: false, isDefault: false, version: 1 };
+    const createBudget = vi.fn().mockResolvedValue(undefined);
+    const updateBudget = vi.fn().mockResolvedValue(undefined);
+    const api = {
+      budgets: vi.fn().mockResolvedValue([]),
+      financeCatalog: vi.fn().mockResolvedValue({ categories: [category], merchants: [], incomeSources: [] }),
+      createBudget,
+      updateBudget,
+    };
+    const screen = new FinanceBudgets(api as unknown as ApiService, { markForCheck: vi.fn() } as never);
+    screen.workspaceId = 'space-1';
+    screen.period = '2026-10';
+    screen.permissions = { ...permissions, manageResources: true };
+    screen.catalog = { categories: [category], merchants: [], incomeSources: [] } as never;
+    screen.openCreate();
+    screen.limitDraft = '0,00';
+    expect(screen.isLimitValid).toBe(true);
+    screen.limitDraft = '-1,50';
+    expect(screen.isLimitValid).toBe(false);
+    screen.limitDraft = '1,50';
+    await screen.saveLimit();
+    expect(createBudget.mock.calls[0][0]).toMatchObject({ limitAmount: '1.50', currency: 'ARS' });
+
+    screen.openLimit(response[0] as never);
+    screen.limitDraft = '1,50';
+    await screen.saveLimit();
+    expect(updateBudget.mock.calls[0][1]).toMatchObject({ version: 4, limitAmount: '1.50' });
+  });
+
   it('does not show a remaining cap for an unconfigured category and names summary adjustments separately', () => {
     const screen = new FinanceBudgets({} as ApiService, { markForCheck: vi.fn() } as never);
     const unconfigured = { ...response[0], budgetId: null, version: null, isConfigured: false, limitAmount: null };

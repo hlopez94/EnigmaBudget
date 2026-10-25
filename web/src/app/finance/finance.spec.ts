@@ -183,6 +183,14 @@ describe('finance workspace regressions', () => {
     expect(shell.requestedWorkspaceId).toBe('');
     expect(shell.error).toMatch(/período válido/i);
 
+    shell.error = '';
+    shell.period = '1999-12';
+    await shell.changePeriod();
+    expect(shell.period).toBe('1999-12');
+    expect(shell.requestedWorkspaceId).toBe('');
+    expect(shell.error).toMatch(/período válido/i);
+
+    shell.error = '';
     shell.period = '2026-10';
     await shell.changePeriod();
     expect(refresh).toHaveBeenCalledOnce();

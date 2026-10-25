@@ -47,11 +47,15 @@ const monthName = new Intl.DateTimeFormat('es-AR', {
   timeZone: 'UTC',
 });
 
-const periodParts = (value: string): { year: number; month: number } | null => {
+const isoMonthParts = (value: string): { year: number; month: number } | null => {
   const match = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(value);
   if (!match || match[0] !== value) return null;
   const year = Number(match[1]);
   return year > 0 ? { year, month: Number(match[2]) } : null;
+};
+const periodParts = (value: string): { year: number; month: number } | null => {
+  const parts = isoMonthParts(value);
+  return parts && parts.year >= 2000 && parts.year <= 9999 ? parts : null;
 };
 
 @Component({
@@ -105,7 +109,7 @@ export class FinanceShell implements OnInit, OnChanges {
   private periodRequestGeneration = 0;
   get periodLabel(): string {
     const period = this.overview?.period ?? this.appliedPeriod;
-    const parts = periodParts(period);
+    const parts = isoMonthParts(period);
     if (!parts) return '';
     const date = new Date(0);
     date.setUTCFullYear(parts.year, parts.month - 1, 1);

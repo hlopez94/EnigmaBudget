@@ -37,7 +37,10 @@ export class FinanceBudgets extends FinanceActions implements OnChanges {
   private closeDialogs(): void { this.selectedBudget = null; this.selectedSource = null; this.editorOpen = false; this.editing = false; this.categoryId = ''; this.limitDraft = ''; }
   get canManage(): boolean { return !!this.permissions?.manageResources && !this.workspaceArchived; }
   get activeExpenseCategories(): FinanceCategoryOption[] { return this.catalog.categories.filter(item => item.kind === 'Expense' && !item.isArchived); }
-  get isLimitValid(): boolean { return validAmount(this.limitDraft, true) && this.limitDraft.trim() !== ''; }
+  get isLimitValid(): boolean {
+    const amount = this.decimal(this.limitDraft);
+    return validAmount(amount, true) && amount.trim() !== '';
+  }
   hasStaleNotice(): boolean { return /cambi[oó]|actualizá/i.test(this.notice); }
   hasStaleError(): boolean { return this.lastFailure instanceof ApiProblem && this.lastFailure.status === 409 || /versi[oó]n|cambi[oó]|conflicto/i.test(this.error); }
   async setCurrency(currency: 'ARS' | 'USD'): Promise<void> {
@@ -77,7 +80,7 @@ export class FinanceBudgets extends FinanceActions implements OnChanges {
   closeEditor(): void { if (!this.saving) this.editorOpen = false; }
   async saveLimit(): Promise<void> {
     if (!this.canManage || !this.isLimitValid) return;
-    const limitAmount = this.limitDraft.trim();
+    const limitAmount = this.decimal(this.limitDraft).trim();
     if (this.editing) {
       const row = this.selectedBudget; if (!row?.budgetId || row.version === null) return;
       const payload = { version: row.version, limitAmount };
