@@ -226,7 +226,8 @@ public static partial class FinanceEndpoints
             && x.Period == period
             && x.Currency == currency
         );
-        var card = await db.Cards.SingleAsync(x => x.WorkspaceId == ws.Id && x.Id == cardId);
+        var input = await CardObligationCalculator.LoadAsync(db, ws.Id, cardId, http.RequestAborted);
+        if (statement is { State: not "Confirmed" }) input = IncludeStatement(input, statement);
         var installments = await db
             .Installments.Where(x =>
                 x.WorkspaceId == ws.Id
@@ -236,28 +237,7 @@ public static partial class FinanceEndpoints
             )
             .OrderBy(x => x.Period)
             .ToArrayAsync();
-        var paymentRows = await db
-            .CardPayments.Where(x =>
-                x.WorkspaceId == ws.Id
-                && x.CardId == cardId
-                && x.Currency == currency
-                && x.Date < end
-            )
-            .ToArrayAsync();
-        var currentPayments = paymentRows.Where(x => x.Date >= start).Sum(x => x.AppliedAmount);
-        var priorPayments = paymentRows.Where(x => x.Date < start).Sum(x => x.AppliedAmount);
-        var opening =
-            card.AsOfDate.ToString("yyyy-MM").CompareTo(period) <= 0
-                ? (currency == "ARS" ? card.StatementDebtArs : card.StatementDebtUsd)
-                : 0m;
-        var priorAdjustments = await ConfirmedAdjustments(
-            db,
-            ws.Id,
-            cardId,
-            currency,
-            period!,
-            exclusive: true
-        );
+        var paymentRows = input.Payments.Where(x => x.Currency == currency && x.Date < end).ToArray();
         var currentAdjustments = statement is null
             ? []
             : await db
@@ -265,16 +245,11 @@ public static partial class FinanceEndpoints
                     x.WorkspaceId == ws.Id && x.StatementId == statement.Id
                 )
                 .ToArrayAsync();
-        var carry =
-            opening
-            + installments.Where(x => x.Period.CompareTo(period) < 0).Sum(x => x.Amount)
-            + priorAdjustments
-            - priorPayments;
-        var currentInstallments = installments.Where(x => x.Period == period).Sum(x => x.Amount);
-        var grossExpected = carry + currentInstallments + currentAdjustments.Sum(x => x.Amount);
-        var expected = Math.Max(0m, grossExpected);
-        var pending = Math.Max(0m, grossExpected - currentPayments);
-        var creditBalance = Math.Max(0m, currentPayments - grossExpected);
+        var breakdown = CardObligationCalculator.GetStatementBreakdown(input, period!, end.AddDays(-1), currency);
+        var carry = breakdown.Carry;
+        var expected = breakdown.Expected;
+        var pending = breakdown.Pending;
+        var creditBalance = breakdown.Credit;
         var statementInstallments = installments
             .Where(x => x.Period == period)
             .Select(x => new
@@ -454,16 +429,11 @@ public static partial class FinanceEndpoints
             );
         if (s.Version != r.Version)
             return Problem(409, "El resumen cambió.");
-        var current = await GetStatementTotals(db, ws.Id, s);
-        var adjustments =
-            await db
-                .StatementAdjustments.Where(x => x.WorkspaceId == ws.Id && x.StatementId == s.Id)
-                .SumAsync(x => (decimal?)x.Amount)
-            ?? 0;
-        if (s.ActualTotal != current + adjustments)
+        var current = await GetStatementTotals(db, ws.Id, s, includeDraftStatement: true);
+        if (s.ActualTotal != current)
             return Problem(
                 400,
-                $"El importe real debe coincidir con el estimado ({F(current + adjustments)})."
+                $"El importe real debe coincidir con el estimado ({F(current)})."
             );
         s.State = "Confirmed";
         s.Version++;
@@ -490,81 +460,24 @@ public static partial class FinanceEndpoints
     private static async Task<decimal> GetStatementTotals(
         AppDbContext db,
         Guid workspaceId,
-        CardStatement statement
+        CardStatement statement,
+        bool includeDraftStatement = false
     )
     {
-        var card = await db.Cards.SingleAsync(x =>
-            x.WorkspaceId == workspaceId && x.Id == statement.CardId
-        );
         var end = DateOnly
             .ParseExact(statement.Period + "-01", "yyyy-MM-dd", Invariant)
             .AddMonths(1);
-        var opening =
-            card.AsOfDate.ToString("yyyy-MM").CompareTo(statement.Period) <= 0
-                ? (statement.Currency == "ARS" ? card.StatementDebtArs : card.StatementDebtUsd)
-                : 0m;
-        var installments =
-            await db
-                .Installments.Where(x =>
-                    x.WorkspaceId == workspaceId
-                    && x.CardId == statement.CardId
-                    && x.Currency == statement.Currency
-                    && string.Compare(x.Period, statement.Period) <= 0
-                )
-                .SumAsync(x => (decimal?)x.Amount)
-            ?? 0m;
-        var adjustments = await ConfirmedAdjustments(
-            db,
-            workspaceId,
-            statement.CardId,
-            statement.Currency,
-            statement.Period,
-            exclusive: false
-        );
-        var applied =
-            await db
-                .CardPayments.Where(x =>
-                    x.WorkspaceId == workspaceId
-                    && x.CardId == statement.CardId
-                    && x.Currency == statement.Currency
-                    && x.Date < end
-                )
-                .SumAsync(x => (decimal?)x.AppliedAmount)
-            ?? 0m;
-        return Math.Max(0m, opening + installments + adjustments - applied);
+        var input = await CardObligationCalculator.LoadAsync(db, workspaceId, statement.CardId);
+        if (includeDraftStatement && input.Statements.Any(x => x.Id == statement.Id)) input = IncludeStatement(input, statement);
+        return CardObligationCalculator.GetStatementBreakdown(input, statement.Period, end.AddDays(-1), statement.Currency).Pending;
     }
 
-    private static async Task<decimal> ConfirmedAdjustments(
-        AppDbContext db,
-        Guid workspaceId,
-        Guid cardId,
-        string currency,
-        string period,
-        bool exclusive
-    )
-    {
-        var rows = await (
-            from adjustment in db.StatementAdjustments
-            join statement in db.CardStatements
-                on new { adjustment.WorkspaceId, StatementId = adjustment.StatementId } equals new
-                {
-                    statement.WorkspaceId,
-                    StatementId = statement.Id,
-                }
-            where
-                adjustment.WorkspaceId == workspaceId
-                && statement.CardId == cardId
-                && statement.Currency == currency
-                && statement.State == "Confirmed"
-                && (
-                    exclusive
-                        ? string.Compare(statement.Period, period) < 0
-                        : string.Compare(statement.Period, period) <= 0
-                )
-            select adjustment.Amount
-        ).ToArrayAsync();
-        return rows.Sum();
-    }
+    private static CardObligationInput IncludeStatement(CardObligationInput input, CardStatement statement) =>
+        input with { Statements = input.Statements.Select(x => x.Id == statement.Id
+            ? new CardStatement { Id = x.Id, WorkspaceId = x.WorkspaceId, CardId = x.CardId, Period = x.Period,
+                Currency = x.Currency, Version = x.Version, State = "Confirmed", DueDate = x.DueDate,
+                ActualTotal = x.ActualTotal }
+            : x).ToArray() };
 
     private static async Task<IResult> PayCard(
         HttpContext http,

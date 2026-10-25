@@ -231,43 +231,9 @@ public static partial class FinanceEndpoints
         var today = clock.Today;
         foreach (var card in cards)
         {
-            var installments = await db
-                .Installments.Where(x => x.WorkspaceId == ws.Id && x.CardId == card.Id)
-                .GroupBy(x => x.Currency)
-                .Select(g => new { Currency = g.Key, Total = g.Sum(x => x.Amount) })
-                .ToArrayAsync();
-            var payments = await db
-                .CardPayments.Where(x => x.WorkspaceId == ws.Id && x.CardId == card.Id)
-                .GroupBy(x => x.Currency)
-                .Select(g => new { Currency = g.Key, Total = g.Sum(x => x.AppliedAmount) })
-                .ToArrayAsync();
-            var adjustments = await db
-                .StatementAdjustments.Where(x =>
-                    x.WorkspaceId == ws.Id
-                    && db.CardStatements.Any(s =>
-                        s.WorkspaceId == ws.Id
-                        && s.Id == x.StatementId
-                        && s.CardId == card.Id
-                        && s.State == "Confirmed"
-                    )
-                )
-                .GroupBy(x =>
-                    db.CardStatements.Where(s => s.Id == x.StatementId)
-                        .Select(s => s.Currency)
-                        .First()
-                )
-                .Select(g => new { Currency = g.Key, Total = g.Sum(x => x.Amount) })
-                .ToArrayAsync();
-            decimal Net(string currency)
-            {
-                var opening = CurrentCardOpeningDebt(card, currency, today);
-                return opening
-                    + installments.Where(x => x.Currency == currency).Sum(x => x.Total)
-                    + adjustments.Where(x => x.Currency == currency).Sum(x => x.Total)
-                    - payments.Where(x => x.Currency == currency).Sum(x => x.Total);
-            }
-            var ars = Net("ARS");
-            var usd = Net("USD");
+            var built = CardObligationCalculator.Build(await CardObligationCalculator.LoadAsync(db, ws.Id, card.Id, http.RequestAborted), today);
+            var ars = built.ForCurrency("ARS");
+            var usd = built.ForCurrency("USD");
             output.Add(
                 new
                 {
@@ -279,10 +245,10 @@ public static partial class FinanceEndpoints
                     statementDebtArs = F(card.StatementDebtArs),
                     statementDebtUsd = F(card.StatementDebtUsd),
                     asOfDate = card.AsOfDate.ToString("yyyy-MM-dd"),
-                    debtArs = F(Math.Max(0, ars)),
-                    debtUsd = F(Math.Max(0, usd)),
-                    creditArs = F(Math.Max(0, -ars)),
-                    creditUsd = F(Math.Max(0, -usd)),
+                    debtArs = F(ars.Debt),
+                    debtUsd = F(usd.Debt),
+                    creditArs = F(ars.Credit),
+                    creditUsd = F(usd.Credit),
                     isArchived = card.IsArchived,
                     version = card.Version,
                 }

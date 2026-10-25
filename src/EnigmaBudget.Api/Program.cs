@@ -8,6 +8,7 @@ using EnigmaBudget.Api.Storage;
 using EnigmaBudget.Api.Finance;
 using EnigmaBudget.Api.Savings;
 using EnigmaBudget.Api.ExchangeRates;
+using EnigmaBudget.Api.Projection;
 using EnigmaBudget.Api.Workspaces;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -33,6 +34,7 @@ builder.Services.AddScoped<PrivacyGrantService>();
 builder.Services.AddScoped<SavingsService>();
 builder.Services.AddScoped<SavingsAccountBalanceQuery>();
 builder.Services.AddScoped<SavingsAllocationService>();
+builder.Services.AddScoped<ProjectionService>();
 builder.Services.AddScoped<ExchangeRateService>();
 builder.Services.AddSingleton<ExchangeRateRefreshCoordinator>();
 if (builder.Configuration.GetValue("ExchangeRates:AutomaticRefreshEnabled", true))
@@ -234,6 +236,7 @@ api.MapPost("/onboarding/complete", async (HttpContext http, AppDbContext db, Wo
 });
 api.MapFinanceEndpoints();
 api.MapSavingsEndpoints();
+api.MapProjectionEndpoints();
 api.MapExchangeRateEndpoints();
 app.MapWorkspaceEndpoints();
 app.Run();

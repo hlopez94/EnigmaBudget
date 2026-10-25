@@ -72,30 +72,13 @@ public static partial class FinanceEndpoints
         var today = clock.Today;
         foreach (var card in cards)
         {
-            var installmentsForCard = await db
-                .Installments.Where(x => x.WorkspaceId == ws.Id && x.CardId == card.Id)
-                .ToArrayAsync();
-            var paymentsForCard = await db
-                .CardPayments.Where(x => x.WorkspaceId == ws.Id && x.CardId == card.Id)
-                .ToArrayAsync();
-            var ars =
-                CurrentCardOpeningDebt(card, "ARS", today)
-                + installmentsForCard.Where(x => x.Currency == "ARS").Sum(x => x.Amount)
-                + confirmedAdjustments
-                    .Where(x => x.CardId == card.Id && x.Currency == "ARS")
-                    .Sum(x => x.Amount)
-                - paymentsForCard.Where(x => x.Currency == "ARS").Sum(x => x.AppliedAmount);
-            var usd =
-                CurrentCardOpeningDebt(card, "USD", today)
-                + installmentsForCard.Where(x => x.Currency == "USD").Sum(x => x.Amount)
-                + confirmedAdjustments
-                    .Where(x => x.CardId == card.Id && x.Currency == "USD")
-                    .Sum(x => x.Amount)
-                - paymentsForCard.Where(x => x.Currency == "USD").Sum(x => x.AppliedAmount);
-            cardDebtArs += Math.Max(0, ars);
-            cardDebtUsd += Math.Max(0, usd);
-            cardCreditArs += Math.Max(0, -ars);
-            cardCreditUsd += Math.Max(0, -usd);
+            var built = CardObligationCalculator.Build(await CardObligationCalculator.LoadAsync(db, ws.Id, card.Id, http.RequestAborted), today);
+            var ars = built.ForCurrency("ARS");
+            var usd = built.ForCurrency("USD");
+            cardDebtArs += ars.Debt;
+            cardDebtUsd += usd.Debt;
+            cardCreditArs += ars.Credit;
+            cardCreditUsd += usd.Credit;
             cardDtos.Add(
                 new
                 {
@@ -107,10 +90,10 @@ public static partial class FinanceEndpoints
                     statementDebtArs = F(card.StatementDebtArs),
                     statementDebtUsd = F(card.StatementDebtUsd),
                     asOfDate = card.AsOfDate.ToString("yyyy-MM-dd"),
-                    debtArs = F(Math.Max(0, ars)),
-                    debtUsd = F(Math.Max(0, usd)),
-                    creditArs = F(Math.Max(0, -ars)),
-                    creditUsd = F(Math.Max(0, -usd)),
+                    debtArs = F(ars.Debt),
+                    debtUsd = F(usd.Debt),
+                    creditArs = F(ars.Credit),
+                    creditUsd = F(usd.Credit),
                     isArchived = card.IsArchived,
                     version = card.Version,
                 }
@@ -236,10 +219,4 @@ public static partial class FinanceEndpoints
         return Results.Ok(overview);
     }
 
-    private static decimal CurrentCardOpeningDebt(PaymentCard card, string currency, DateOnly today)
-    {
-        if (card.AsOfDate > today)
-            return 0m;
-        return currency == "ARS" ? card.StatementDebtArs : card.StatementDebtUsd;
-    }
 }
