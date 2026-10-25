@@ -287,7 +287,10 @@ export class App implements OnInit, OnDestroy {
     this.nativeLinks.setAuthenticated(false);
     this.workspaceContext.clear();
     this.api.clearWorkspace();
-    if (!preserveInvitation) this.api.clearPendingInvitation();
+    if (!preserveInvitation) {
+      this.api.clearPendingInvitation();
+      this.nativeLinks.clearPendingInvitation();
+    }
     this.state = null;
     this.activeWorkspace = null;
     this.workspaces = [];

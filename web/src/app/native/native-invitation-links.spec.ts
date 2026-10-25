@@ -70,6 +70,39 @@ describe('NativeInvitationLinks', () => {
     expect(received).toEqual(['cold-start-secret']);
   });
 
+  it('preserves a pre-login token through anonymous auth observations but clears it explicitly before login', async () => {
+    const received: string[] = [];
+    const links = new NativeInvitationLinks();
+    const state = links as unknown as { pendingToken: string | null };
+    await links.start('invites.example.test', token => received.push(token));
+    native.callback?.({ url: 'https://invites.example.test/invitar#invite=keep-until-login' });
+
+    links.setAuthenticated(false);
+    links.setAuthenticated(false);
+    links.setAuthenticated(true);
+    await Promise.resolve();
+    expect(received).toEqual(['keep-until-login']);
+
+    links.setAuthenticated(false);
+    native.callback?.({ url: 'https://invites.example.test/invitar#invite=logout-clears-this' });
+    expect(state.pendingToken).toBe('logout-clears-this');
+    links.clearPendingInvitation();
+    expect(state.pendingToken).toBeNull();
+    links.setAuthenticated(true);
+    await Promise.resolve();
+    expect(received).toEqual(['keep-until-login']);
+
+    links.setAuthenticated(false);
+    native.callback?.({ url: 'https://invites.example.test/invitar#invite=identity-change-clears-this' });
+    links.clearPendingInvitation();
+    expect(state.pendingToken).toBeNull();
+
+    native.callback?.({ url: 'https://invites.example.test/invitar#invite=stop-clears-this' });
+    expect(state.pendingToken).toBe('stop-clears-this');
+    await links.stop();
+    expect(state.pendingToken).toBeNull();
+  });
+
   it('does not register when no host is configured or the app is not native', async () => {
     const listener = new NativeInvitationLinks();
     await listener.start(null, () => undefined);

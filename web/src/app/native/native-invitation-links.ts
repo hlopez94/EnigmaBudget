@@ -44,8 +44,13 @@ export class NativeInvitationLinks {
   setAuthenticated(authenticated: boolean): void {
     if (this.authenticated !== authenticated) ++this.authGeneration;
     this.authenticated = authenticated;
-    if (!authenticated) { this.pendingToken = null; return; }
+    if (!authenticated) return;
     void this.deliverPending();
+  }
+
+  clearPendingInvitation(): void {
+    ++this.authGeneration;
+    this.pendingToken = null;
   }
 
   async stop(): Promise<void> {
