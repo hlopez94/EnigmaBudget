@@ -387,7 +387,7 @@ body .finance-action-dialog .form-grid label.check input[type='checkbox'] {
     position: fixed;
     z-index: 100;
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     left: 0;
     right: 0;
     bottom: 0;
@@ -395,9 +395,6 @@ body .finance-action-dialog .form-grid label.check input[type='checkbox'] {
     border-top: 1px solid #dfe6dd;
     background: #fffffff2;
     backdrop-filter: blur(14px);
-  }
-  .workspace:has(.mobile-navigation .pi-users) .mobile-navigation {
-    grid-template-columns: repeat(5, 1fr);
   }
   .workspace .mobile-navigation button {
     display: grid;

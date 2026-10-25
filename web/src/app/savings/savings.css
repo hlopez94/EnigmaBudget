@@ -1,0 +1,24 @@
+:host{display:block;color:var(--ink,#22291f)}
+:host[hidden]{display:none!important}
+.savings-screen{gap:14px}
+.goal-panel{padding:20px 22px;background:#fff}
+.goal-panel.selected-goal{border-color:#c8d9c5}
+.goal-header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
+.goal-header h3{margin:0;font-size:20px;letter-spacing:-.035em;overflow-wrap:anywhere}
+.goal-header .eyebrow{margin:0 0 5px}
+.goal-header .target{font-size:18px;text-align:right;overflow-wrap:anywhere}
+.goal-backing,.estimate-note{font-size:13px;color:#5e695e;line-height:1.5}
+.goal-backing span{color:#778077}
+.goal-progress{display:grid;grid-template-columns:1fr auto;gap:5px 14px;border-top:1px solid #edf0eb;padding-top:13px;margin-top:14px;font-size:12px}
+.goal-progress span,.goal-progress small{color:#6b756b}.goal-progress small{grid-column:1/-1}
+.goal-estimate{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:15px 0;padding:13px 0;border-top:1px solid #edf0eb;border-bottom:1px solid #edf0eb}
+.goal-estimate div{display:grid;gap:5px;min-width:0}.goal-estimate span{font-size:10px;color:#6d776d}.goal-estimate b{font-size:12px;line-height:1.45;overflow-wrap:anywhere}
+.rate-provenance,.conversion-note{display:block;margin:10px 0;padding:11px 13px;border-radius:9px;background:#f6f7f3;color:#5c685c;font-size:12px;line-height:1.55;overflow-wrap:anywhere}
+.rate-provenance small{display:block;margin-top:4px}.warning{color:#8b5910;font-weight:650}
+.goal-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:13px}
+.details-block{border-top:1px solid #e7ece5;margin-top:16px;padding-top:12px}.details-block h4{margin:12px 0 7px}.allocation-row,.history-row,.availability-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:7px 12px;align-items:center;padding:11px 0;border-bottom:1px solid #edf0eb;min-width:0}
+.allocation-row>div,.history-row>div,.availability-row>div{min-width:0}.allocation-row b,.history-row b,.availability-row b{display:block;font-size:13px;overflow-wrap:anywhere}.allocation-row small,.history-row small,.availability-row small{display:block;color:#6e786e;font-size:11px;line-height:1.45;margin-top:4px;overflow-wrap:anywhere}.allocation-row>strong{white-space:nowrap;font-size:13px}.allocation-row>button,.history-row>button{justify-self:end}.empty-inline{font-size:12px;color:#737d73}.history-paging{display:flex;align-items:center;justify-content:center;gap:12px;padding-top:12px;font-size:12px;color:#647064}.history-paging button{min-height:36px;padding:7px 10px}
+.availability-row{grid-template-columns:minmax(0,1fr) auto}.rate-summary p{margin:5px 0 0;color:#667267;font-size:12px}.goal-actions .secondary{min-height:36px;padding:8px 10px;font-size:12px}
+.goal-choice{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding-top:12px}.goal-choice>b,.goal-choice>small{flex-basis:100%;font-size:12px;color:#596559}.payment-followup>p{margin:-8px 0 10px;color:#697469;font-size:12px;line-height:1.5}
+@media(max-width:700px){.goal-estimate{grid-template-columns:repeat(2,minmax(0,1fr))}.allocation-row{grid-template-columns:minmax(0,1fr) auto}.allocation-row>button{grid-row:2;justify-self:start}.history-row{grid-template-columns:minmax(0,1fr) auto}}
+@media(max-width:420px){.goal-panel{padding:14px 12px}.goal-header{gap:8px}.goal-header h3{font-size:17px}.goal-header .target{font-size:14px}.goal-estimate{gap:8px}.goal-estimate b{font-size:11px}.goal-actions{gap:5px}.goal-actions .secondary{font-size:11px;padding:7px 8px}.history-paging{gap:7px}.availability-row{gap:8px}}

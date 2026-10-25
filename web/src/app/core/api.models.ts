@@ -1,4 +1,29 @@
 export type Currency = 'ARS' | 'USD';
+
+export interface SavingsGoalCreate { id: string; name: string; targetCurrency: Currency; targetAmount: string; desiredDate: string | null; monthlyContribution: string | null; nextContributionDate: string | null; }
+export interface SavingsGoalUpdate { requestId: string; version: number; name: string; targetCurrency: Currency; targetAmount: string; desiredDate: string | null; state: string; monthlyContribution: string | null; nextContributionDate: string | null; }
+export interface BackingAmount { currency: Currency; amount: string; }
+export interface GoalRateChoice { mode: string; snapshotId: string | null; house: string | null; side: string | null; rate: string; providerUpdatedAt: string | null; fetchedAt: string | null; manualReason: string | null; stale: boolean; }
+export interface SavingsGoal { id: string; name: string; targetCurrency: Currency; targetAmount: string; desiredDate: string | null; state: string; monthlyContribution: string | null; nextContributionDate: string | null; reached: boolean; backingAmounts: BackingAmount[]; rateChoice: GoalRateChoice | null; savedAmount: string | null; remainingAmount: string | null; requiredMonthlyContribution: string | null; requiredContributionCount: number | null; estimatedCompletionDate: string | null; estimateStatus: string; estimateExplanation: string; version: number; }
+export interface SavingsAllocation { id: string; goalId: string; accountId: string; currency: Currency; reservedAmount: string; version: number; }
+export interface SavingsReleaseRequest { id: string; amount: string; }
+export interface SavingsAccountBalance { accountId: string; currency: Currency; cashBalance: string; availableCash: string; restrictedCash: string; totalReserved: string; backingDeficit: string; freeBalance: string; isArchived: boolean; fundsAvailableFrom: string | null; }
+export interface SavingsMovement { id: string; allocationId: string; kind: string; currency: Currency; amount: string; financePaymentId: string | null; reversesMovementId: string | null; reason: string | null; actorUserId: string; actorDisplayName: string; occurredAt: string; isReversed: boolean; }
+export interface SavingsGoalDetails { goal: SavingsGoal; allocations: SavingsAllocation[]; movements: SavingsMovement[]; historyPage: number; historyPageSize: number; totalMovements: number; hasMore: boolean; }
+export interface SavingsRateChoiceInput { requestId: string; goalVersion: number; mode: string; snapshotId: string | null; house: string | null; side: string | null; manualArsPerUsd: string | null; manualReason: string | null; }
+export interface ExchangeRateSnapshot { id: string; currency: string; house: string; name: string; buy: string | null; sell: string | null; providerUpdatedAt: string; fetchedAt: string; }
+export interface ExchangeRateList { status: string; stale: boolean; error: string | null; fetchedAt: string | null; snapshots: ExchangeRateSnapshot[]; }
+export interface ProjectionDailyBalance { date: string; cashBalance: string; availableCash: string; restrictedCash: string; reservedNominal: string; freeBalance: string; }
+export interface CurrencyProjection { currency: Currency; cashBalance: string; availableCash: string; restrictedCash: string; reservedNominal: string; backingDeficit: string; freeBalance: string; minimumFreeBalance: string; firstShortfallDate: string | null; dailyBalances: ProjectionDailyBalance[]; }
+export interface ProjectionRow { sourceKind: string; sourceId: string; componentId: string | null; date: string | null; dateCertainty: string; currency: Currency; amount: string; direction: string; certainty: string; accountId: string | null; description: string; summaryId: string | null; warnings: string[]; }
+export interface ProjectionAlert { code: string; severity: string; currency: Currency; message: string; date: string | null; sourceId: string | null; }
+export interface Projection { workspaceId: string; workspaceName: string; asOf: string; currencies: CurrencyProjection[]; rows: ProjectionRow[]; alerts: ProjectionAlert[]; }
+export interface ProjectionAssumption { id: string; kind: 'Income' | 'Expense' | 'AmountChange' | 'DateChange'; date: string | null; currency: Currency | null; amount: string | null; description: string; sourceId: string | null; sourceKind?: string | null; componentId?: string | null; }
+export interface ProjectionCalculateRequest { through: string; scenario: string; savedScenarioId: string | null; assumptions: ProjectionAssumption[]; }
+export interface ProjectionScenario { id: string; name: string; version: number; assumptions: ProjectionAssumption[]; }
+export interface ProjectionScenarioCreate { id: string; name: string; assumptions: ProjectionAssumption[]; }
+export interface ProjectionScenarioSave { id: string; requestId: string; version: number; name: string; assumptions: ProjectionAssumption[]; }
+export interface ProjectionScenarioDelete { requestId: string; version: number; }
 export interface SessionInfo {
   authenticated: boolean;
   displayName: string | null;

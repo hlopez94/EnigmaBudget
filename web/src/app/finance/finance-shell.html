@@ -16,6 +16,12 @@
                     ? 'Compartidos'
                     : section === 'spaces'
                       ? 'Espacios y privacidad'
+                      : section === 'savings'
+                        ? 'Ahorros'
+                        : section === 'projection'
+                          ? 'Proyección'
+                          : section === 'exchange'
+                            ? 'Cotizaciones'
                       : 'Más'
         }}
       </h1>
@@ -64,6 +70,7 @@
     </button>
     @if (canReadGroups) { <button type="button" [class.active]="section === 'sharing'" (click)="navigate('sharing')">Compartidos</button> }
     <button type="button" [class.active]="section === 'spaces'" (click)="navigate('spaces')">Espacios</button>
+    <button type="button" [class.active]="section === 'more' || section === 'savings' || section === 'projection' || section === 'exchange'" (click)="navigate('more')">Más</button>
   </nav>
   <nav class="mobile-navigation" aria-label="Navegación principal">
     <button type="button" [class.active]="section === 'home'" (click)="navigate('home')">
@@ -79,10 +86,10 @@
     <button type="button" [class.active]="section === 'cards'" (click)="navigate('cards')">
       <i class="pi pi-credit-card" aria-hidden="true"></i><small>Tarjetas</small>
     </button>
-    @if (canReadGroups) { <button type="button" [class.active]="section === 'sharing'" (click)="navigate('sharing')"><i class="pi pi-users" aria-hidden="true"></i><small>Compartidos</small></button> }
+    <button type="button" [class.active]="section === 'accounts'" (click)="navigate('accounts')"><i class="pi pi-wallet" aria-hidden="true"></i><small>Cuentas</small></button>
     <button
       type="button"
-      [class.active]="section === 'more' || section === 'accounts' || section === 'spaces'"
+      [class.active]="section === 'more' || section === 'spaces' || section === 'sharing' || section === 'savings' || section === 'projection' || section === 'exchange'"
       (click)="navigate('more')"
     >
       <i class="pi pi-ellipsis-h" aria-hidden="true"></i><small>Más</small>
@@ -145,9 +152,10 @@
     @if (section === 'more') {
       <main class="content more-screen">
         <section class="panel">
-          <h2>Administrar espacio</h2>
-          @if (canManageResources) { <button type="button" class="more-link" (click)="navigateMore('accounts')">
-            <span><b>Cuentas</b><small>Ver saldos, conciliar o agregar una cuenta</small></span
+          <h2>Más</h2>
+          <p class="more-context">{{ activeWorkspace?.name || name }}</p>
+          @for (link of moreLinks; track link.section) { <button type="button" class="more-link" (click)="navigateMore(link.section)">
+            <span><b>{{ link.label }}</b><small>{{ link.description }}</small></span
             ><i class="pi pi-chevron-right" aria-hidden="true"></i>
           </button> }
           @if (setupIncomplete) {
@@ -159,10 +167,6 @@
           <button type="button" class="more-link" (click)="refresh()" [disabled]="busy">
             <span><b>Actualizar datos</b><small>Sincronizar el resumen</small></span
             ><i class="pi pi-refresh" aria-hidden="true"></i>
-          </button>
-          <button type="button" class="more-link" (click)="navigate('spaces')">
-            <span><b>Hogares, integrantes y privacidad</b><small>Administrar espacios y permisos</small></span
-            ><i class="pi pi-chevron-right" aria-hidden="true"></i>
           </button>
         </section>
       </main>
@@ -336,6 +340,39 @@
         Abriendo compartidos…
       </div>
     }
+    @defer (when section === 'savings') {
+      <app-savings
+        [hidden]="section !== 'savings'"
+        [workspaceId]="activeWorkspace?.id ?? null"
+        [contextGeneration]="workspaceGeneration"
+        [permissions]="permissions || null"
+        [workspaceArchived]="!!activeWorkspace?.isArchived"
+        [workspaceName]="activeWorkspace?.name || name"
+        [overview]="overview!"
+        [refreshOverview]="refreshOverview"
+      />
+    } @placeholder { @if (section === 'savings') { <div class="loading" aria-live="polite">Abriendo ahorros…</div> } }
+    @defer (when section === 'projection') {
+      <app-projection
+        [hidden]="section !== 'projection'"
+        [workspaceId]="activeWorkspace?.id ?? null"
+        [contextGeneration]="workspaceGeneration"
+        [permissions]="permissions || null"
+        [workspaceArchived]="!!activeWorkspace?.isArchived"
+        [workspaceName]="activeWorkspace?.name || name"
+      />
+    } @placeholder { @if (section === 'projection') { <div class="loading" aria-live="polite">Abriendo proyección…</div> } }
+    @defer (when section === 'exchange') {
+      <app-projection
+        [hidden]="section !== 'exchange'"
+        view="exchange"
+        [workspaceId]="activeWorkspace?.id ?? null"
+        [contextGeneration]="workspaceGeneration"
+        [permissions]="permissions || null"
+        [workspaceArchived]="!!activeWorkspace?.isArchived"
+        [workspaceName]="activeWorkspace?.name || name"
+      />
+    } @placeholder { @if (section === 'exchange') { <div class="loading" aria-live="polite">Abriendo cotizaciones…</div> } }
   }
   @if (requestedWorkspaceId) {
     <app-action-dialog [title]="requestedWorkspaceId === 'setup' ? 'Abrir configuración inicial' : requestedWorkspaceId.startsWith('@section:') ? 'Cambiar de sección' : 'Cambiar de espacio'" [open]="true" (closed)="cancelWorkspaceChange()" [dismissible]="!saving">

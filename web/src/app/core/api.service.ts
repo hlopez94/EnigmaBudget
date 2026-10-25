@@ -21,6 +21,21 @@ import {
   Workspace,
   WorkspaceInvitation,
   WorkspaceMember,
+  SavingsGoal,
+  SavingsGoalCreate,
+  SavingsGoalUpdate,
+  SavingsGoalDetails,
+  SavingsAccountBalance,
+  SavingsAllocation,
+  SavingsReleaseRequest,
+  SavingsRateChoiceInput,
+  ExchangeRateList,
+  ExchangeRateSnapshot,
+  Projection,
+  ProjectionCalculateRequest,
+  ProjectionScenario,
+  ProjectionScenarioDelete,
+  ProjectionScenarioSave,
 } from './api.models';
 
 export type Fetcher = typeof fetch;
@@ -285,6 +300,62 @@ export class ApiService {
       method: 'POST',
       body: JSON.stringify(input),
     });
+  }
+
+  savingsGoals(): Promise<SavingsGoal[]> { return this.financeRequest('/api/savings/goals'); }
+  savingsGoalDetails(id: string, historyPage = 1): Promise<SavingsGoalDetails> {
+    return this.financeRequest(`/api/savings/goals/${encodeURIComponent(id)}/details?historyPage=${historyPage}`);
+  }
+  createSavingsGoal(input: SavingsGoalCreate): Promise<SavingsGoal> {
+    return this.financeMutate('/api/savings/goals', { method: 'POST', body: JSON.stringify(input) });
+  }
+  updateSavingsGoal(id: string, input: SavingsGoalUpdate): Promise<SavingsGoal> {
+    return this.financeMutate(`/api/savings/goals/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(input) });
+  }
+  setSavingsGoalRate(id: string, input: SavingsRateChoiceInput): Promise<import('./api.models').GoalRateChoice> {
+    return this.financeMutate(`/api/savings/goals/${encodeURIComponent(id)}/rate`, { method: 'PUT', body: JSON.stringify(input) });
+  }
+  closeSavingsGoal(id: string, input: { requestId: string; version: number; confirmRelease: boolean }): Promise<SavingsGoal> {
+    return this.financeMutate(`/api/savings/goals/${encodeURIComponent(id)}/close`, { method: 'POST', body: JSON.stringify(input) });
+  }
+  savingsBalances(): Promise<SavingsAccountBalance[]> { return this.financeRequest('/api/savings/balances'); }
+  setAccountLiquidity(accountId: string, input: { requestId: string; version: number; fundsAvailableFrom: string | null }): Promise<SavingsAccountBalance> {
+    return this.financeMutate(`/api/savings/accounts/${encodeURIComponent(accountId)}/liquidity`, { method: 'PUT', body: JSON.stringify(input) });
+  }
+  allocateSavings(input: { id: string; goalId: string; accountId: string; amount: string }): Promise<SavingsAllocation> {
+    return this.financeMutate('/api/savings/allocations', { method: 'POST', body: JSON.stringify(input) });
+  }
+  releaseSavings(id: string, input: SavingsReleaseRequest): Promise<SavingsAllocation> {
+    return this.financeMutate(`/api/savings/allocations/${encodeURIComponent(id)}/release`, { method: 'POST', body: JSON.stringify(input) });
+  }
+  applySavings(input: { id: string; allocationId: string; financePaymentId: string; amount: string }): Promise<unknown> {
+    return this.financeMutate('/api/savings/applications', { method: 'POST', body: JSON.stringify(input) });
+  }
+  reverseSavingsApplication(movementId: string, input: { requestId: string; reason: string; confirm: boolean }): Promise<unknown> {
+    return this.financeMutate(`/api/savings/applications/${encodeURIComponent(movementId)}/reverse`, { method: 'POST', body: JSON.stringify(input) });
+  }
+  exchangeRates(): Promise<ExchangeRateList> { return this.financeRequest('/api/exchange-rates'); }
+  refreshExchangeRates(input: { id: string }): Promise<ExchangeRateList> {
+    return this.financeMutate('/api/exchange-rates/refresh', { method: 'POST', body: JSON.stringify(input) });
+  }
+  projection(through: string, scenario: string, scenarioId?: string): Promise<Projection> {
+    const query = new URLSearchParams({ through, scenario });
+    if (scenarioId) query.set('scenarioId', scenarioId);
+    return this.financeRequest(`/api/projection?${query}`);
+  }
+  calculateProjection(input: ProjectionCalculateRequest): Promise<Projection> {
+    return this.financeMutate('/api/projection/calculate', { method: 'POST', body: JSON.stringify(input) });
+  }
+  projectionScenarios(): Promise<ProjectionScenario[]> { return this.financeRequest('/api/projection/scenarios'); }
+  saveProjectionScenario(input: ProjectionScenarioSave | { id: string; name: string; assumptions: ProjectionScenarioSave['assumptions'] }): Promise<ProjectionScenario> {
+    if ('version' in input) {
+      const { id, ...body } = input;
+      return this.financeMutate(`/api/projection/scenarios/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(body) });
+    }
+    return this.financeMutate('/api/projection/scenarios', { method: 'POST', body: JSON.stringify(input) });
+  }
+  deleteProjectionScenario(id: string, input: ProjectionScenarioDelete): Promise<void> {
+    return this.financeMutate(`/api/projection/scenarios/${encodeURIComponent(id)}`, { method: 'DELETE', body: JSON.stringify(input) });
   }
 
   private mutate<T>(url: string, init: RequestInit): Promise<T> {

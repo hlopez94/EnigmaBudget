@@ -7,6 +7,9 @@ import { FinanceAccounts } from './accounts';
 import { FinanceCards } from './cards';
 import { FinanceOperations } from './operations';
 import { FinanceSharing } from './sharing';
+import { FinanceSavings } from '../savings/savings';
+import { FinanceProjection } from '../projection/projection';
+import { FinanceShell } from './finance-shell';
 
 class TestFinanceOperations extends FinanceOperations {
   idempotencyKey(payload: unknown): string {
@@ -15,6 +18,40 @@ class TestFinanceOperations extends FinanceOperations {
 }
 
 describe('finance workspace regressions', () => {
+  it('offers savings, projection, and exchange from Más while keeping the workspace name visible', () => {
+    const shell = new FinanceShell({} as ApiService, { markForCheck: vi.fn() } as never);
+    shell.activeWorkspace = { id: 'space-1', name: 'Casa de la costa' } as never;
+    expect(shell.workspaceLabel(shell.activeWorkspace as never)).toContain('Casa de la costa');
+    expect(shell.moreLinks.map((item: { label: string }) => item.label)).toEqual(expect.arrayContaining(['Ahorros', 'Proyección', 'Cotizaciones']));
+  });
+
+  it('keeps goal records first and preserves drafts and retry identity after a failed allocation', async () => {
+    const api = { savingsGoals: vi.fn().mockResolvedValue([{ id: 'g1', name: 'Viaje', targetCurrency: 'USD', targetAmount: '1000.00', state: 'Active', backingAmounts: [], version: 1 }]), savingsBalances: vi.fn().mockResolvedValue([]), exchangeRates: vi.fn().mockResolvedValue({ snapshots: [], stale: false }), allocateSavings: vi.fn().mockRejectedValue(new Error('No hay saldo disponible.')) };
+    const savings = new FinanceSavings(api as unknown as ApiService, { markForCheck: vi.fn() } as never);
+    savings.workspaceId = 'space-1';
+    savings.permissions = { read: true, readGroups: false, recordFinance: true, manageResources: true, correctHistory: true, manageMembers: false, managePrivacy: false };
+    await savings.load();
+    savings.openAllocate('g1');
+    savings.allocationDraft.accountId = 'a1';
+    savings.allocationDraft.amount = '10.25';
+    const pending = savings.saveAllocation();
+    expect(savings.closeDialog()).toBe(false);
+    await pending;
+    const first = savings.currentRequestId('allocate');
+    await savings.saveAllocation();
+    expect(savings.goals[0].name).toBe('Viaje');
+    expect(savings.allocationDraft.amount).toBe('10.25');
+    expect(api.allocateSavings.mock.calls[0][0].amount).toBe('10.25');
+    expect(api.allocateSavings.mock.calls[1][0].id).toBe(first);
+  });
+
+  it('loads exchange data without inventing a missing estimate and surfaces snapshot provenance', async () => {
+    const projection = new FinanceProjection({ exchangeRates: vi.fn().mockResolvedValue({ status: 'Available', stale: true, snapshots: [{ id: 's1', house: 'Oficial', name: 'Oficial', buy: null, sell: '1200.00', providerUpdatedAt: '2026-10-25T10:00:00Z', fetchedAt: '2026-10-25T10:05:00Z' }] }) } as unknown as ApiService, { markForCheck: vi.fn() } as never);
+    await projection.loadRates();
+    expect(projection.rates?.snapshots[0].buy).toBeNull();
+    expect(projection.rateState()).toContain('desactualizada');
+    expect(projection.rateSource(projection.rates!.snapshots[0])).toContain('Oficial');
+  });
   it('does not treat the remembered account selection as an unsaved operation draft', () => {
     const operations = new TestFinanceOperations({} as ApiService, { markForCheck: vi.fn() } as never);
     operations.operationDraft.accountId = 'default-account';

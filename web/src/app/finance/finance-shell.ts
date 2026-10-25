@@ -22,8 +22,11 @@ import { FinanceOperations } from './operations';
 import { FinanceSharing } from './sharing';
 import { WorkspaceManager } from '../workspaces/workspace-manager';
 import { ActionDialog } from './ui/action-dialog';
+import { FinanceSavings } from '../savings/savings';
+import { FinanceProjection } from '../projection/projection';
 
-export type FinanceSection = 'home' | 'operations' | 'accounts' | 'cards' | 'sharing' | 'more' | 'spaces';
+export type FinanceSection = 'home' | 'operations' | 'accounts' | 'cards' | 'sharing' | 'more' | 'spaces' | 'savings' | 'projection' | 'exchange';
+type MoreSection = 'accounts' | 'savings' | 'projection' | 'exchange' | 'sharing' | 'spaces';
 
 const today = (): string => {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -61,6 +64,8 @@ const periodParts = (value: string): { year: number; month: number } | null => {
     FinanceSharing,
     WorkspaceManager,
     ActionDialog,
+    FinanceSavings,
+    FinanceProjection,
   ],
   templateUrl: './finance-shell.html',
   styleUrl: './finance-shell.css',
@@ -85,6 +90,8 @@ export class FinanceShell implements OnInit, OnChanges {
   @ViewChildren(FinanceCards) cardComponents!: QueryList<FinanceCards>;
   @ViewChildren(FinanceSharing) sharingComponents!: QueryList<FinanceSharing>;
   @ViewChildren(WorkspaceManager) workspaceManagers!: QueryList<WorkspaceManager>;
+  @ViewChildren(FinanceSavings) savingsComponents!: QueryList<FinanceSavings>;
+  @ViewChildren(FinanceProjection) projectionComponents!: QueryList<FinanceProjection>;
   private workspaceManagerInstance: WorkspaceManager | null = null;
 
   period = today().slice(0, 7);
@@ -99,7 +106,6 @@ export class FinanceShell implements OnInit, OnChanges {
     return `${monthName.format(date)} ${period.slice(0, 4)}`;
   }
   section: FinanceSection = 'home';
-  moreTarget: 'accounts' | 'setup' = 'accounts';
   requestedWorkspaceId = '';
   workspacePickerValue = '';
   workspaceGeneration = 0;
@@ -201,15 +207,26 @@ export class FinanceShell implements OnInit, OnChanges {
   }
 
   get permissions() { return this.activeWorkspace?.permissions; }
+  get moreLinks(): { section: MoreSection; label: string; description: string }[] {
+    const links: { section: MoreSection; label: string; description: string }[] = [
+      { section: 'accounts', label: 'Cuentas', description: 'Ver saldos, disponibilidad y administrar cuentas' },
+      { section: 'savings', label: 'Ahorros', description: 'Objetivos, reservas y aportes' },
+      { section: 'projection', label: 'Proyección', description: 'Saldos futuros, compromisos y escenarios' },
+      { section: 'exchange', label: 'Cotizaciones', description: 'Referencias guardadas de compra y venta' },
+    ];
+    if (this.canReadGroups) links.push({ section: 'sharing', label: 'Compartidos', description: 'Grupos y gastos compartidos' });
+    links.push({ section: 'spaces', label: 'Espacios y privacidad', description: 'Integrantes, permisos y configuración del espacio' });
+    return links;
+  }
   get canReadGroups(): boolean { return !!this.permissions?.readGroups; }
   get canWrite(): boolean { return !!this.permissions?.recordFinance && !this.activeWorkspace?.isArchived; }
   get canManageResources(): boolean { return !!this.permissions?.manageResources && !this.activeWorkspace?.isArchived; }
-  get saving(): boolean { return [...(this.accountComponents?.toArray() ?? []), ...(this.operationComponents?.toArray() ?? []), ...(this.cardComponents?.toArray() ?? []), ...(this.sharingComponents?.toArray() ?? [])].some(component => component.saving) || (this.workspaceManagers?.toArray() ?? []).some(component => component.busy); }
-  get hasPendingDraft(): boolean { return [...(this.accountComponents?.toArray() ?? []), ...(this.operationComponents?.toArray() ?? []), ...(this.cardComponents?.toArray() ?? []), ...(this.sharingComponents?.toArray() ?? [])].some(component => component.hasPendingDraft()) || (this.workspaceManagers?.toArray() ?? []).some(component => component.hasPendingDraft()); }
+  get saving(): boolean { return [...(this.accountComponents?.toArray() ?? []), ...(this.operationComponents?.toArray() ?? []), ...(this.cardComponents?.toArray() ?? []), ...(this.sharingComponents?.toArray() ?? []), ...(this.savingsComponents?.toArray() ?? []), ...(this.projectionComponents?.toArray() ?? [])].some(component => component.saving) || (this.workspaceManagers?.toArray() ?? []).some(component => component.busy); }
+  get hasPendingDraft(): boolean { return [...(this.accountComponents?.toArray() ?? []), ...(this.operationComponents?.toArray() ?? []), ...(this.cardComponents?.toArray() ?? []), ...(this.sharingComponents?.toArray() ?? []), ...(this.savingsComponents?.toArray() ?? []), ...(this.projectionComponents?.toArray() ?? [])].some(component => component.hasPendingDraft()) || (this.workspaceManagers?.toArray() ?? []).some(component => component.hasPendingDraft()); }
 
   private invalidateFinanceChildren(): void {
     this.workspaceGeneration++;
-    [...(this.accountComponents?.toArray() ?? []), ...(this.operationComponents?.toArray() ?? []), ...(this.cardComponents?.toArray() ?? []), ...(this.sharingComponents?.toArray() ?? [])].forEach(component => component.invalidateContext());
+    [...(this.accountComponents?.toArray() ?? []), ...(this.operationComponents?.toArray() ?? []), ...(this.cardComponents?.toArray() ?? []), ...(this.sharingComponents?.toArray() ?? []), ...(this.savingsComponents?.toArray() ?? []), ...(this.projectionComponents?.toArray() ?? [])].forEach(component => component.invalidateContext());
     this.workspaceManagerInstance?.invalidateContext();
   }
 
@@ -263,9 +280,9 @@ export class FinanceShell implements OnInit, OnChanges {
     this.changeDetector.markForCheck();
   }
 
-  navigateMore(target: 'accounts' | 'setup'): void {
-    this.moreTarget = target;
+  navigateMore(target: MoreSection | 'setup'): void {
     if (target === 'accounts') this.navigate('accounts');
+    else if (target !== 'setup') this.navigate(target);
     else if (this.saving) {
       this.notice = 'Esperá a que termine el guardado antes de abrir la configuración.';
       this.changeDetector.markForCheck();
