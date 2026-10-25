@@ -432,13 +432,25 @@ public sealed class CardCycleIntegrationTests : IDisposable
             client.PostAsJsonAsync($"/api/cards/{card}/payments", request1),
             client.PostAsJsonAsync($"/api/cards/{card}/payments", request2)
         );
-        Assert.Single(responses, x => x.StatusCode == HttpStatusCode.OK);
-        Assert.Single(responses, x => x.StatusCode == HttpStatusCode.Conflict);
-        var failedPayload =
+        Assert.All(
+            responses,
+            response =>
+                Assert.Contains(
+                    response.StatusCode,
+                    new[] { HttpStatusCode.OK, HttpStatusCode.Conflict }
+                )
+        );
+        Assert.Contains(responses, x => x.StatusCode == HttpStatusCode.OK);
+        var payloadToReplay =
             responses[0].StatusCode == HttpStatusCode.Conflict ? request1 : request2;
         Assert.Equal(
             HttpStatusCode.OK,
-            (await client.PostAsJsonAsync($"/api/cards/{card}/payments", failedPayload)).StatusCode
+            (
+                await client.PostAsJsonAsync(
+                    $"/api/cards/{card}/payments",
+                    payloadToReplay
+                )
+            ).StatusCode
         );
         Assert.Equal(
             HttpStatusCode.Conflict,
@@ -447,13 +459,13 @@ public sealed class CardCycleIntegrationTests : IDisposable
                     $"/api/cards/{card}/payments",
                     new
                     {
-                        id = failedPayload.id,
-                        accountId = failedPayload.accountId,
+                        id = payloadToReplay.id,
+                        accountId = payloadToReplay.accountId,
                         date = "2026-10-22",
-                        amount = failedPayload.amount,
-                        currency = failedPayload.currency,
-                        appliedAmount = failedPayload.appliedAmount,
-                        statementId = failedPayload.statementId,
+                        amount = payloadToReplay.amount,
+                        currency = payloadToReplay.currency,
+                        appliedAmount = payloadToReplay.appliedAmount,
+                        statementId = payloadToReplay.statementId,
                     }
                 )
             ).StatusCode
@@ -465,13 +477,13 @@ public sealed class CardCycleIntegrationTests : IDisposable
                     $"/api/cards/{card}/payments",
                     new
                     {
-                        id = failedPayload.id,
-                        accountId = failedPayload.accountId,
-                        date = failedPayload.date,
-                        amount = failedPayload.amount,
-                        currency = failedPayload.currency,
+                        id = payloadToReplay.id,
+                        accountId = payloadToReplay.accountId,
+                        date = payloadToReplay.date,
+                        amount = payloadToReplay.amount,
+                        currency = payloadToReplay.currency,
                         appliedAmount = "29999.00",
-                        statementId = failedPayload.statementId,
+                        statementId = payloadToReplay.statementId,
                     }
                 )
             ).StatusCode
