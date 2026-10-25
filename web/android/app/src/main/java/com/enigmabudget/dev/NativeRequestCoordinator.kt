@@ -35,7 +35,7 @@ class NativeRequestCoordinator(
     private val transport: NativeHttpTransport,
     private val clock: () -> Long = System::currentTimeMillis,
     private val permitTtlMillis: Long = 30_000,
-    private val onSessionInvalidated: () -> Unit = {},
+    private val onRequestsInvalidated: () -> Unit = {},
 ) {
     private data class Pending(
         val requestId: String,
@@ -68,6 +68,7 @@ class NativeRequestCoordinator(
         if (angularEpoch < latestEpoch) throw SecurityException("Out-of-order request context.")
         latestEpoch = angularEpoch
         contextGeneration++
+        onRequestsInvalidated()
         permits.clear(); retryPending.clear(); retryMarkers.clear(); contexts.clear()
         val context = NativeRequestContext(UUID.randomUUID().toString(), angularEpoch, trusted, workspaceId, sessionGeneration, contextGeneration)
         contexts[context.id] = context
@@ -151,7 +152,7 @@ class NativeRequestCoordinator(
     fun <T> invalidate(clearNativeState: () -> T): T = synchronized(stateLock) {
         sessionGeneration++
         contextGeneration++
-        onSessionInvalidated()
+        onRequestsInvalidated()
         permits.clear(); retryPending.clear(); retryMarkers.clear(); contexts.clear()
         currentCredentials = null
         refreshFlight?.future?.completeExceptionally(SecurityException("Native session changed during refresh."))

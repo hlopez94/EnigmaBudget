@@ -23,7 +23,6 @@ import java.net.URI
 import java.net.URL
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.Executors
 import java.util.concurrent.ThreadPoolExecutor
@@ -32,8 +31,7 @@ import java.util.concurrent.TimeUnit
 @CapacitorPlugin(name = "NativeAuth")
 class NativeAuthPlugin : Plugin() {
     private val executor = boundedExecutor("native-auth")
-    private val networkExecutor = boundedExecutor("native-http")
-    private val protectedTransport = NativeQueuedHttpTransport(networkExecutor, ::sendProtected)
+    private val protectedTransport by lazy { NativeAsyncHttpTransport(OkHttpNativeHttpClient()) }
     private val logoutExecutor = ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, java.util.concurrent.SynchronousQueue(), { runnable ->
         Thread(runnable, "native-logout-${UUID.randomUUID()}").apply { isDaemon = true }
     }, ThreadPoolExecutor.AbortPolicy())
@@ -59,7 +57,7 @@ class NativeAuthPlugin : Plugin() {
                 expiresAt = value.accessExpiresAtMillis
                 return true
             }
-        }, protectedTransport, onSessionInvalidated = protectedTransport::invalidateQueued)
+        }, protectedTransport, onRequestsInvalidated = protectedTransport::cancelPending)
     }
     private val coordinator by coordinatorDelegate
     private val logoutResults = ConcurrentHashMap<String, CompletableFuture<Boolean>>()
@@ -248,11 +246,6 @@ class NativeAuthPlugin : Plugin() {
         if (!installed) throw SecurityException("Sign-in completed after the native session changed.")
     }
 
-    private fun sendProtected(request: GatedRequest, bearer: String): NativeApiResponse {
-        val headers = request.headers.toMutableMap().apply { put("authorization", "Bearer $bearer") }
-        return http(request.url.toString(), request.method, headers, request.body)
-    }
-
     private fun authRequest(method: String, path: String, body: JSONObject?, bearer: String? = null, timeoutMillis: Int = 8_000): NativeApiResponse {
         val base = URI(requireApiBase())
         val uri = base.resolve(path)
@@ -336,7 +329,7 @@ class NativeAuthPlugin : Plugin() {
     private fun beginAccountReplacement(): Long = coordinator.invalidate {
         clearLocalStateWithoutCoordinator(); sessionStore.clear(); coordinator.currentSessionGeneration()
     }
-    private fun boundedExecutor(prefix: String) = ThreadPoolExecutor(2, 2, 0L, TimeUnit.MILLISECONDS, ArrayBlockingQueue(32), { runnable ->
+    private fun boundedExecutor(prefix: String) = ThreadPoolExecutor(2, 2, 0L, TimeUnit.MILLISECONDS, java.util.concurrent.ArrayBlockingQueue(32), { runnable ->
         Thread(runnable, "$prefix-${UUID.randomUUID()}").apply { isDaemon = true }
     }, ThreadPoolExecutor.AbortPolicy())
     private fun resolveVoid(call: PluginCall) = call.resolve(JSObject())
