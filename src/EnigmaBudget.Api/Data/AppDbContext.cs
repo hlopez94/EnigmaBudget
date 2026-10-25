@@ -3,6 +3,7 @@ using EnigmaBudget.Api.Workspaces;
 using EnigmaBudget.Api.Identity;
 using EnigmaBudget.Api.Savings;
 using EnigmaBudget.Api.ExchangeRates;
+using EnigmaBudget.Api.Finance;
 
 namespace EnigmaBudget.Api.Data;
 
@@ -82,6 +83,9 @@ public sealed class FinanceOperation
     public DateOnly Date { get; set; }
     public string Description { get; set; } = "";
     public string Category { get; set; } = "";
+    public Guid? CategoryId { get; set; }
+    public Guid? MerchantId { get; set; }
+    public Guid? IncomeSourceId { get; set; }
     public string Currency { get; set; } = "";
     public decimal Amount { get; set; }
     public bool IsVoided { get; set; }
@@ -142,6 +146,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<PaymentCard> Cards => Set<PaymentCard>();
     public DbSet<OpeningBalanceRecord> OpeningBalances => Set<OpeningBalanceRecord>();
     public DbSet<FinanceOperation> FinanceOperations => Set<FinanceOperation>();
+    public DbSet<FinanceCategory> FinanceCategories => Set<FinanceCategory>();
+    public DbSet<FinanceMerchant> FinanceMerchants => Set<FinanceMerchant>();
+    public DbSet<FinanceIncomeSource> FinanceIncomeSources => Set<FinanceIncomeSource>();
     public DbSet<FinancePayment> FinancePayments => Set<FinancePayment>();
     public DbSet<LedgerEntry> LedgerEntries => Set<LedgerEntry>();
     public DbSet<TransferRecord> Transfers => Set<TransferRecord>();
@@ -258,6 +265,34 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         model.Entity<FinanceOperation>().Property(x => x.Amount).HasPrecision(18, 2);
         model.Entity<FinanceOperation>().Property(x => x.Version).IsConcurrencyToken();
         model.Entity<FinanceOperation>().HasIndex(x => new { x.WorkspaceId, x.Id }).IsUnique();
+        model.Entity<FinanceCategory>().HasKey(x => x.Id);
+        model.Entity<FinanceCategory>().HasAlternateKey(x => new { x.WorkspaceId, x.Id });
+        model.Entity<FinanceCategory>().Property(x => x.Kind).HasMaxLength(20);
+        model.Entity<FinanceCategory>().Property(x => x.Name).HasColumnType("text");
+        model.Entity<FinanceCategory>().Property(x => x.IsArchived).HasDefaultValue(false);
+        model.Entity<FinanceCategory>().Property(x => x.Version).IsConcurrencyToken().HasDefaultValue(1);
+        model.Entity<FinanceCategory>().ToTable(table => table.HasCheckConstraint("CK_FinanceCategories_Kind", "\"Kind\" IN ('Expense','Income')"));
+        model.Entity<FinanceCategory>().HasIndex(x => new { x.WorkspaceId, x.Kind, x.Name }).IsUnique();
+        model.Entity<FinanceCategory>().HasOne<Workspace>().WithMany().HasForeignKey(x => x.WorkspaceId).OnDelete(DeleteBehavior.Cascade);
+        model.Entity<FinanceMerchant>().HasKey(x => x.Id);
+        model.Entity<FinanceMerchant>().HasAlternateKey(x => new { x.WorkspaceId, x.Id });
+        model.Entity<FinanceMerchant>().Property(x => x.Name).HasColumnType("text");
+        model.Entity<FinanceMerchant>().Property(x => x.IsArchived).HasDefaultValue(false);
+        model.Entity<FinanceMerchant>().Property(x => x.Version).IsConcurrencyToken().HasDefaultValue(1);
+        model.Entity<FinanceMerchant>().HasIndex(x => new { x.WorkspaceId, x.Name }).IsUnique();
+        model.Entity<FinanceMerchant>().HasOne<Workspace>().WithMany().HasForeignKey(x => x.WorkspaceId).OnDelete(DeleteBehavior.Cascade);
+        model.Entity<FinanceIncomeSource>().HasKey(x => x.Id);
+        model.Entity<FinanceIncomeSource>().HasAlternateKey(x => new { x.WorkspaceId, x.Id });
+        model.Entity<FinanceIncomeSource>().Property(x => x.Kind).HasMaxLength(30);
+        model.Entity<FinanceIncomeSource>().Property(x => x.Name).HasColumnType("text");
+        model.Entity<FinanceIncomeSource>().Property(x => x.IsArchived).HasDefaultValue(false);
+        model.Entity<FinanceIncomeSource>().Property(x => x.Version).IsConcurrencyToken().HasDefaultValue(1);
+        model.Entity<FinanceIncomeSource>().ToTable(table => table.HasCheckConstraint("CK_FinanceIncomeSources_Kind", "\"Kind\" IN ('Salary','Extra','AnnualBonus','IndependentWork','Other')"));
+        model.Entity<FinanceIncomeSource>().HasIndex(x => new { x.WorkspaceId, x.Kind, x.Name }).IsUnique();
+        model.Entity<FinanceIncomeSource>().HasOne<Workspace>().WithMany().HasForeignKey(x => x.WorkspaceId).OnDelete(DeleteBehavior.Cascade);
+        model.Entity<FinanceOperation>().HasOne<FinanceCategory>().WithMany().HasForeignKey(x => new { x.WorkspaceId, x.CategoryId }).HasPrincipalKey(x => new { x.WorkspaceId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+        model.Entity<FinanceOperation>().HasOne<FinanceMerchant>().WithMany().HasForeignKey(x => new { x.WorkspaceId, x.MerchantId }).HasPrincipalKey(x => new { x.WorkspaceId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+        model.Entity<FinanceOperation>().HasOne<FinanceIncomeSource>().WithMany().HasForeignKey(x => new { x.WorkspaceId, x.IncomeSourceId }).HasPrincipalKey(x => new { x.WorkspaceId, x.Id }).OnDelete(DeleteBehavior.Restrict);
         model.Entity<FinancePayment>().Property(x => x.Amount).HasPrecision(18, 2);
         model.Entity<FinancePayment>().HasAlternateKey(x => new { x.WorkspaceId, x.Id });
         model.Entity<BankAccount>().HasAlternateKey(x => new { x.WorkspaceId, x.Id });
@@ -289,6 +324,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         model.Entity<MonthlyRule>().Property(x => x.MutationVersion).IsConcurrencyToken();
         model.Entity<RuleWeight>().Property(x => x.Value).HasPrecision(18, 2);
         model.Entity<CardPurchase>().Property(x => x.TotalAmount).HasPrecision(18, 2);
+        model.Entity<CardPurchase>().HasOne<FinanceCategory>().WithMany().HasForeignKey(x => new { x.WorkspaceId, x.CategoryId }).HasPrincipalKey(x => new { x.WorkspaceId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+        model.Entity<CardPurchase>().HasOne<FinanceMerchant>().WithMany().HasForeignKey(x => new { x.WorkspaceId, x.MerchantId }).HasPrincipalKey(x => new { x.WorkspaceId, x.Id }).OnDelete(DeleteBehavior.Restrict);
         model.Entity<CardInstallment>().Property(x => x.Amount).HasPrecision(18, 2);
         model.Entity<SharedCollection>().Property(x => x.Amount).HasPrecision(18, 2);
         model.Entity<SharedCollection>().Property(x => x.AppliedAmount).HasPrecision(18, 2);
@@ -305,6 +342,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             .IsUnique();
         model.Entity<CardStatement>().Property(x => x.Version).IsConcurrencyToken();
         model.Entity<StatementAdjustment>().Property(x => x.Amount).HasPrecision(18, 2);
+        model.Entity<StatementAdjustment>().HasOne<FinanceCategory>().WithMany().HasForeignKey(x => new { x.WorkspaceId, x.CategoryId }).HasPrincipalKey(x => new { x.WorkspaceId, x.Id }).OnDelete(DeleteBehavior.Restrict);
         model.Entity<CardPaymentRecord>().Property(x => x.Amount).HasPrecision(18, 2);
         model.Entity<CardPaymentRecord>().Property(x => x.AppliedAmount).HasPrecision(18, 2);
         model.Entity<CardPaymentRecord>().HasIndex(x => new { x.WorkspaceId, x.Id }).IsUnique();

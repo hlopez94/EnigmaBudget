@@ -3,6 +3,7 @@ using EnigmaBudget.Api.Data;
 using EnigmaBudget.Api.Identity;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.EntityFrameworkCore;
+using EnigmaBudget.Api.Finance;
 
 namespace EnigmaBudget.Api.Workspaces;
 
@@ -72,6 +73,7 @@ public static class WorkspaceEndpoints
         db.Workspaces.Add(workspace);
         db.WorkspaceMemberships.Add(new WorkspaceMembership { Workspace = workspace, UserId = personal.OwnerUserId, Role = "Owner", JoinedAt = DateTimeOffset.UtcNow });
         db.WorkspaceAuditEvents.Add(new WorkspaceAuditEvent { WorkspaceId = workspace.Id, ActorUserId = personal.OwnerUserId, Action = "workspace.created", ResourceType = "Workspace", ResourceId = workspace.Id.ToString(), OccurredAt = DateTimeOffset.UtcNow });
+        CatalogDefaults.AddForWorkspace(db, workspace.Id);
         try { await db.SaveChangesAsync(http.RequestAborted); }
         catch (DbUpdateException) { return Problem(409, "No se pudo crear el espacio. Actualizá y volvé a intentar."); }
         return Results.Created($"/api/workspaces/{workspace.Id}", ToDto(workspace, "Owner", personal.OwnerUserId, ownerDisplayName: personal.OwnerUser.DisplayName, membershipVersion: 1));

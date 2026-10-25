@@ -3,6 +3,7 @@ using EnigmaBudget.Api.Data;
 using EnigmaBudget.Api.Workspaces;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
+using EnigmaBudget.Api.Finance;
 
 namespace EnigmaBudget.Api.Identity;
 
@@ -65,6 +66,7 @@ public sealed class WorkspaceProvisioner(AppDbContext db, TimeProvider clock)
         };
         db.Workspaces.Add(personal);
         db.WorkspaceMemberships.Add(new WorkspaceMembership { Workspace = personal, User = user, Role = "Owner", JoinedAt = clock.GetUtcNow() });
+        CatalogDefaults.AddForWorkspace(db, personal.Id);
         try
         {
             await db.SaveChangesAsync(cancellationToken);

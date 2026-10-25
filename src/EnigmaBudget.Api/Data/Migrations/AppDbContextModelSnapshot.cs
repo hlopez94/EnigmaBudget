@@ -171,6 +171,9 @@ namespace EnigmaBudget.Api.Data.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<Guid?>("CategoryId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Currency")
                         .IsRequired()
                         .HasColumnType("text");
@@ -192,6 +195,9 @@ namespace EnigmaBudget.Api.Data.Migrations
                     b.Property<int>("InstallmentCount")
                         .HasColumnType("integer");
 
+                    b.Property<Guid?>("MerchantId")
+                        .HasColumnType("uuid");
+
                     b.Property<decimal>("TotalAmount")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
@@ -200,6 +206,10 @@ namespace EnigmaBudget.Api.Data.Migrations
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("WorkspaceId", "CategoryId");
+
+                    b.HasIndex("WorkspaceId", "MerchantId");
 
                     b.ToTable("Purchases");
                 });
@@ -263,6 +273,9 @@ namespace EnigmaBudget.Api.Data.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<Guid?>("CategoryId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Currency")
                         .IsRequired()
                         .HasColumnType("text");
@@ -274,6 +287,9 @@ namespace EnigmaBudget.Api.Data.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<Guid?>("IncomeSourceId")
+                        .HasColumnType("uuid");
+
                     b.Property<bool>("InitiallyPaid")
                         .HasColumnType("boolean");
 
@@ -283,6 +299,9 @@ namespace EnigmaBudget.Api.Data.Migrations
                     b.Property<string>("Kind")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<Guid?>("MerchantId")
+                        .HasColumnType("uuid");
 
                     b.Property<int>("Version")
                         .IsConcurrencyToken()
@@ -299,8 +318,14 @@ namespace EnigmaBudget.Api.Data.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("WorkspaceId", "CategoryId");
+
                     b.HasIndex("WorkspaceId", "Id")
                         .IsUnique();
+
+                    b.HasIndex("WorkspaceId", "IncomeSourceId");
+
+                    b.HasIndex("WorkspaceId", "MerchantId");
 
                     b.ToTable("FinanceOperations");
                 });
@@ -663,6 +688,9 @@ namespace EnigmaBudget.Api.Data.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<Guid?>("CategoryId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasColumnType("text");
@@ -674,6 +702,8 @@ namespace EnigmaBudget.Api.Data.Migrations
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("WorkspaceId", "CategoryId");
 
                     b.ToTable("StatementAdjustments");
                 });
@@ -865,6 +895,118 @@ namespace EnigmaBudget.Api.Data.Migrations
                         });
                 });
 
+            modelBuilder.Entity("EnigmaBudget.Api.Finance.FinanceCategory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsArchived")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
+
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WorkspaceId", "Kind", "Name")
+                        .IsUnique();
+
+                    b.ToTable("FinanceCategories", t =>
+                        {
+                            t.HasCheckConstraint("CK_FinanceCategories_Kind", "\"Kind\" IN ('Expense','Income')");
+                        });
+                });
+
+            modelBuilder.Entity("EnigmaBudget.Api.Finance.FinanceIncomeSource", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsArchived")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
+
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WorkspaceId", "Kind", "Name")
+                        .IsUnique();
+
+                    b.ToTable("FinanceIncomeSources", t =>
+                        {
+                            t.HasCheckConstraint("CK_FinanceIncomeSources_Kind", "\"Kind\" IN ('Salary','Extra','AnnualBonus','IndependentWork','Other')");
+                        });
+                });
+
+            modelBuilder.Entity("EnigmaBudget.Api.Finance.FinanceMerchant", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsArchived")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
+
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WorkspaceId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("FinanceMerchants");
+                });
+
             modelBuilder.Entity("EnigmaBudget.Api.Identity.NativeAuthChallenge", b =>
                 {
                     b.Property<Guid>("Id")
@@ -990,6 +1132,10 @@ namespace EnigmaBudget.Api.Data.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
 
+                    b.Property<string>("ComponentId")
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)");
+
                     b.Property<string>("Currency")
                         .HasMaxLength(3)
                         .HasColumnType("character varying(3)");
@@ -1016,10 +1162,6 @@ namespace EnigmaBudget.Api.Data.Migrations
                     b.Property<string>("SourceKind")
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
-
-                    b.Property<string>("ComponentId")
-                        .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
 
                     b.Property<int>("Version")
                         .IsConcurrencyToken()
@@ -1493,6 +1635,42 @@ namespace EnigmaBudget.Api.Data.Migrations
                     b.Navigation("Workspace");
                 });
 
+            modelBuilder.Entity("EnigmaBudget.Api.Data.CardPurchase", b =>
+                {
+                    b.HasOne("EnigmaBudget.Api.Finance.FinanceCategory", null)
+                        .WithMany()
+                        .HasForeignKey("WorkspaceId", "CategoryId")
+                        .HasPrincipalKey("WorkspaceId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("EnigmaBudget.Api.Finance.FinanceMerchant", null)
+                        .WithMany()
+                        .HasForeignKey("WorkspaceId", "MerchantId")
+                        .HasPrincipalKey("WorkspaceId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("EnigmaBudget.Api.Data.FinanceOperation", b =>
+                {
+                    b.HasOne("EnigmaBudget.Api.Finance.FinanceCategory", null)
+                        .WithMany()
+                        .HasForeignKey("WorkspaceId", "CategoryId")
+                        .HasPrincipalKey("WorkspaceId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("EnigmaBudget.Api.Finance.FinanceIncomeSource", null)
+                        .WithMany()
+                        .HasForeignKey("WorkspaceId", "IncomeSourceId")
+                        .HasPrincipalKey("WorkspaceId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("EnigmaBudget.Api.Finance.FinanceMerchant", null)
+                        .WithMany()
+                        .HasForeignKey("WorkspaceId", "MerchantId")
+                        .HasPrincipalKey("WorkspaceId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
             modelBuilder.Entity("EnigmaBudget.Api.Data.FinancePayment", b =>
                 {
                     b.HasOne("EnigmaBudget.Api.Data.FinanceOperation", null)
@@ -1537,6 +1715,15 @@ namespace EnigmaBudget.Api.Data.Migrations
                     b.Navigation("Workspace");
                 });
 
+            modelBuilder.Entity("EnigmaBudget.Api.Data.StatementAdjustment", b =>
+                {
+                    b.HasOne("EnigmaBudget.Api.Finance.FinanceCategory", null)
+                        .WithMany()
+                        .HasForeignKey("WorkspaceId", "CategoryId")
+                        .HasPrincipalKey("WorkspaceId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
             modelBuilder.Entity("EnigmaBudget.Api.Data.Workspace", b =>
                 {
                     b.HasOne("EnigmaBudget.Api.Workspaces.ApplicationUser", "OwnerUser")
@@ -1574,6 +1761,33 @@ namespace EnigmaBudget.Api.Data.Migrations
                         .WithOne()
                         .HasForeignKey("EnigmaBudget.Api.ExchangeRates.SavingsGoalRateChoiceEntity", "WorkspaceId", "GoalId")
                         .HasPrincipalKey("EnigmaBudget.Api.Savings.SavingsGoal", "WorkspaceId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("EnigmaBudget.Api.Finance.FinanceCategory", b =>
+                {
+                    b.HasOne("EnigmaBudget.Api.Data.Workspace", null)
+                        .WithMany()
+                        .HasForeignKey("WorkspaceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("EnigmaBudget.Api.Finance.FinanceIncomeSource", b =>
+                {
+                    b.HasOne("EnigmaBudget.Api.Data.Workspace", null)
+                        .WithMany()
+                        .HasForeignKey("WorkspaceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("EnigmaBudget.Api.Finance.FinanceMerchant", b =>
+                {
+                    b.HasOne("EnigmaBudget.Api.Data.Workspace", null)
+                        .WithMany()
+                        .HasForeignKey("WorkspaceId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

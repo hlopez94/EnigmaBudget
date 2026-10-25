@@ -48,6 +48,8 @@ public sealed class CardPurchase
     public DateOnly Date { get; set; }
     public string Description { get; set; } = "";
     public string Category { get; set; } = "";
+    public Guid? CategoryId { get; set; }
+    public Guid? MerchantId { get; set; }
     public string Currency { get; set; } = "ARS";
     public decimal TotalAmount { get; set; }
     public int InstallmentCount { get; set; }
@@ -102,6 +104,7 @@ public sealed class StatementAdjustment
     public Guid StatementId { get; set; }
     public string Description { get; set; } = "";
     public string Category { get; set; } = "";
+    public Guid? CategoryId { get; set; }
     public decimal Amount { get; set; }
 }
 
