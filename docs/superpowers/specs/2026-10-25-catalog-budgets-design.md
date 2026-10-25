@@ -49,6 +49,14 @@ Cada fila distingue presupuesto inexistente (`IsConfigured=false`, sin ID ni ver
 
 Las mutaciones guardan un `BudgetCommand` propio con hash del request tipado, resultado de definición inmutable, actor y fecha; comparten bloqueo, permiso vigente y transacción con presupuesto y auditoría. El reintento no se rompe por el archivo posterior de la categoría. La consulta incluye categorías activas y las archivadas con presupuesto o consumo relevante, conserva el snapshot de categoría en cada origen y explica operación, cuota y ajuste confirmado sin duplicar pagos ni totales de resúmenes. Las cuotas ya pagadas siguen siendo consumo del período. Los ajustes firmados pertenecen al componente de tarjeta; los registros sin clasificación se explican bajo el fallback protegido.
 
+## Precisión de la presentación y navegación
+
+“Consumo registrado” presenta la suma exacta del aporte de operaciones y del componente de tarjeta del período; el detalle separa “Operaciones registradas” y “Cuotas y ajustes de tarjeta”. Un pago parcial no reduce el consumo de la operación, y pagar el resumen no agrega consumo. La vista de presupuesto no llama “Caja” a importes de operaciones: ese dato no demuestra cuánto se pagó realmente desde una cuenta. Los saldos y movimientos bancarios conservan su circuito propio.
+
+Una categoría sin presupuesto muestra “Sin presupuestar” y no presenta un restante o un exceso respecto de un tope inexistente. Un límite explícito de cero sí muestra su restante aritmético, incluso negativo.
+
+Cambiar de sección dentro del mismo espacio conserva los formularios montados y sus borradores; no exige descartar datos que seguirán disponibles. Las vistas de categorías/comercios y fuentes conservan por separado nombre, tipo y recurso de sus formularios de creación. Cambiar de espacio, abrir una configuración que desmonta el circuito o cambiar un contexto que realmente reinicia el borrador mantiene la confirmación correspondiente. Durante un guardado sigue bloqueado el cambio de contexto.
+
 ## Criterios y decisiones abiertas
 
 - Historial conserva texto, ID de operación, montos y fechas; ninguna fuente/comercio se deduce automáticamente.
