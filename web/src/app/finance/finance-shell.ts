@@ -37,6 +37,11 @@ const today = (): string => {
   return [part('year'), part('month'), part('day')].join('-');
 };
 
+const monthName = new Intl.DateTimeFormat('es-AR', {
+  month: 'long',
+  timeZone: 'UTC',
+});
+
 @Component({
   selector: 'app-finance-shell',
   standalone: true,
@@ -76,6 +81,11 @@ export class FinanceShell implements OnInit, OnChanges {
   private workspaceManagerInstance: WorkspaceManager | null = null;
 
   period = today().slice(0, 7);
+  get periodLabel(): string {
+    const [year, month] = this.period.split('-');
+    const date = new Date(Date.UTC(Number(year), Number(month) - 1, 1));
+    return `${monthName.format(date)} ${year}`;
+  }
   section: FinanceSection = 'home';
   moreTarget: 'accounts' | 'setup' = 'accounts';
   requestedWorkspaceId = '';

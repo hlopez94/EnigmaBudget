@@ -24,7 +24,6 @@
       (closed)="closeForm()"
       [dismissible]="!saving"
       ><section class="panel">
-        <h3>Registrar ingreso o gasto</h3>
         <form (ngSubmit)="saveOperation()" class="form-grid">
           <label
             >Tipo<select name="opKind" [(ngModel)]="operationDraft.kind" [disabled]="saving">
@@ -78,7 +77,7 @@
               [(ngModel)]="operationDraft.paid"
               [disabled]="saving"
             />
-            Ya está cobrado/pagado</label
+            Ya está cobrado o pagado</label
           ><button class="primary" type="submit" [disabled]="saving || !activeAccounts.length">
             Guardar movimiento
           </button>
@@ -91,7 +90,6 @@
       (closed)="closeForm()"
       [dismissible]="!saving"
       ><section class="panel">
-        <h3>Transferir entre cuentas</h3>
         <p class="helper">
           La transferencia no cuenta como gasto. Para monedas distintas, informá los dos importes
           reales.

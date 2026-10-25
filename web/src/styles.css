@@ -109,6 +109,32 @@ body .finance-action-dialog .p-dialog-content {
   background: #fff;
   color: #202b23;
 }
+body .finance-action-dialog .panel {
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+body .finance-action-dialog .form-grid label.check {
+  display: flex !important;
+  align-items: center;
+  gap: 10px !important;
+  min-height: 44px;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.4;
+  cursor: pointer;
+}
+body .finance-action-dialog .form-grid label.check input[type='checkbox'] {
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  min-height: 18px;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--green);
+}
 
 /* Shared finance language for accounts, operations, cards and collaboration. */
 .shell .topbar {
@@ -505,6 +531,8 @@ body .finance-action-dialog .p-dialog-content {
 .shell app-finance-shell .workspace .balance-summary{grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);gap:18px;align-items:end;margin:0}
 .shell app-finance-shell .workspace .balance-summary .summary-card{background:transparent;border:0;border-radius:0;padding:2px 0 13px;gap:6px}
 .shell app-finance-shell .workspace .balance-summary .summary-card span{font-size:12px;letter-spacing:.035em;color:var(--muted)}
+.shell app-finance-shell .workspace .balance-summary .balance-value-line{display:flex;align-items:baseline;flex-wrap:wrap;gap:6px;min-width:0}
+.shell app-finance-shell .workspace .balance-summary .balance-value-line span{flex:none;font-weight:650}
 .shell app-finance-shell .workspace .balance-summary .summary-card strong{font-variant-numeric:tabular-nums;line-height:1.04;letter-spacing:-.055em;overflow-wrap:anywhere}
 .shell app-finance-shell .workspace .balance-summary .summary-card.ars strong{font-size:clamp(38px,5vw,64px);font-weight:650;color:#10271e}
 .shell app-finance-shell .workspace .balance-summary .summary-card.usd strong{font-size:clamp(27px,3vw,38px);font-weight:600;color:#162921}
@@ -571,8 +599,8 @@ body .finance-action-dialog .p-dialog-content {
 .shell app-finance-shell .workspace .home-content .overview-intro h2{font-size:12px}
 .shell app-finance-shell .workspace .home-content .overview-intro h2{display:none}
 .shell app-finance-shell .workspace .home-content .period-caption{font-size:10px}
-.shell app-finance-shell .workspace .balance-summary{grid-template-columns:minmax(0,1fr);gap:4px}
-.shell app-finance-shell .workspace .balance-summary .summary-card{padding:3px 0 4px;gap:4px}
+.shell app-finance-shell .workspace .balance-summary{grid-template-columns:minmax(0,1fr);gap:2px}
+.shell app-finance-shell .workspace .balance-summary .summary-card{padding:1px 0 4px;gap:2px}
 .shell app-finance-shell .workspace .balance-summary .summary-card span{font-size:12px}
 .shell app-finance-shell .workspace .balance-summary .summary-card.ars strong{font-size:clamp(39px,10vw,47px)}
 .shell app-finance-shell .workspace .balance-summary .summary-card.usd strong{font-size:30px}

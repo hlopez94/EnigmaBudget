@@ -789,8 +789,12 @@ test('keeps live ARS and USD balances readable with a long workspace name on pho
   await expect(page.locator('.summary-grid')).toBeVisible();
   await expect(page.getByText('Saldo en cuentas', { exact: true })).toBeVisible();
   await expect(page.locator('.workspace-picker select')).toHaveValue(workspaceId);
-  await expect(page.getByText('Pesos argentinos · ARS')).toBeVisible();
-  await expect(page.getByText('Dólares estadounidenses · USD')).toBeVisible();
+  const pesos = page.getByRole('article', { name: 'Saldo en pesos argentinos (ARS)' });
+  const dollars = page.getByRole('article', { name: 'Saldo en dólares estadounidenses (USD)' });
+  await expect(pesos).toBeVisible();
+  await expect(pesos.getByText('ARS', { exact: true })).toBeVisible();
+  await expect(dollars).toBeVisible();
+  await expect(dollars.getByText('USD', { exact: true })).toBeVisible();
 
   for (const viewport of [
     { width: 360, height: 844 },

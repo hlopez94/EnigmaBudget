@@ -178,43 +178,38 @@
           </p>
         }
         <section class="summary-grid balance-summary" aria-label="Saldo actual en cuentas, separado por moneda">
-          <article class="summary-card cash balance-card ars">
-            <span>Pesos argentinos · ARS</span
-            ><strong>{{ money(overview.totals.balanceArs, 'ARS') }}</strong
-            ><small>Dinero registrado en bancos</small>
+          <article class="summary-card cash balance-card ars" aria-label="Saldo en pesos argentinos (ARS)">
+            <div class="balance-value-line"><strong>{{ money(overview.totals.balanceArs, 'ARS') }}</strong><span>ARS</span></div>
+            <small>Dinero registrado en bancos</small>
           </article>
-          <article class="summary-card cash balance-card usd">
-            <span>Dólares estadounidenses · USD</span
-            ><strong>{{ money(overview.totals.balanceUsd, 'USD') }}</strong
-            ><small>Se mantiene separado de pesos</small>
+          <article class="summary-card cash balance-card usd" aria-label="Saldo en dólares estadounidenses (USD)">
+            <div class="balance-value-line"><strong>{{ money(overview.totals.balanceUsd, 'USD') }}</strong><span>USD</span></div>
+            <small>Se mantiene separado de pesos</small>
           </article>
         </section>
         <section class="quick-panel" aria-label="Acciones de finanzas">
           <div class="quick-actions">
             @if (canWrite) {
               <button class="primary main-action" type="button" (click)="navigate('operations')"><i class="pi pi-plus" aria-hidden="true"></i><span>Registrar movimiento</span><i class="pi pi-chevron-right action-arrow" aria-hidden="true"></i></button>
-              <button type="button" (click)="navigate('cards')"><i class="pi pi-plus" aria-hidden="true"></i> Cargar compra</button>
             }
-            @if (canReadGroups) { <button type="button" (click)="navigate('sharing')">Ver cobros compartidos</button> }
           </div>
         </section>
         <div class="overview-columns dashboard-columns">
           <section class="panel dash-panel commitments-panel">
             <div class="panel-title">
               <div>
-                <p class="eyebrow">{{ period }}</p>
                 <h3>Este mes</h3>
               </div>
               <button type="button" class="text-action" (click)="navigate('cards')">{{ cards.length === 0 && canManageResources ? 'Agregar tarjeta' : 'Ver tarjetas' }}</button>
             </div>
             <div class="finance-row">
               <span class="finance-row-icon" aria-hidden="true"><i class="pi pi-credit-card"></i></span>
-              <div class="finance-row-label"><b>Cuotas de tarjeta del mes</b><small>{{ period }} · ARS</small></div>
+              <div class="finance-row-label"><b>Cuotas de tarjeta del mes</b><small>{{ periodLabel }} · ARS</small></div>
               <strong>{{ money(overview.budget.cardInstallmentsArs, 'ARS') }}</strong>
             </div>
             <div class="finance-row">
               <span class="finance-row-icon" aria-hidden="true"><i class="pi pi-credit-card"></i></span>
-              <div class="finance-row-label"><b>Cuotas de tarjeta del mes</b><small>{{ period }} · USD</small></div>
+              <div class="finance-row-label"><b>Cuotas de tarjeta del mes</b><small>{{ periodLabel }} · USD</small></div>
               <strong>{{ money(overview.budget.cardInstallmentsUsd, 'USD') }}</strong>
             </div>
             <div class="finance-row debt-row">
@@ -225,11 +220,31 @@
                 <strong>{{ money(overview.totals.cardDebtUsd, 'USD') }}</strong><small>USD</small>
               </div>
             </div>
-            @if (cards.length > 0) {
+            @if (cards.length > 0 && (overview.totals.cardCreditArs !== '0.00' || overview.totals.cardCreditUsd !== '0.00')) {
               <div class="credit-balances" aria-label="Crédito a favor de tarjetas, separado por moneda">
                 <span>Crédito a favor</span>
                 <b>{{ money(overview.totals.cardCreditArs, 'ARS') }} ARS</b>
                 <b>{{ money(overview.totals.cardCreditUsd, 'USD') }} USD</b>
+              </div>
+            }
+          </section>
+          <section class="panel dash-panel accounts-panel">
+            <div class="panel-title">
+              <div><h3>Tus cuentas</h3></div>
+              <button type="button" class="text-action" (click)="navigate('accounts')">Administrar cuentas</button>
+            </div>
+            @if (activeAccounts.length === 0) {
+              <div class="empty">
+                <b>Empezá por agregar una cuenta</b>
+                <p>Vas a poder registrar ingresos, gastos y pagos desde esa cuenta.</p>
+                @if (canManageResources) { <button type="button" (click)="navigate('accounts')">Agregar cuenta</button> }
+              </div>
+            }
+            @for (account of activeAccounts; track account.id) {
+              <div class="finance-row account-row">
+                <span class="finance-row-icon" aria-hidden="true"><i class="pi pi-building-columns"></i></span>
+                <div class="finance-row-label"><b>{{ account.name }}</b><small>{{ account.bankName }} · {{ account.currency }}</small></div>
+                <strong>{{ money(account.currentBalance, account.currency) }}</strong>
               </div>
             }
             @if (cards.length > 0) {
@@ -253,26 +268,6 @@
               <div class="month-cost"><span>Cargos confirmados · ARS</span><b>{{ money(overview.budget.cardChargesArs, 'ARS') }}</b></div>
               <div class="month-cost"><span>Cargos confirmados · USD</span><b>{{ money(overview.budget.cardChargesUsd, 'USD') }}</b></div>
             </details>
-          </section>
-          <section class="panel dash-panel accounts-panel">
-            <div class="panel-title">
-              <div><p class="eyebrow">DINERO REGISTRADO EN BANCOS</p><h3>Tus cuentas</h3></div>
-              <button type="button" class="text-action" (click)="navigate('accounts')">Administrar cuentas</button>
-            </div>
-            @if (activeAccounts.length === 0) {
-              <div class="empty">
-                <b>Empezá por agregar una cuenta</b>
-                <p>Vas a poder registrar ingresos, gastos y pagos desde esa cuenta.</p>
-                @if (canManageResources) { <button type="button" (click)="navigate('accounts')">Agregar cuenta</button> }
-              </div>
-            }
-            @for (account of activeAccounts; track account.id) {
-              <div class="finance-row account-row">
-                <span class="finance-row-icon" aria-hidden="true"><i class="pi pi-building-columns"></i></span>
-                <div class="finance-row-label"><b>{{ account.name }}</b><small>{{ account.bankName }} · {{ account.currency }}</small></div>
-                <strong>{{ money(account.currentBalance, account.currency) }}</strong>
-              </div>
-            }
           </section>
         </div>
       </main>
