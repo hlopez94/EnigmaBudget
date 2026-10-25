@@ -21,8 +21,8 @@ import {
   WorkspaceMember,
 } from './api.models';
 
-type Fetcher = typeof fetch;
-const API_FETCHER = new InjectionToken<Fetcher>('API_FETCHER');
+export type Fetcher = typeof fetch;
+export const API_FETCHER = new InjectionToken<Fetcher>('API_FETCHER');
 export class ApiProblem extends Error {
   constructor(
     readonly status: number,
