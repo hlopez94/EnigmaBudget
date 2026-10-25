@@ -79,7 +79,7 @@ public sealed class FinanceOperation
     public Guid Id { get; set; }
     public Guid WorkspaceId { get; set; }
     public string Kind { get; set; } = "";
-    public Guid AccountId { get; set; }
+    public Guid? AccountId { get; set; }
     public DateOnly Date { get; set; }
     public string Description { get; set; } = "";
     public string Category { get; set; } = "";
@@ -149,6 +149,12 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<PaymentCard> Cards => Set<PaymentCard>();
     public DbSet<OpeningBalanceRecord> OpeningBalances => Set<OpeningBalanceRecord>();
     public DbSet<FinanceOperation> FinanceOperations => Set<FinanceOperation>();
+    public DbSet<RecurringRule> RecurringRules => Set<RecurringRule>();
+    public DbSet<RecurringRuleRevision> RecurringRuleRevisions => Set<RecurringRuleRevision>();
+    public DbSet<RecurringOccurrenceAction> RecurringOccurrenceActions => Set<RecurringOccurrenceAction>();
+    public DbSet<HealthcareComponent> HealthcareComponents => Set<HealthcareComponent>();
+    public DbSet<NonCashSettlement> NonCashSettlements => Set<NonCashSettlement>();
+    public DbSet<RecurringRuleCommand> RecurringRuleCommands => Set<RecurringRuleCommand>();
     public DbSet<FinanceCategory> FinanceCategories => Set<FinanceCategory>();
     public DbSet<FinanceMerchant> FinanceMerchants => Set<FinanceMerchant>();
     public DbSet<FinanceIncomeSource> FinanceIncomeSources => Set<FinanceIncomeSource>();
@@ -272,6 +278,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         model.Entity<FinanceOperation>().Property(x => x.CatalogSelectionHash).HasMaxLength(64);
         model.Entity<FinanceOperation>().Property(x => x.Version).IsConcurrencyToken();
         model.Entity<FinanceOperation>().HasIndex(x => new { x.WorkspaceId, x.Id }).IsUnique();
+        model.Entity<FinanceOperation>().ToTable(t => t.HasCheckConstraint("CK_FinanceOperations_NullAccountExpenseOnly", "\"AccountId\" IS NOT NULL OR \"Kind\" = 'Expense'"));
+        model.Entity<FinanceOperation>().HasOne<BankAccount>().WithMany().HasForeignKey(x => new { x.WorkspaceId, x.AccountId }).HasPrincipalKey(x => new { x.WorkspaceId, x.Id }).OnDelete(DeleteBehavior.Restrict);
         model.Entity<FinanceCategory>().HasKey(x => x.Id);
         model.Entity<FinanceCategory>().HasAlternateKey(x => new { x.WorkspaceId, x.Id });
         model.Entity<FinanceCategory>().Property(x => x.Kind).HasMaxLength(20);
@@ -310,6 +318,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         model.Entity<FinanceOperation>().HasOne<FinanceIncomeSource>().WithMany().HasForeignKey(x => new { x.WorkspaceId, x.IncomeSourceId }).HasPrincipalKey(x => new { x.WorkspaceId, x.Id }).OnDelete(DeleteBehavior.Restrict);
         model.Entity<FinancePayment>().Property(x => x.Amount).HasPrecision(18, 2);
         model.Entity<FinancePayment>().HasAlternateKey(x => new { x.WorkspaceId, x.Id });
+        model.Entity<FinancePayment>().HasOne<BankAccount>().WithMany().HasForeignKey(x => new { x.WorkspaceId, x.AccountId }).HasPrincipalKey(x => new { x.WorkspaceId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+        model.Entity<FinancePayment>().HasOne<FinanceOperation>().WithMany(x => x.Payments).HasForeignKey(x => new { x.WorkspaceId, x.OperationId }).HasPrincipalKey(x => new { x.WorkspaceId, x.Id }).OnDelete(DeleteBehavior.Cascade);
         model.Entity<BankAccount>().HasAlternateKey(x => new { x.WorkspaceId, x.Id });
         model.Entity<LedgerEntry>().Property(x => x.Amount).HasPrecision(18, 2);
         model.Entity<LedgerEntry>().Property(x => x.ObservedBalance).HasPrecision(18, 2);
@@ -340,6 +350,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         model.Entity<RuleWeight>().Property(x => x.Value).HasPrecision(18, 2);
         model.Entity<CardPurchase>().Property(x => x.TotalAmount).HasPrecision(18, 2);
         model.Entity<CardPurchase>().Property(x => x.CatalogSelectionHash).HasMaxLength(64);
+        model.Entity<CardPurchase>().HasAlternateKey(x => new { x.WorkspaceId, x.Id });
+        model.Entity<CardPurchase>().HasIndex(x => new { x.WorkspaceId, x.ExpenseOperationId }).IsUnique().HasFilter("\"ExpenseOperationId\" IS NOT NULL");
+        model.Entity<CardPurchase>().HasOne<FinanceOperation>().WithMany().HasForeignKey(x => new { x.WorkspaceId, x.ExpenseOperationId }).HasPrincipalKey(x => new { x.WorkspaceId, x.Id }).OnDelete(DeleteBehavior.Restrict);
         model.Entity<CardPurchase>().HasOne<FinanceCategory>().WithMany().HasForeignKey(x => new { x.WorkspaceId, x.CategoryId }).HasPrincipalKey(x => new { x.WorkspaceId, x.Id }).OnDelete(DeleteBehavior.Restrict);
         model.Entity<CardPurchase>().HasOne<FinanceMerchant>().WithMany().HasForeignKey(x => new { x.WorkspaceId, x.MerchantId }).HasPrincipalKey(x => new { x.WorkspaceId, x.Id }).OnDelete(DeleteBehavior.Restrict);
         model.Entity<CardInstallment>().Property(x => x.Amount).HasPrecision(18, 2);
@@ -461,6 +474,99 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         model.Entity<SavingsGoalRateChoiceEntity>().HasOne<ExchangeRateSnapshot>().WithMany().HasForeignKey(x => x.SnapshotId).OnDelete(DeleteBehavior.Restrict);
         model.Entity<ExchangeRateRefreshCommand>().HasKey(x => new { x.WorkspaceId, x.RequestId });
         model.Entity<ExchangeRateRefreshCommand>().HasOne<Workspace>().WithMany().HasForeignKey(x => x.WorkspaceId).OnDelete(DeleteBehavior.Cascade);
+
+        model.Entity<PaymentCard>().HasAlternateKey(x => new { x.WorkspaceId, x.Id });
+        model.Entity<RecurringRule>().HasKey(x => x.Id);
+        model.Entity<RecurringRule>().HasAlternateKey(x => new { x.WorkspaceId, x.Id });
+        model.Entity<RecurringRule>().Property(x => x.State).HasMaxLength(20);
+        model.Entity<RecurringRule>().HasIndex(x => new { x.WorkspaceId, x.Id }).IsUnique();
+        model.Entity<RecurringRule>().ToTable(t => t.HasCheckConstraint("CK_RecurringRules_State", "\"State\" IN ('Active','Paused','Ended') AND \"CurrentVersion\" > 0"));
+        model.Entity<RecurringRule>().HasOne<Workspace>().WithMany().HasForeignKey(x => x.WorkspaceId).OnDelete(DeleteBehavior.Cascade);
+
+        model.Entity<RecurringRuleRevision>().HasKey(x => x.Id);
+        model.Entity<RecurringRuleRevision>().HasAlternateKey(x => new { x.WorkspaceId, x.Id });
+        model.Entity<RecurringRuleRevision>().HasAlternateKey(x => new { x.WorkspaceId, x.RuleId, x.Id });
+        model.Entity<RecurringRuleRevision>().Property(x => x.State).HasMaxLength(20);
+        model.Entity<RecurringRuleRevision>().Property(x => x.Flow).HasMaxLength(20);
+        model.Entity<RecurringRuleRevision>().Property(x => x.Description).HasMaxLength(240);
+        model.Entity<RecurringRuleRevision>().Property(x => x.Amount).HasPrecision(18, 2);
+        model.Entity<RecurringRuleRevision>().Property(x => x.AmountMode).HasMaxLength(20);
+        model.Entity<RecurringRuleRevision>().Property(x => x.Currency).HasMaxLength(3);
+        model.Entity<RecurringRuleRevision>().Property(x => x.Frequency).HasMaxLength(20);
+        model.Entity<RecurringRuleRevision>().HasIndex(x => new { x.WorkspaceId, x.RuleId, x.Version }).IsUnique();
+        model.Entity<RecurringRuleRevision>().HasIndex(x => new { x.WorkspaceId, x.RuleId, x.EffectiveFrom, x.Version });
+        model.Entity<RecurringRuleRevision>().ToTable(t => {
+            t.HasCheckConstraint("CK_RecurringRuleRevisions_State", "\"State\" IN ('Active','Paused','Ended')");
+            t.HasCheckConstraint("CK_RecurringRuleRevisions_Version", "\"Version\" > 0");
+            t.HasCheckConstraint("CK_RecurringRuleRevisions_Amount", "\"Amount\" > 0");
+            t.HasCheckConstraint("CK_RecurringRuleRevisions_Interval", "\"Interval\" > 0");
+            t.HasCheckConstraint("CK_RecurringRuleRevisions_FlowAndAmountMode", "\"Flow\" IN ('Income','Expense') AND \"AmountMode\" IN ('Fixed','Estimated')");
+            t.HasCheckConstraint("CK_RecurringRuleRevisions_Frequency", "\"Frequency\" IN ('Monthly','Weekly','Annual')");
+            t.HasCheckConstraint("CK_RecurringRuleRevisions_DueDay", "\"DueDay\" IS NULL OR \"DueDay\" BETWEEN 1 AND 31");
+            t.HasCheckConstraint("CK_RecurringRuleRevisions_Currency", "\"Currency\" IN ('ARS','USD')");
+        });
+        model.Entity<RecurringRuleRevision>().HasOne<RecurringRule>().WithMany().HasForeignKey(x => new { x.WorkspaceId, x.RuleId }).HasPrincipalKey(x => new { x.WorkspaceId, x.Id }).OnDelete(DeleteBehavior.Cascade);
+        model.Entity<RecurringRuleRevision>().HasOne<FinanceCategory>().WithMany().HasForeignKey(x => new { x.WorkspaceId, x.CategoryId }).HasPrincipalKey(x => new { x.WorkspaceId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+        model.Entity<RecurringRuleRevision>().HasOne<FinanceMerchant>().WithMany().HasForeignKey(x => new { x.WorkspaceId, x.MerchantId }).HasPrincipalKey(x => new { x.WorkspaceId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+        model.Entity<RecurringRuleRevision>().HasOne<FinanceIncomeSource>().WithMany().HasForeignKey(x => new { x.WorkspaceId, x.IncomeSourceId }).HasPrincipalKey(x => new { x.WorkspaceId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+        model.Entity<RecurringRuleRevision>().HasOne<BankAccount>().WithMany().HasForeignKey(x => new { x.WorkspaceId, x.PreferredAccountId }).HasPrincipalKey(x => new { x.WorkspaceId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+        model.Entity<RecurringRuleRevision>().HasOne<PaymentCard>().WithMany().HasForeignKey(x => new { x.WorkspaceId, x.PreferredCardId }).HasPrincipalKey(x => new { x.WorkspaceId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+
+        model.Entity<RecurringOccurrenceAction>().HasKey(x => x.Id);
+        model.Entity<RecurringOccurrenceAction>().HasAlternateKey(x => new { x.WorkspaceId, x.Id });
+        model.Entity<RecurringOccurrenceAction>().HasAlternateKey(x => new { x.WorkspaceId, x.Id, x.RuleRevisionId });
+        model.Entity<RecurringOccurrenceAction>().Property(x => x.Outcome).HasMaxLength(20);
+        model.Entity<RecurringOccurrenceAction>().Property(x => x.Reason).HasMaxLength(240);
+        model.Entity<RecurringOccurrenceAction>().Property(x => x.PayloadHash).HasMaxLength(64);
+        model.Entity<RecurringOccurrenceAction>().HasIndex(x => new { x.WorkspaceId, x.RuleId, x.ScheduledDate }).IsUnique();
+        model.Entity<RecurringOccurrenceAction>().HasIndex(x => new { x.WorkspaceId, x.RequestId }).IsUnique();
+        model.Entity<RecurringOccurrenceAction>().ToTable(t => t.HasCheckConstraint("CK_RecurringOccurrenceActions_OutcomeSources", "(\"Outcome\" = 'Recorded' AND \"FinanceOperationId\" IS NOT NULL) OR (\"Outcome\" = 'Skipped' AND \"FinanceOperationId\" IS NULL AND \"CardPurchaseId\" IS NULL)"));
+        model.Entity<RecurringOccurrenceAction>().HasOne<RecurringRule>().WithMany().HasForeignKey(x => new { x.WorkspaceId, x.RuleId }).HasPrincipalKey(x => new { x.WorkspaceId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+        model.Entity<RecurringOccurrenceAction>().HasOne<RecurringRuleRevision>().WithMany().HasForeignKey(x => new { x.WorkspaceId, x.RuleId, x.RuleRevisionId }).HasPrincipalKey(x => new { x.WorkspaceId, x.RuleId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+        model.Entity<RecurringOccurrenceAction>().HasOne<FinanceOperation>().WithMany().HasForeignKey(x => new { x.WorkspaceId, x.FinanceOperationId }).HasPrincipalKey(x => new { x.WorkspaceId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+        model.Entity<RecurringOccurrenceAction>().HasOne<CardPurchase>().WithMany().HasForeignKey(x => new { x.WorkspaceId, x.CardPurchaseId }).HasPrincipalKey(x => new { x.WorkspaceId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+
+        model.Entity<HealthcareComponent>().HasKey(x => x.Id);
+        model.Entity<HealthcareComponent>().HasAlternateKey(x => new { x.WorkspaceId, x.Id });
+        model.Entity<HealthcareComponent>().Property(x => x.Kind).HasMaxLength(32);
+        model.Entity<HealthcareComponent>().Property(x => x.Amount).HasPrecision(18, 2);
+        model.Entity<HealthcareComponent>().ToTable(t => {
+            t.HasCheckConstraint("CK_HealthcareComponents_Kind", "\"Kind\" IN ('ProviderCharge','ProviderDiscount','PayrollWithholding','HouseholdContribution','ExpectedRefund','Other')");
+            t.HasCheckConstraint("CK_HealthcareComponents_Amount", "\"Amount\" > 0");
+            t.HasCheckConstraint("CK_HealthcareComponents_AppliesToProviderBalance", "NOT \"AppliesToProviderBalance\" OR \"Kind\" = 'PayrollWithholding'");
+        });
+        model.Entity<HealthcareComponent>().HasOne<Workspace>().WithMany().HasForeignKey(x => x.WorkspaceId).OnDelete(DeleteBehavior.Cascade);
+        model.Entity<HealthcareComponent>().HasOne<RecurringRuleRevision>().WithMany().HasForeignKey(x => new { x.WorkspaceId, x.RuleRevisionId }).HasPrincipalKey(x => new { x.WorkspaceId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+        model.Entity<HealthcareComponent>().HasOne<RecurringOccurrenceAction>().WithMany().HasForeignKey(x => new { x.WorkspaceId, x.OccurrenceActionId, x.RuleRevisionId }).HasPrincipalKey(x => new { x.WorkspaceId, x.Id, x.RuleRevisionId }).OnDelete(DeleteBehavior.Restrict);
+
+        model.Entity<NonCashSettlement>().HasKey(x => x.Id);
+        model.Entity<NonCashSettlement>().HasAlternateKey(x => new { x.WorkspaceId, x.Id });
+        model.Entity<NonCashSettlement>().Property(x => x.Currency).HasMaxLength(3);
+        model.Entity<NonCashSettlement>().Property(x => x.Kind).HasMaxLength(24);
+        model.Entity<NonCashSettlement>().Property(x => x.Amount).HasPrecision(18, 2);
+        model.Entity<NonCashSettlement>().Property(x => x.PayloadHash).HasMaxLength(64);
+        model.Entity<NonCashSettlement>().HasIndex(x => new { x.WorkspaceId, x.RequestId }).IsUnique();
+        model.Entity<NonCashSettlement>().HasIndex(x => new { x.WorkspaceId, x.ReversesSettlementId }).IsUnique().HasFilter("\"ReversesSettlementId\" IS NOT NULL");
+        model.Entity<NonCashSettlement>().ToTable(t => {
+            t.HasCheckConstraint("CK_NonCashSettlements_Amount", "\"Amount\" > 0");
+            t.HasCheckConstraint("CK_NonCashSettlements_KindSource", "(\"Kind\" = 'PayrollWithholding' AND \"HealthcareComponentId\" IS NOT NULL AND \"CardPurchaseId\" IS NULL AND \"ReversesSettlementId\" IS NULL) OR (\"Kind\" = 'CardCharge' AND \"HealthcareComponentId\" IS NULL AND \"CardPurchaseId\" IS NOT NULL AND \"ReversesSettlementId\" IS NULL) OR (\"Kind\" = 'Reversal' AND \"HealthcareComponentId\" IS NULL AND \"CardPurchaseId\" IS NULL AND \"ReversesSettlementId\" IS NOT NULL)");
+            t.HasCheckConstraint("CK_NonCashSettlements_Currency", "\"Currency\" IN ('ARS','USD')");
+        });
+        model.Entity<NonCashSettlement>().HasOne<Workspace>().WithMany().HasForeignKey(x => x.WorkspaceId).OnDelete(DeleteBehavior.Cascade);
+        model.Entity<NonCashSettlement>().HasOne<FinanceOperation>().WithMany().HasForeignKey(x => new { x.WorkspaceId, x.OperationId }).HasPrincipalKey(x => new { x.WorkspaceId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+        model.Entity<NonCashSettlement>().HasOne<HealthcareComponent>().WithMany().HasForeignKey(x => new { x.WorkspaceId, x.HealthcareComponentId }).HasPrincipalKey(x => new { x.WorkspaceId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+        model.Entity<NonCashSettlement>().HasOne<CardPurchase>().WithMany().HasForeignKey(x => new { x.WorkspaceId, x.CardPurchaseId }).HasPrincipalKey(x => new { x.WorkspaceId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+        model.Entity<NonCashSettlement>().HasOne<NonCashSettlement>().WithMany().HasForeignKey(x => new { x.WorkspaceId, x.ReversesSettlementId }).HasPrincipalKey(x => new { x.WorkspaceId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+        model.Entity<NonCashSettlement>().HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.ActorUserId).OnDelete(DeleteBehavior.Restrict);
+
+        model.Entity<RecurringRuleCommand>().HasKey(x => x.Id);
+        model.Entity<RecurringRuleCommand>().HasIndex(x => new { x.WorkspaceId, x.RequestId }).IsUnique();
+        model.Entity<RecurringRuleCommand>().Property(x => x.CommandKind).HasMaxLength(80);
+        model.Entity<RecurringRuleCommand>().Property(x => x.PayloadHash).HasMaxLength(64);
+        model.Entity<RecurringRuleCommand>().Property(x => x.ResultJson).HasColumnType("jsonb");
+        model.Entity<RecurringRuleCommand>().HasOne<Workspace>().WithMany().HasForeignKey(x => x.WorkspaceId).OnDelete(DeleteBehavior.Cascade);
+        model.Entity<RecurringRuleCommand>().HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.ActorUserId).OnDelete(DeleteBehavior.Restrict);
+        model.Entity<RecurringRuleCommand>().HasOne<RecurringRule>().WithMany().HasForeignKey(x => new { x.WorkspaceId, x.RuleId }).HasPrincipalKey(x => new { x.WorkspaceId, x.Id }).OnDelete(DeleteBehavior.Restrict);
 
         model.Entity<MonthlyBudget>().HasKey(x => x.Id);
         model.Entity<MonthlyBudget>().HasAlternateKey(x => new { x.WorkspaceId, x.Id });

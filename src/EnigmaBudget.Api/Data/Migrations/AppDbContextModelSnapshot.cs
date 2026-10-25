@@ -189,6 +189,9 @@ namespace EnigmaBudget.Api.Data.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<Guid?>("ExpenseOperationId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("FirstPeriod")
                         .IsRequired()
                         .HasColumnType("text");
@@ -215,6 +218,10 @@ namespace EnigmaBudget.Api.Data.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("WorkspaceId", "CategoryId");
+
+                    b.HasIndex("WorkspaceId", "ExpenseOperationId")
+                        .IsUnique()
+                        .HasFilter("\"ExpenseOperationId\" IS NOT NULL");
 
                     b.HasIndex("WorkspaceId", "MerchantId");
 
@@ -269,7 +276,7 @@ namespace EnigmaBudget.Api.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("AccountId")
+                    b.Property<Guid?>("AccountId")
                         .HasColumnType("uuid");
 
                     b.Property<decimal>("Amount")
@@ -335,6 +342,8 @@ namespace EnigmaBudget.Api.Data.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("WorkspaceId", "AccountId");
+
                     b.HasIndex("WorkspaceId", "CategoryId");
 
                     b.HasIndex("WorkspaceId", "Id")
@@ -344,7 +353,10 @@ namespace EnigmaBudget.Api.Data.Migrations
 
                     b.HasIndex("WorkspaceId", "MerchantId");
 
-                    b.ToTable("FinanceOperations");
+                    b.ToTable("FinanceOperations", t =>
+                        {
+                            t.HasCheckConstraint("CK_FinanceOperations_NullAccountExpenseOnly", "\"AccountId\" IS NOT NULL OR \"Kind\" = 'Expense'");
+                        });
                 });
 
             modelBuilder.Entity("EnigmaBudget.Api.Data.FinancePayment", b =>
@@ -367,9 +379,6 @@ namespace EnigmaBudget.Api.Data.Migrations
                     b.Property<DateOnly>("Date")
                         .HasColumnType("date");
 
-                    b.Property<Guid?>("FinanceOperationId")
-                        .HasColumnType("uuid");
-
                     b.Property<Guid>("OperationId")
                         .HasColumnType("uuid");
 
@@ -378,7 +387,9 @@ namespace EnigmaBudget.Api.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("FinanceOperationId");
+                    b.HasIndex("WorkspaceId", "AccountId");
+
+                    b.HasIndex("WorkspaceId", "OperationId");
 
                     b.ToTable("FinancePayments");
                 });
@@ -597,8 +608,6 @@ namespace EnigmaBudget.Api.Data.Migrations
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("WorkspaceId");
 
                     b.ToTable("Cards");
                 });
@@ -1111,6 +1120,52 @@ namespace EnigmaBudget.Api.Data.Migrations
                     b.ToTable("FinanceMerchants");
                 });
 
+            modelBuilder.Entity("EnigmaBudget.Api.Finance.HealthcareComponent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<bool>("AppliesToProviderBalance")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<Guid?>("OccurrenceActionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ParticipantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("RuleRevisionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WorkspaceId", "RuleRevisionId");
+
+                    b.HasIndex("WorkspaceId", "OccurrenceActionId", "RuleRevisionId");
+
+                    b.ToTable("HealthcareComponents", t =>
+                        {
+                            t.HasCheckConstraint("CK_HealthcareComponents_Amount", "\"Amount\" > 0");
+
+                            t.HasCheckConstraint("CK_HealthcareComponents_AppliesToProviderBalance", "NOT \"AppliesToProviderBalance\" OR \"Kind\" = 'PayrollWithholding'");
+
+                            t.HasCheckConstraint("CK_HealthcareComponents_Kind", "\"Kind\" IN ('ProviderCharge','ProviderDiscount','PayrollWithholding','HouseholdContribution','ExpectedRefund','Other')");
+                        });
+                });
+
             modelBuilder.Entity("EnigmaBudget.Api.Finance.MonthlyBudget", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1153,6 +1208,339 @@ namespace EnigmaBudget.Api.Data.Migrations
                     b.ToTable("MonthlyBudgets", t =>
                         {
                             t.HasCheckConstraint("CK_MonthlyBudgets_Limit_NonNegative", "\"Limit\" >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("EnigmaBudget.Api.Finance.NonCashSettlement", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ActorUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<Guid?>("CardPurchaseId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("CauseVoidRequestId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)");
+
+                    b.Property<Guid?>("HealthcareComponentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)");
+
+                    b.Property<Guid>("OperationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("PayloadHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid>("RequestId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ReversesSettlementId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ActorUserId");
+
+                    b.HasIndex("WorkspaceId", "CardPurchaseId");
+
+                    b.HasIndex("WorkspaceId", "HealthcareComponentId");
+
+                    b.HasIndex("WorkspaceId", "OperationId");
+
+                    b.HasIndex("WorkspaceId", "RequestId")
+                        .IsUnique();
+
+                    b.HasIndex("WorkspaceId", "ReversesSettlementId")
+                        .IsUnique()
+                        .HasFilter("\"ReversesSettlementId\" IS NOT NULL");
+
+                    b.ToTable("NonCashSettlements", t =>
+                        {
+                            t.HasCheckConstraint("CK_NonCashSettlements_Amount", "\"Amount\" > 0");
+
+                            t.HasCheckConstraint("CK_NonCashSettlements_Currency", "\"Currency\" IN ('ARS','USD')");
+
+                            t.HasCheckConstraint("CK_NonCashSettlements_KindSource", "(\"Kind\" = 'PayrollWithholding' AND \"HealthcareComponentId\" IS NOT NULL AND \"CardPurchaseId\" IS NULL AND \"ReversesSettlementId\" IS NULL) OR (\"Kind\" = 'CardCharge' AND \"HealthcareComponentId\" IS NULL AND \"CardPurchaseId\" IS NOT NULL AND \"ReversesSettlementId\" IS NULL) OR (\"Kind\" = 'Reversal' AND \"HealthcareComponentId\" IS NULL AND \"CardPurchaseId\" IS NULL AND \"ReversesSettlementId\" IS NOT NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("EnigmaBudget.Api.Finance.RecurringOccurrenceAction", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("CardPurchaseId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("FinanceOperationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("PayloadHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(240)
+                        .HasColumnType("character varying(240)");
+
+                    b.Property<Guid>("RequestId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("RuleId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("RuleRevisionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateOnly>("ScheduledDate")
+                        .HasColumnType("date");
+
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("WorkspaceId", "Id");
+
+                    b.HasIndex("WorkspaceId", "CardPurchaseId");
+
+                    b.HasIndex("WorkspaceId", "FinanceOperationId");
+
+                    b.HasIndex("WorkspaceId", "RequestId")
+                        .IsUnique();
+
+                    b.HasIndex("WorkspaceId", "RuleId", "RuleRevisionId");
+
+                    b.HasIndex("WorkspaceId", "RuleId", "ScheduledDate")
+                        .IsUnique();
+
+                    b.ToTable("RecurringOccurrenceActions", t =>
+                        {
+                            t.HasCheckConstraint("CK_RecurringOccurrenceActions_OutcomeSources", "(\"Outcome\" = 'Recorded' AND \"FinanceOperationId\" IS NOT NULL) OR (\"Outcome\" = 'Skipped' AND \"FinanceOperationId\" IS NULL AND \"CardPurchaseId\" IS NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("EnigmaBudget.Api.Finance.RecurringRule", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("CurrentVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WorkspaceId", "Id")
+                        .IsUnique();
+
+                    b.ToTable("RecurringRules", t =>
+                        {
+                            t.HasCheckConstraint("CK_RecurringRules_State", "\"State\" IN ('Active','Paused','Ended') AND \"CurrentVersion\" > 0");
+                        });
+                });
+
+            modelBuilder.Entity("EnigmaBudget.Api.Finance.RecurringRuleCommand", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ActorUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CommandKind")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("PayloadHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid>("RequestId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ResultJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<Guid>("RuleId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ActorUserId");
+
+                    b.HasIndex("WorkspaceId", "RequestId")
+                        .IsUnique();
+
+                    b.HasIndex("WorkspaceId", "RuleId");
+
+                    b.ToTable("RecurringRuleCommands");
+                });
+
+            modelBuilder.Entity("EnigmaBudget.Api.Finance.RecurringRuleRevision", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("AmountMode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<Guid?>("CategoryId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(240)
+                        .HasColumnType("character varying(240)");
+
+                    b.Property<int?>("DueDay")
+                        .HasColumnType("integer");
+
+                    b.Property<DateOnly>("EffectiveFrom")
+                        .HasColumnType("date");
+
+                    b.Property<DateOnly?>("EndDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Flow")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Frequency")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<Guid?>("IncomeSourceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Interval")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("MerchantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("PreferredAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("PreferredCardId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("RuleId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateOnly>("ScheduleAnchorDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WorkspaceId", "CategoryId");
+
+                    b.HasIndex("WorkspaceId", "IncomeSourceId");
+
+                    b.HasIndex("WorkspaceId", "MerchantId");
+
+                    b.HasIndex("WorkspaceId", "PreferredAccountId");
+
+                    b.HasIndex("WorkspaceId", "PreferredCardId");
+
+                    b.HasIndex("WorkspaceId", "RuleId", "Version")
+                        .IsUnique();
+
+                    b.HasIndex("WorkspaceId", "RuleId", "EffectiveFrom", "Version");
+
+                    b.ToTable("RecurringRuleRevisions", t =>
+                        {
+                            t.HasCheckConstraint("CK_RecurringRuleRevisions_Amount", "\"Amount\" > 0");
+
+                            t.HasCheckConstraint("CK_RecurringRuleRevisions_Currency", "\"Currency\" IN ('ARS','USD')");
+
+                            t.HasCheckConstraint("CK_RecurringRuleRevisions_DueDay", "\"DueDay\" IS NULL OR \"DueDay\" BETWEEN 1 AND 31");
+
+                            t.HasCheckConstraint("CK_RecurringRuleRevisions_FlowAndAmountMode", "\"Flow\" IN ('Income','Expense') AND \"AmountMode\" IN ('Fixed','Estimated')");
+
+                            t.HasCheckConstraint("CK_RecurringRuleRevisions_Frequency", "\"Frequency\" IN ('Monthly','Weekly','Annual')");
+
+                            t.HasCheckConstraint("CK_RecurringRuleRevisions_Interval", "\"Interval\" > 0");
+
+                            t.HasCheckConstraint("CK_RecurringRuleRevisions_State", "\"State\" IN ('Active','Paused','Ended')");
+
+                            t.HasCheckConstraint("CK_RecurringRuleRevisions_Version", "\"Version\" > 0");
                         });
                 });
 
@@ -1792,6 +2180,12 @@ namespace EnigmaBudget.Api.Data.Migrations
                         .HasPrincipalKey("WorkspaceId", "Id")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("EnigmaBudget.Api.Data.FinanceOperation", null)
+                        .WithMany()
+                        .HasForeignKey("WorkspaceId", "ExpenseOperationId")
+                        .HasPrincipalKey("WorkspaceId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("EnigmaBudget.Api.Finance.FinanceMerchant", null)
                         .WithMany()
                         .HasForeignKey("WorkspaceId", "MerchantId")
@@ -1801,6 +2195,12 @@ namespace EnigmaBudget.Api.Data.Migrations
 
             modelBuilder.Entity("EnigmaBudget.Api.Data.FinanceOperation", b =>
                 {
+                    b.HasOne("EnigmaBudget.Api.Data.BankAccount", null)
+                        .WithMany()
+                        .HasForeignKey("WorkspaceId", "AccountId")
+                        .HasPrincipalKey("WorkspaceId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("EnigmaBudget.Api.Finance.FinanceCategory", null)
                         .WithMany()
                         .HasForeignKey("WorkspaceId", "CategoryId")
@@ -1822,9 +2222,19 @@ namespace EnigmaBudget.Api.Data.Migrations
 
             modelBuilder.Entity("EnigmaBudget.Api.Data.FinancePayment", b =>
                 {
+                    b.HasOne("EnigmaBudget.Api.Data.BankAccount", null)
+                        .WithMany()
+                        .HasForeignKey("WorkspaceId", "AccountId")
+                        .HasPrincipalKey("WorkspaceId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("EnigmaBudget.Api.Data.FinanceOperation", null)
                         .WithMany("Payments")
-                        .HasForeignKey("FinanceOperationId");
+                        .HasForeignKey("WorkspaceId", "OperationId")
+                        .HasPrincipalKey("WorkspaceId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("EnigmaBudget.Api.Data.OnboardingDraft", b =>
@@ -1978,6 +2388,28 @@ namespace EnigmaBudget.Api.Data.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("EnigmaBudget.Api.Finance.HealthcareComponent", b =>
+                {
+                    b.HasOne("EnigmaBudget.Api.Data.Workspace", null)
+                        .WithMany()
+                        .HasForeignKey("WorkspaceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("EnigmaBudget.Api.Finance.RecurringRuleRevision", null)
+                        .WithMany()
+                        .HasForeignKey("WorkspaceId", "RuleRevisionId")
+                        .HasPrincipalKey("WorkspaceId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("EnigmaBudget.Api.Finance.RecurringOccurrenceAction", null)
+                        .WithMany()
+                        .HasForeignKey("WorkspaceId", "OccurrenceActionId", "RuleRevisionId")
+                        .HasPrincipalKey("WorkspaceId", "Id", "RuleRevisionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
             modelBuilder.Entity("EnigmaBudget.Api.Finance.MonthlyBudget", b =>
                 {
                     b.HasOne("EnigmaBudget.Api.Data.Workspace", null)
@@ -1991,6 +2423,146 @@ namespace EnigmaBudget.Api.Data.Migrations
                         .HasForeignKey("WorkspaceId", "CategoryId")
                         .HasPrincipalKey("WorkspaceId", "Id")
                         .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("EnigmaBudget.Api.Finance.NonCashSettlement", b =>
+                {
+                    b.HasOne("EnigmaBudget.Api.Workspaces.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("ActorUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("EnigmaBudget.Api.Data.Workspace", null)
+                        .WithMany()
+                        .HasForeignKey("WorkspaceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("EnigmaBudget.Api.Data.CardPurchase", null)
+                        .WithMany()
+                        .HasForeignKey("WorkspaceId", "CardPurchaseId")
+                        .HasPrincipalKey("WorkspaceId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("EnigmaBudget.Api.Finance.HealthcareComponent", null)
+                        .WithMany()
+                        .HasForeignKey("WorkspaceId", "HealthcareComponentId")
+                        .HasPrincipalKey("WorkspaceId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("EnigmaBudget.Api.Data.FinanceOperation", null)
+                        .WithMany()
+                        .HasForeignKey("WorkspaceId", "OperationId")
+                        .HasPrincipalKey("WorkspaceId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("EnigmaBudget.Api.Finance.NonCashSettlement", null)
+                        .WithMany()
+                        .HasForeignKey("WorkspaceId", "ReversesSettlementId")
+                        .HasPrincipalKey("WorkspaceId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("EnigmaBudget.Api.Finance.RecurringOccurrenceAction", b =>
+                {
+                    b.HasOne("EnigmaBudget.Api.Data.CardPurchase", null)
+                        .WithMany()
+                        .HasForeignKey("WorkspaceId", "CardPurchaseId")
+                        .HasPrincipalKey("WorkspaceId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("EnigmaBudget.Api.Data.FinanceOperation", null)
+                        .WithMany()
+                        .HasForeignKey("WorkspaceId", "FinanceOperationId")
+                        .HasPrincipalKey("WorkspaceId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("EnigmaBudget.Api.Finance.RecurringRule", null)
+                        .WithMany()
+                        .HasForeignKey("WorkspaceId", "RuleId")
+                        .HasPrincipalKey("WorkspaceId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("EnigmaBudget.Api.Finance.RecurringRuleRevision", null)
+                        .WithMany()
+                        .HasForeignKey("WorkspaceId", "RuleId", "RuleRevisionId")
+                        .HasPrincipalKey("WorkspaceId", "RuleId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("EnigmaBudget.Api.Finance.RecurringRule", b =>
+                {
+                    b.HasOne("EnigmaBudget.Api.Data.Workspace", null)
+                        .WithMany()
+                        .HasForeignKey("WorkspaceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("EnigmaBudget.Api.Finance.RecurringRuleCommand", b =>
+                {
+                    b.HasOne("EnigmaBudget.Api.Workspaces.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("ActorUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("EnigmaBudget.Api.Data.Workspace", null)
+                        .WithMany()
+                        .HasForeignKey("WorkspaceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("EnigmaBudget.Api.Finance.RecurringRule", null)
+                        .WithMany()
+                        .HasForeignKey("WorkspaceId", "RuleId")
+                        .HasPrincipalKey("WorkspaceId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("EnigmaBudget.Api.Finance.RecurringRuleRevision", b =>
+                {
+                    b.HasOne("EnigmaBudget.Api.Finance.FinanceCategory", null)
+                        .WithMany()
+                        .HasForeignKey("WorkspaceId", "CategoryId")
+                        .HasPrincipalKey("WorkspaceId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("EnigmaBudget.Api.Finance.FinanceIncomeSource", null)
+                        .WithMany()
+                        .HasForeignKey("WorkspaceId", "IncomeSourceId")
+                        .HasPrincipalKey("WorkspaceId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("EnigmaBudget.Api.Finance.FinanceMerchant", null)
+                        .WithMany()
+                        .HasForeignKey("WorkspaceId", "MerchantId")
+                        .HasPrincipalKey("WorkspaceId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("EnigmaBudget.Api.Data.BankAccount", null)
+                        .WithMany()
+                        .HasForeignKey("WorkspaceId", "PreferredAccountId")
+                        .HasPrincipalKey("WorkspaceId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("EnigmaBudget.Api.Data.PaymentCard", null)
+                        .WithMany()
+                        .HasForeignKey("WorkspaceId", "PreferredCardId")
+                        .HasPrincipalKey("WorkspaceId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("EnigmaBudget.Api.Finance.RecurringRule", null)
+                        .WithMany()
+                        .HasForeignKey("WorkspaceId", "RuleId")
+                        .HasPrincipalKey("WorkspaceId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 

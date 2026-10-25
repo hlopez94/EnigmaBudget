@@ -147,7 +147,7 @@ public sealed record PaymentDto(Guid Id, Guid AccountId, string Date, string Amo
 public sealed record OperationDto(
     Guid Id,
     string Kind,
-    Guid AccountId,
+    Guid? AccountId,
     string Date,
     string Description,
     string Category,

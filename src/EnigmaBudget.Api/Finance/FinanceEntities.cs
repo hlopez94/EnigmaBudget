@@ -49,6 +49,7 @@ public sealed class CardPurchase
     public string Description { get; set; } = "";
     public string Category { get; set; } = "";
     public Guid? CategoryId { get; set; }
+    public Guid? ExpenseOperationId { get; set; }
     public Guid? MerchantId { get; set; }
     public string? MerchantNameSnapshot { get; set; }
     public string? CatalogSelectionHash { get; set; }
