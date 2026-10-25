@@ -335,6 +335,7 @@ export class ApiService {
     return this.financeMutate(`/api/savings/applications/${encodeURIComponent(movementId)}/reverse`, { method: 'POST', body: JSON.stringify(input) });
   }
   exchangeRates(): Promise<ExchangeRateList> { return this.financeRequest('/api/exchange-rates'); }
+  exchangeRateSnapshot(snapshotId: string): Promise<ExchangeRateSnapshot> { return this.financeRequest(`/api/exchange-rates/snapshots/${encodeURIComponent(snapshotId)}`); }
   refreshExchangeRates(input: { id: string }): Promise<ExchangeRateList> {
     return this.financeMutate('/api/exchange-rates/refresh', { method: 'POST', body: JSON.stringify(input) });
   }

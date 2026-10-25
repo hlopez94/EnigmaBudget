@@ -70,6 +70,14 @@ public sealed class ExchangeRateIntegrationTests
         Assert.Equal(expected, classifier.Invoke(null, [method, new Microsoft.AspNetCore.Http.PathString(path)]));
     }
 
+    [Theory]
+    [InlineData("GET", "/api/exchange-rates/snapshots/00000000-0000-0000-0000-000000000001", WorkspacePermissions.Read)]
+    public void Exact_snapshot_lookup_requires_selected_workspace_read(string method, string path, string expected)
+    {
+        var classifier = typeof(FinanceWorkspaceFilter).GetMethod("RequiredPermission", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
+        Assert.Equal(expected, classifier.Invoke(null, [method, new Microsoft.AspNetCore.Http.PathString(path)]));
+    }
+
     [Fact]
     public async Task Shares_refresh_within_five_minute_cache_and_replays_identical_manual_refresh()
     {
@@ -87,7 +95,9 @@ public sealed class ExchangeRateIntegrationTests
         Assert.Equal(HttpStatusCode.OK, (await Refresh(client, Guid.NewGuid())).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await Refresh(client, firstId)).StatusCode);
         Assert.Equal(1, calls);
-        using var list = JsonDocument.Parse(await (await client.GetAsync("/api/exchange-rates")).Content.ReadAsStringAsync());
+        var listResponse = await client.GetAsync("/api/exchange-rates");
+        Assert.True(listResponse.IsSuccessStatusCode, await listResponse.Content.ReadAsStringAsync());
+        using var list = JsonDocument.Parse(await listResponse.Content.ReadAsStringAsync());
         Assert.Single(list.RootElement.GetProperty("snapshots").EnumerateArray());
     }
 
@@ -348,6 +358,113 @@ public sealed class ExchangeRateIntegrationTests
         Assert.Equal("Compra", updated.RateChoice.Side);
         Assert.Equal("1000.12345678", updated.RateChoice.Rate);
         Assert.Equal("1000.12", updated.SavedAmount);
+    }
+
+    [Theory]
+    [InlineData("Compra", "1000.12345678")]
+    [InlineData("Venta", "1010.87654321")]
+    public async Task Snapshot_goal_choice_round_trips_each_canonical_side(string side, string expectedRate)
+    {
+        using var factory = new ApiFactory(exchangeRateHandlerFactory: () => new StubHandler(_ => Json(HttpStatusCode.OK, ValidQuote)));
+        using var client = await factory.AuthenticatedClientAsync();
+        await Refresh(client, Guid.NewGuid());
+        var snapshot = (await client.GetFromJsonAsync<ExchangeRateListDto>("/api/exchange-rates"))!.Snapshots.Single();
+        using var goal = JsonDocument.Parse(await (await client.PostAsJsonAsync("/api/savings/goals", new SavingsGoalCreate(Guid.NewGuid(), "Meta", "ARS", "10.00", null, null, null))).Content.ReadAsStringAsync());
+        var goalId = goal.RootElement.GetProperty("id").GetGuid();
+        var choice = new SavingsGoalRateChoice(Guid.NewGuid(), goal.RootElement.GetProperty("version").GetInt32(), "Snapshot", snapshot.Id, snapshot.House, side, null, null);
+        var saved = await client.PutAsJsonAsync($"/api/savings/goals/{goalId}/rate", choice);
+        Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
+        using var reread = JsonDocument.Parse(await (await client.GetAsync("/api/savings/goals")).Content.ReadAsStringAsync());
+        var persisted = reread.RootElement.EnumerateArray().Single(x => x.GetProperty("id").GetGuid() == goalId).GetProperty("rateChoice");
+        Assert.Equal(side, persisted.GetProperty("side").GetString());
+        Assert.Equal(expectedRate, persisted.GetProperty("rate").GetString());
+    }
+
+    [Fact]
+    public async Task Snapshot_goal_choice_rejects_an_unavailable_sell_side()
+    {
+        using var factory = new ApiFactory();
+        using var client = await factory.AuthenticatedClientAsync();
+        var snapshot = new ExchangeRateSnapshot { Id = Guid.NewGuid(), Currency = "USD", House = "buy-only", Name = "Compra", Buy = 1000m, Sell = null, ProviderUpdatedAt = DateTimeOffset.Parse("2026-10-25T12:00:00Z"), FetchedAt = DateTimeOffset.Parse("2026-10-25T12:01:00Z") };
+        await using (var db = Db(factory)) { db.ExchangeRateSnapshots.Add(snapshot); await db.SaveChangesAsync(); }
+        using var goal = JsonDocument.Parse(await (await client.PostAsJsonAsync("/api/savings/goals", new SavingsGoalCreate(Guid.NewGuid(), "Meta", "ARS", "10.00", null, null, null))).Content.ReadAsStringAsync());
+        var id = goal.RootElement.GetProperty("id").GetGuid();
+        var request = new SavingsGoalRateChoice(Guid.NewGuid(), goal.RootElement.GetProperty("version").GetInt32(), "Snapshot", snapshot.Id, snapshot.House, "Venta", null, null);
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PutAsJsonAsync($"/api/savings/goals/{id}/rate", request)).StatusCode);
+    }
+
+    [Fact]
+    public async Task Snapshot_list_is_bounded_to_latest_deterministic_snapshot_per_house()
+    {
+        using var factory = new ApiFactory();
+        using var client = await factory.AuthenticatedClientAsync();
+        var oldIds = new List<Guid>();
+        await using (var db = Db(factory))
+        {
+            for (var house = 0; house < 63; house++)
+            for (var version = 0; version < 4; version++)
+            {
+                var id = Guid.NewGuid();
+                var updated = DateTimeOffset.Parse("2026-10-20T12:00:00Z").AddDays(version);
+                db.ExchangeRateSnapshots.Add(new ExchangeRateSnapshot { Id = id, Currency = "USD", House = $"house-{house:D2}", Name = "Quote", Buy = 1000m + version, Sell = 1010m + version, ProviderUpdatedAt = updated, FetchedAt = updated.AddMinutes(version) });
+                if (version == 0 && house == 0) oldIds.Add(id);
+            }
+            await db.SaveChangesAsync();
+        }
+        var listResponse = await client.GetAsync("/api/exchange-rates");
+        Assert.True(listResponse.IsSuccessStatusCode, await listResponse.Content.ReadAsStringAsync());
+        using var list = JsonDocument.Parse(await listResponse.Content.ReadAsStringAsync());
+        var rows = list.RootElement.GetProperty("snapshots").EnumerateArray().ToArray();
+        Assert.Equal(50, rows.Length);
+        Assert.Equal(50, rows.Select(x => x.GetProperty("house").GetString()).Distinct().Count());
+        Assert.Equal(Enumerable.Range(0, 50).Select(i => $"house-{i:D2}"), rows.Select(x => x.GetProperty("house").GetString()));
+        Assert.All(rows, row => Assert.Equal("1003.00000000", row.GetProperty("buy").GetString()));
+        Assert.Equal("2026-10-23T12:03:00.0000000+00:00", list.RootElement.GetProperty("fetchedAt").GetString());
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync($"/api/exchange-rates/snapshots/{oldIds[0]}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync($"/api/exchange-rates/snapshots/{Guid.NewGuid()}")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Exact_snapshot_lookup_preserves_a_selected_historical_quote_and_requires_read_access()
+    {
+        const string ownerSubject = "historical-rate-owner";
+        using var factory = new ApiFactory();
+        using var client = await factory.AuthenticatedClientAsync(ownerSubject);
+        var selected = new ExchangeRateSnapshot { Id = Guid.NewGuid(), Currency = "USD", House = "old-house", Name = "Old", Buy = 1000.12345678m, Sell = 1010.87654321m, ProviderUpdatedAt = DateTimeOffset.Parse("2026-01-01T00:00:00Z"), FetchedAt = DateTimeOffset.Parse("2026-01-01T00:01:00Z") };
+        Guid goalId;
+        Guid workspaceId;
+        await using (var db = Db(factory))
+        {
+            workspaceId = await db.Workspaces.Select(x => x.Id).SingleAsync();
+            goalId = Guid.NewGuid();
+            db.ExchangeRateSnapshots.Add(selected);
+            db.SavingsGoals.Add(new SavingsGoal { Id = goalId, WorkspaceId = workspaceId, Name = "Meta antigua", TargetCurrency = "ARS", TargetAmount = 10m, State = "Active", Version = 1 });
+            db.SavingsGoalRateChoices.Add(new SavingsGoalRateChoiceEntity { WorkspaceId = workspaceId, GoalId = goalId, Mode = "Snapshot", SnapshotId = selected.Id, House = selected.House, Side = "Venta", Version = 1 });
+            for (var house = 0; house < 51; house++)
+            {
+                var date = DateTimeOffset.Parse("2026-10-20T12:00:00Z");
+                db.ExchangeRateSnapshots.Add(new ExchangeRateSnapshot { Id = Guid.NewGuid(), Currency = "USD", House = $"new-{house:D2}", Name = "New", Buy = 1000m, Sell = 1010m, ProviderUpdatedAt = date, FetchedAt = date });
+            }
+            await db.SaveChangesAsync();
+        }
+        var recentResponse = await client.GetAsync("/api/exchange-rates");
+        Assert.True(recentResponse.IsSuccessStatusCode, await recentResponse.Content.ReadAsStringAsync());
+        using var recent = JsonDocument.Parse(await recentResponse.Content.ReadAsStringAsync());
+        Assert.DoesNotContain(recent.RootElement.GetProperty("snapshots").EnumerateArray(), x => x.GetProperty("id").GetGuid() == selected.Id);
+        using var exact = JsonDocument.Parse(await (await client.GetAsync($"/api/exchange-rates/snapshots/{selected.Id}")).Content.ReadAsStringAsync());
+        Assert.Equal(selected.Id, exact.RootElement.GetProperty("id").GetGuid());
+        Assert.Equal("1010.87654321", exact.RootElement.GetProperty("sell").GetString());
+        using var goals = JsonDocument.Parse(await (await client.GetAsync("/api/savings/goals")).Content.ReadAsStringAsync());
+        var choice = goals.RootElement.EnumerateArray().Single(x => x.GetProperty("id").GetGuid() == goalId).GetProperty("rateChoice");
+        Assert.Equal(selected.Id, choice.GetProperty("snapshotId").GetGuid());
+        Assert.Equal("Venta", choice.GetProperty("side").GetString());
+        Assert.Equal("1010.87654321", choice.GetProperty("rate").GetString());
+
+        using var anonymous = new HttpClient(factory.Server.CreateHandler()) { BaseAddress = new Uri("http://localhost") };
+        Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync($"/api/exchange-rates/snapshots/{selected.Id}")).StatusCode);
+        using var otherMember = await factory.AuthenticatedClientAsync("historical-rate-stranger");
+        otherMember.DefaultRequestHeaders.Add("X-Workspace-Id", workspaceId.ToString());
+        Assert.Equal(HttpStatusCode.NotFound, (await otherMember.GetAsync($"/api/exchange-rates/snapshots/{selected.Id}")).StatusCode);
     }
 
     private static Task<HttpResponseMessage> Refresh(HttpClient client, Guid id) => client.PostAsJsonAsync("/api/exchange-rates/refresh", new ExchangeRateRefreshRequest(id));

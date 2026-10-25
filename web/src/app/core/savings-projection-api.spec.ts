@@ -14,7 +14,7 @@ describe('savings and projection API contracts', () => {
     await api.createSavingsGoal(goal);
     await api.savingsGoalDetails('g1', 3);
     await api.setSavingsGoalRate('g1', { requestId: 'r1', goalVersion: 2, mode: 'Manual', snapshotId: null, house: null, side: null, manualArsPerUsd: '1200.12345678', manualReason: 'Cotización acordada' });
-    await api.exchangeRates(); await api.refreshExchangeRates({ id: 'r2' });
+    await api.exchangeRates(); await api.exchangeRateSnapshot('snapshot-1'); await api.refreshExchangeRates({ id: 'r2' });
     await api.projection('2027-10-25', 'Confirmed');
     await api.calculateProjection({ through: '2027-10-25', scenario: 'Estimated', savedScenarioId: null, assumptions: [{ id: 'a1', kind: 'Expense', date: '2026-11-01', currency: 'ARS', amount: '0.10', description: 'Servicio', sourceId: null }] });
     await api.projectionScenarios();
@@ -23,6 +23,7 @@ describe('savings and projection API contracts', () => {
     const create = calls.find(x => x.url === '/api/savings/goals')!;
     expect(JSON.parse(String(create.init?.body))).toEqual(goal);
     expect(calls.map(x => x.url)).toContain('/api/savings/goals/g1/details?historyPage=3');
+    expect(calls.map(x => x.url)).toContain('/api/exchange-rates/snapshots/snapshot-1');
     expect(calls.map(x => x.url)).toContain('/api/projection?through=2027-10-25&scenario=Confirmed');
     expect(JSON.parse(String(calls.find(x => x.url === '/api/projection/calculate')?.init?.body)).assumptions[0].amount).toBe('0.10');
   });

@@ -1,12 +1,13 @@
 import { ChangeDetectorRef, Component, Input, OnChanges, SimpleChanges } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Account, ExchangeRateSnapshot, FinanceOverview, Operation, SavingsAccountBalance, SavingsAllocation, SavingsGoal, SavingsGoalDetails, SavingsMovement } from '../core/api.models';
+import { Account, ExchangeRateSnapshot, FinanceOverview, Operation, SavingsAccountBalance, SavingsAllocation, SavingsGoal, SavingsGoalDetails, SavingsMovement, SavingsRateSide } from '../core/api.models';
 import { ApiService } from '../core/api.service';
 import { FinanceActions, financeToday, RefreshFinanceOverview } from '../finance/finance-actions';
 import { ActionDialog } from '../finance/ui/action-dialog';
 
 type SavingsDialog = '' | 'create' | 'edit' | 'allocate' | 'release' | 'apply' | 'rate' | 'liquidity' | 'reverse' | 'close';
+type RateDraft = { mode: 'Snapshot' | 'Manual'; snapshotId: string; house: string; side: '' | SavingsRateSide; manualRate: string; manualReason: string };
 const manualRatePattern = /^(?:0|[1-9]\d*)(?:\.\d{1,8})?$/;
 const scaled = (value: string, scale: number): bigint | null => {
   const match = /^(\d+)(?:\.(\d+))?$/.exec(value.trim());
@@ -45,7 +46,7 @@ export class FinanceSavings extends FinanceActions implements OnChanges {
   allocationDraft = { accountId: '', amount: '' };
   releaseDraft = { allocationId: '', amount: '' };
   applicationDraft = { allocationId: '', paymentId: '', amount: '' };
-  rateDraft = { mode: 'Snapshot', snapshotId: '', house: '', side: '', manualRate: '', manualReason: '' };
+  rateDraft: RateDraft = { mode: 'Snapshot', snapshotId: '', house: '', side: '', manualRate: '', manualReason: '' };
   liquidityDraft = { accountId: '', fundsAvailableFrom: '' };
   reverseDraft = { movementId: '', reason: '', confirm: false };
   paymentFollowupId = '';
@@ -114,7 +115,21 @@ export class FinanceSavings extends FinanceActions implements OnChanges {
     if (!allocation) { this.error = 'Este objetivo todavía no tiene fondos reservados para aplicar.'; return; }
     this.openApply(allocation, paymentId); this.paymentFollowupId = '';
   }
-  openRate(goal: SavingsGoal): void { if (!this.canManage) return; this.selectedGoalId = goal.id; this.rateDraft = { mode: goal.rateChoice?.mode ?? 'Snapshot', snapshotId: goal.rateChoice?.snapshotId ?? '', house: goal.rateChoice?.house ?? '', side: goal.rateChoice?.side ?? '', manualRate: goal.rateChoice?.mode === 'Manual' ? goal.rateChoice.rate : '', manualReason: goal.rateChoice?.manualReason ?? '' }; this.dialog = 'rate'; }
+  async openRate(goal: SavingsGoal): Promise<void> {
+    if (!this.canManage) return;
+    this.selectedGoalId = goal.id;
+    this.rateDraft = { mode: (goal.rateChoice?.mode as RateDraft['mode']) ?? 'Snapshot', snapshotId: goal.rateChoice?.snapshotId ?? '', house: goal.rateChoice?.house ?? '', side: goal.rateChoice?.side ?? '', manualRate: goal.rateChoice?.mode === 'Manual' ? goal.rateChoice.rate : '', manualReason: goal.rateChoice?.manualReason ?? '' };
+    this.dialog = 'rate';
+    const snapshotId = goal.rateChoice?.mode === 'Snapshot' ? goal.rateChoice.snapshotId : null;
+    if (!snapshotId || this.rates.some(rate => rate.id === snapshotId)) return;
+    const context = this.captureContext();
+    try {
+      const snapshot = await this.api.exchangeRateSnapshot(snapshotId);
+      if (this.isCurrentContext(context) && this.selectedGoalId === goal.id && !this.rates.some(rate => rate.id === snapshot.id)) this.rates = [...this.rates, snapshot];
+    } catch (error) {
+      if (this.isCurrentContext(context) && this.selectedGoalId === goal.id) this.rateError = `No se pudo recuperar la cotización guardada: ${this.message(error)}`;
+    }
+  }
   openLiquidity(account: Account): void { if (!this.canManage) return; this.liquidityDraft = { accountId: account.id, fundsAvailableFrom: this.balances.find(x => x.accountId === account.id)?.fundsAvailableFrom ?? '' }; this.dialog = 'liquidity'; }
   openReverse(movement: SavingsMovement): void { if (!this.canCorrect || movement.isReversed) return; this.reverseDraft = { movementId: movement.id, reason: '', confirm: false }; this.dialog = 'reverse'; }
   closeDialog(): boolean { if (this.saving) return false; this.dialog = ''; return true; }
@@ -171,7 +186,7 @@ export class FinanceSavings extends FinanceActions implements OnChanges {
       payload = { goalVersion: goal.version, mode: 'Manual', snapshotId: null, house: null, side: null, manualArsPerUsd: rate, manualReason: this.rateDraft.manualReason.trim() };
     } else {
       const side = this.rateDraft.side;
-      if (!snapshot || (side !== 'Buy' && side !== 'Sell') || (side === 'Buy' ? snapshot.buy : snapshot.sell) === null) { this.error = 'Elegí una cotización de compra o venta disponible.'; return; }
+      if (!snapshot || (side !== 'Compra' && side !== 'Venta') || (side === 'Compra' ? snapshot.buy : snapshot.sell) === null) { this.error = 'Elegí una cotización de compra o venta disponible.'; return; }
       payload = { goalVersion: goal.version, mode: 'Snapshot', snapshotId: snapshot.id, house: snapshot.house, side, manualArsPerUsd: null, manualReason: null };
     }
     const keyPayload = { goalId: goal.id, ...payload };

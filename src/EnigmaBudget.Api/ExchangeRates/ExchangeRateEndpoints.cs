@@ -10,6 +10,11 @@ public static class ExchangeRateEndpoints
     {
         var rates = api.MapGroup("").AddEndpointFilter<FinanceWorkspaceFilter>();
         rates.MapGet("/exchange-rates", async (ExchangeRateService service, CancellationToken ct) => Results.Ok(await service.ListAsync(ct)));
+        rates.MapGet("/exchange-rates/snapshots/{snapshotId:guid}", async (ExchangeRateService service, Guid snapshotId, CancellationToken ct) =>
+        {
+            var snapshot = await service.GetSnapshotAsync(snapshotId, ct);
+            return snapshot is null ? Results.NotFound() : Results.Ok(snapshot);
+        });
         rates.MapPost("/exchange-rates/refresh", async (HttpContext http, IAntiforgery csrf, ExchangeRateService service, ExchangeRateRefreshRequest request) =>
         {
             if (!await NativeAuthCsrf.ValidateRequestAsync(http, csrf)) return Results.Problem(statusCode: 400, title: "No se pudo completar la solicitud", detail: "La validación de seguridad de la solicitud no fue válida.");

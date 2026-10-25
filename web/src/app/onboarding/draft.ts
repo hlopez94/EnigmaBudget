@@ -27,9 +27,10 @@ export function formatMinorUnits(value: bigint): string {
 }
 export function formatMoney(raw: string, currency: Currency): string {
   const amount = toMinorUnits(raw); if (amount === null) return raw || '—';
-  const [whole, cents] = formatMinorUnits(amount).split('.');
+  const negative = amount < 0n;
+  const [whole, cents] = formatMinorUnits(negative ? -amount : amount).split('.');
   const grouped = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 0 }).format(BigInt(whole));
-  return `${currency === 'ARS' ? '$' : 'US$'} ${grouped},${cents}`;
+  return `${currency === 'ARS' ? '$' : 'US$'} ${negative ? '-' : ''}${grouped},${cents}`;
 }
 export function createAccountDraft(): AccountInput { return accountDraft({ name: '', bankName: '', currency: 'ARS', openingBalance: '', openingDate: dateToday() }); }
 export function createCardDraft(): CardInput { return { id: crypto.randomUUID(), name: '', bankName: '', closingDay: null, dueDay: null, statementDebtArs: '', statementDebtUsd: '', asOfDate: dateToday() }; }

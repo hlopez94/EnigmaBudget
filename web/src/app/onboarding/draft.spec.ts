@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AccountInput, CardInput, OnboardingState } from '../core/api.models';
 import { ApiProblem, ApiService } from '../core/api.service';
-import { accountDraft, cardDebtIsValid, normalizeDecimal, openingTotals } from './draft';
+import { accountDraft, cardDebtIsValid, formatMoney, normalizeDecimal, openingTotals } from './draft';
 import { OnboardingDraftController } from './draft-controller';
 
 const account = (name: string, currency: 'ARS' | 'USD', openingBalance: string): AccountInput => ({ id: name, name, bankName: 'Banco', currency, openingBalance, openingDate: '2026-10-24' });
@@ -23,6 +23,9 @@ describe('onboarding draft rules', () => {
   });
   it('keeps ARS and USD account totals separate using exact minor units', () => {
     expect(openingTotals([account('Pesos','ARS','100.10'), account('Dólares','USD','20.25'), account('Efectivo','ARS','-0.15')])).toEqual({ ARS: '99.95', USD: '20.25' });
+  });
+  it.each([['-0.50', 'ARS', '$ -0,50'], ['-0.01', 'ARS', '$ -0,01'], ['-0.50', 'USD', 'US$ -0,50'], ['-0.01', 'USD', 'US$ -0,01']] as const)('formats negative subunit amount %s in %s without losing the sign', (amount, currency, expected) => {
+    expect(formatMoney(amount, currency)).toBe(expected);
   });
   it('restores a partially completed draft from the API state', async () => {
     const saved = state(3, [account('Caja','ARS','10.50')]);

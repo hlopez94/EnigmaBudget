@@ -1,4 +1,5 @@
 import '@angular/compiler';
+import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import { ApiService } from '../core/api.service';
 import { FinanceSavings } from './savings';
@@ -54,5 +55,56 @@ describe('savings screens', () => {
     screen.goals = [{ id: 'goal-1', name: 'Viaje', targetCurrency: 'USD', targetAmount: '100.00', state: 'Active', backingAmounts: [], version: 3 } as never]; screen.selectedGoalId = 'goal-1';
     screen.rateDraft = { mode: 'Manual', snapshotId: '', house: '', side: '', manualRate: '1234.12345678', manualReason: 'Acuerdo del día' }; await screen.saveRate();
     expect(api.setSavingsGoalRate).toHaveBeenCalledWith('goal-1', expect.objectContaining({ manualArsPerUsd: '1234.12345678', manualReason: 'Acuerdo del día', snapshotId: null, side: null }));
+  });
+
+  it.each(['Compra', 'Venta'] as const)('saves and reopens the canonical %s snapshot side', async side => {
+    const snapshot = { id: 'snapshot-1', currency: 'USD', house: 'oficial', name: 'Oficial', buy: '1000.12345678', sell: '1010.87654321', providerUpdatedAt: '2026-10-25T12:00:00Z', fetchedAt: '2026-10-25T12:01:00Z' };
+    const api = {
+      setSavingsGoalRate: vi.fn().mockResolvedValue({}), savingsGoals: vi.fn().mockResolvedValue([]), savingsBalances: vi.fn().mockResolvedValue([]),
+      exchangeRates: vi.fn().mockResolvedValue({ status: 'Disponible', stale: false, snapshots: [snapshot] }), refreshOverview: vi.fn(),
+    };
+    const screen = new FinanceSavings(api as unknown as ApiService, detector); screen.workspaceId = 'space'; screen.permissions = { ...permissions, manageResources: true }; screen.refreshOverview = vi.fn().mockResolvedValue(undefined);
+    screen.goals = [{ id: 'goal-1', name: 'Viaje', targetCurrency: 'USD', targetAmount: '100.00', state: 'Active', backingAmounts: [], version: 4, rateChoice: null } as never]; screen.selectedGoalId = 'goal-1';
+    screen.rates = [snapshot]; screen.rateDraft = { mode: 'Snapshot', snapshotId: snapshot.id, house: snapshot.house, side, manualRate: '', manualReason: '' };
+    await screen.saveRate();
+    expect(api.setSavingsGoalRate).toHaveBeenCalledWith('goal-1', expect.objectContaining({ mode: 'Snapshot', snapshotId: snapshot.id, house: 'oficial', side }));
+
+    screen.goals[0] = { ...screen.goals[0], rateChoice: { mode: 'Snapshot', snapshotId: snapshot.id, house: 'oficial', side, rate: side === 'Compra' ? snapshot.buy : snapshot.sell, providerUpdatedAt: snapshot.providerUpdatedAt, fetchedAt: snapshot.fetchedAt, manualReason: null, stale: false } } as never;
+    screen.openRate(screen.goals[0]);
+    expect(screen.rateDraft.side).toBe(side);
+  });
+
+  it('renders the same canonical snapshot-side values that the API accepts', () => {
+    const template = readFileSync('src/app/savings/savings.html', 'utf8');
+    expect(template).toContain('goal.rateChoice.side === \'Compra\'');
+    expect(template).toContain('goal.rateChoice.side === \'Venta\'');
+    expect(template).toContain('<option value="Compra"');
+    expect(template).toContain('<option value="Venta"');
+    expect(template).not.toContain('<option value="Buy"');
+    expect(template).not.toContain('<option value="Sell"');
+  });
+
+  it('loads the exact historical snapshot when reopening a goal and preserves its side', async () => {
+    const historical = { id: 'snapshot-old', currency: 'USD', house: 'oficial', name: 'Oficial', buy: '1000.12345678', sell: '1010.87654321', providerUpdatedAt: '2026-01-01T00:00:00Z', fetchedAt: '2026-01-01T00:01:00Z' };
+    const api = { exchangeRateSnapshot: vi.fn().mockResolvedValue(historical) };
+    const screen = new FinanceSavings(api as unknown as ApiService, detector);
+    screen.workspaceId = 'space'; screen.permissions = { ...permissions, manageResources: true };
+    screen.goals = [{ id: 'goal-old', name: 'Viaje', targetCurrency: 'ARS', targetAmount: '10.00', state: 'Active', backingAmounts: [], version: 2, rateChoice: { mode: 'Snapshot', snapshotId: historical.id, house: historical.house, side: 'Venta', rate: historical.sell, providerUpdatedAt: historical.providerUpdatedAt, fetchedAt: historical.fetchedAt, manualReason: null, stale: true } } as never];
+    await screen.openRate(screen.goals[0]);
+    expect(api.exchangeRateSnapshot).toHaveBeenCalledWith(historical.id);
+    expect(screen.rates).toEqual([historical]);
+    expect(screen.rateDraft).toMatchObject({ snapshotId: historical.id, house: 'oficial', side: 'Venta' });
+  });
+
+  it('rejects a snapshot side that has no quote without replacing the saved selection', async () => {
+    const api = { setSavingsGoalRate: vi.fn(), savingsGoals: vi.fn(), savingsBalances: vi.fn(), exchangeRates: vi.fn() };
+    const screen = new FinanceSavings(api as unknown as ApiService, detector); screen.workspaceId = 'space'; screen.permissions = { ...permissions, manageResources: true };
+    screen.goals = [{ id: 'goal-1', name: 'Viaje', targetCurrency: 'USD', targetAmount: '100.00', state: 'Active', backingAmounts: [], version: 4, rateChoice: { mode: 'Snapshot', snapshotId: 'old', house: 'oficial', side: 'Venta', rate: '1010.00000000', providerUpdatedAt: null, fetchedAt: null, manualReason: null, stale: false } } as never];
+    screen.selectedGoalId = 'goal-1'; screen.rates = [{ id: 'snapshot-2', currency: 'USD', house: 'nueva', name: 'Nueva', buy: '1000.00000000', sell: null, providerUpdatedAt: '', fetchedAt: '' }];
+    screen.rateDraft = { mode: 'Snapshot', snapshotId: 'snapshot-2', house: 'nueva', side: 'Venta', manualRate: '', manualReason: '' };
+    await screen.saveRate();
+    expect(api.setSavingsGoalRate).not.toHaveBeenCalled();
+    expect(screen.goals[0].rateChoice?.snapshotId).toBe('old');
+    expect(screen.rateDraft.side).toBe('Venta');
   });
 });

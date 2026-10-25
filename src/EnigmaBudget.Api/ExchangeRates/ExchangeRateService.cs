@@ -90,12 +90,32 @@ public sealed class ExchangeRateService(AppDbContext db, ExchangeRateRefreshCoor
 {
     public async Task<ExchangeRateListDto> ListAsync(CancellationToken ct)
     {
-        var rows = await db.ExchangeRateSnapshots.AsNoTracking().OrderBy(x => x.House).ThenByDescending(x => x.ProviderUpdatedAt).ThenByDescending(x => x.FetchedAt).ToArrayAsync(ct);
-        var latest = rows.Select(x => (DateTimeOffset?)x.FetchedAt).Max();
+        var latest = await db.ExchangeRateSnapshots.AsNoTracking().MaxAsync(x => (DateTimeOffset?)x.FetchedAt, ct);
+        var latestPerHouse = db.ExchangeRateSnapshots.FromSqlRaw("""
+            SELECT "Id", "Currency", "House", "Name", "Buy", "Sell", "ProviderUpdatedAt", "FetchedAt"
+            FROM (
+                SELECT snapshot.*, ROW_NUMBER() OVER (
+                    PARTITION BY "House"
+                    ORDER BY "ProviderUpdatedAt" DESC, "FetchedAt" DESC, "Id" DESC
+                ) AS snapshot_rank
+                FROM "ExchangeRateSnapshots" AS snapshot
+            ) AS ranked
+            WHERE snapshot_rank = 1
+            """).AsNoTracking();
+        var rows = await latestPerHouse
+            .OrderBy(x => x.House).ThenByDescending(x => x.ProviderUpdatedAt).ThenByDescending(x => x.FetchedAt).ThenByDescending(x => x.Id)
+            .Take(50).ToArrayAsync(ct);
         var state = coordinator.GetState(latest);
         var latestFetched = state.LastSuccess ?? latest;
         var snapshots = rows.Select(x => new ExchangeRateSnapshotDto(x.Id, x.Currency, x.House, x.Name, F(x.Buy), F(x.Sell), x.ProviderUpdatedAt.ToString("O", CultureInfo.InvariantCulture), x.FetchedAt.ToString("O", CultureInfo.InvariantCulture))).ToArray();
         return new(state.Status, state.Stale, state.Error, latestFetched?.ToString("O", CultureInfo.InvariantCulture), snapshots);
+    }
+
+    public async Task<ExchangeRateSnapshotDto?> GetSnapshotAsync(Guid snapshotId, CancellationToken ct)
+    {
+        var snapshot = await db.ExchangeRateSnapshots.AsNoTracking().SingleOrDefaultAsync(x => x.Id == snapshotId, ct);
+        return snapshot is null ? null : new(snapshot.Id, snapshot.Currency, snapshot.House, snapshot.Name, F(snapshot.Buy), F(snapshot.Sell),
+            snapshot.ProviderUpdatedAt.ToString("O", CultureInfo.InvariantCulture), snapshot.FetchedAt.ToString("O", CultureInfo.InvariantCulture));
     }
 
     public async Task<ExchangeRateListDto> RefreshAsync(WorkspaceRequestContext context, ExchangeRateRefreshRequest request, CancellationToken ct)

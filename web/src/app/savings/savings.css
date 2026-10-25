@@ -1,6 +1,7 @@
 :host{display:block;color:var(--ink,#22291f)}
 :host[hidden]{display:none!important}
 .savings-screen .primary{color:#fff}
+.savings-screen>.panel{padding:20px 22px}
 .goal-panel{padding:20px 22px;background:#fff}
 .goal-panel.selected-goal{border-color:#c8d9c5}
 .goal-header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
@@ -21,4 +22,4 @@
 .availability-row{grid-template-columns:minmax(0,1fr) auto}.rate-summary p{margin:5px 0 0;color:#667267;font-size:12px}.goal-actions .secondary{min-height:36px;padding:8px 10px;font-size:12px}
 .goal-choice{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding-top:12px}.goal-choice>b,.goal-choice>small{flex-basis:100%;font-size:12px;color:#596559}.payment-followup>p{margin:-8px 0 10px;color:#697469;font-size:12px;line-height:1.5}
 @media(max-width:700px){.goal-estimate{grid-template-columns:repeat(2,minmax(0,1fr))}.allocation-row{grid-template-columns:minmax(0,1fr) auto}.allocation-row>button{grid-row:2;justify-self:start}.history-row{grid-template-columns:minmax(0,1fr) auto}}
-@media(max-width:420px){.goal-panel{padding:14px 12px}.goal-header{gap:8px}.goal-header h3{font-size:17px}.goal-header .target{font-size:14px}.goal-estimate{gap:8px}.goal-estimate b{font-size:11px}.goal-actions{gap:5px}.goal-actions .secondary{font-size:11px;padding:7px 8px}.history-paging{gap:7px}.availability-row{gap:8px}}
+@media(max-width:420px){.savings-screen>.panel{padding:14px 12px}.goal-panel{padding:14px 12px}.goal-header{gap:8px}.goal-header h3{font-size:17px}.goal-header .target{font-size:14px}.goal-estimate{gap:8px}.goal-estimate b{font-size:11px}.goal-actions{gap:5px}.goal-actions .secondary{font-size:11px;padding:7px 8px}.history-paging{gap:7px}.availability-row{gap:8px}}
