@@ -51,11 +51,11 @@
 
 - New Personal and Household workspaces receive their two uncategorized rows in their existing creation transaction through `CatalogDefaults.AddForWorkspace(AppDbContext db, Guid workspaceId)`. Existing bootstrap/read of an already-created space does not write or duplicate rows. Historical whitespace-only labels map to the default without changing the original snapshot; other nonempty labels retain exact case and spacing.
 
-- [ ] **Step 1: Write failing migration tests** `legacy_category_backfill_preserves_labels_and_is_workspace_scoped`, `case_and_spacing_distinct_legacy_buckets_are_preserved`, `uncategorized_expense_and_income_are_seeded_for_empty_workspace`, `empty_label_maps_to_uncategorized_category_of_known_kind`, `income_label_does_not_infer_source`, `merchants_and_income_sources_start_empty`, `card_purchase_and_adjustment_categories_are_preserved`, and `same_label_in_two_workspaces_creates_distinct_categories`, `new_personal_and_household_receive_defaults_atomically`, and `repeated_existing_workspace_bootstrap_does_not_add_catalog_rows` using synthetic values.
-- [ ] **Step 2: Check RAM; run only `FinanceCatalogMigrationTests` through `work/with-ram-limit.sh`.** Expected RED: catalog tables/foreign keys absent.
-- [ ] **Step 3: Implement additive schema and idempotent per-workspace backfill.** Preserve all existing IDs, money, dates and category strings.
-- [ ] **Step 4: Rerun filtered migration tests via the wrapper.** Expected GREEN: history remains unchanged and workspace IDs differ.
-- [ ] **Step 5: Commit** (`feat: add workspace finance catalogs`).
+- [x] **Step 1: Write failing migration tests** `legacy_category_backfill_preserves_labels_and_is_workspace_scoped`, `case_and_spacing_distinct_legacy_buckets_are_preserved`, `uncategorized_expense_and_income_are_seeded_for_empty_workspace`, `empty_label_maps_to_uncategorized_category_of_known_kind`, `income_label_does_not_infer_source`, `merchants_and_income_sources_start_empty`, `card_purchase_and_adjustment_categories_are_preserved`, and `same_label_in_two_workspaces_creates_distinct_categories`, `new_personal_and_household_receive_defaults_atomically`, and `repeated_existing_workspace_bootstrap_does_not_add_catalog_rows` using synthetic values.
+- [x] **Step 2: Check RAM; run only `FinanceCatalogMigrationTests` through `work/with-ram-limit.sh`.** Expected RED: catalog tables/foreign keys absent.
+- [x] **Step 3: Implement additive schema and idempotent per-workspace backfill.** Preserve all existing IDs, money, dates and category strings.
+- [x] **Step 4: Rerun filtered migration tests via the wrapper.** Expected GREEN: history remains unchanged and workspace IDs differ.
+- [x] **Step 5: Commit** (`feat: add workspace finance catalogs`).
 
 ### Task 2: Versioned catalog endpoints and permission mapping
 
@@ -76,11 +76,11 @@
 - Route filter maps `GET` to `read`, all catalog mutations to `manageResources`; write handlers validate CSRF and perform workspace-scoped idempotency/version checks under `WorkspaceMutationGate`, re-resolving authorization inside the locked workspace. Workspace and actor always come from `FinanceWorkspaceFilter.Get(http)`.
 - Exact trimmed, case-sensitive name uniqueness only within the workspace/kind. Cross-workspace lookups return 404; active incompatible category kind returns 400/409.
 
-- [ ] **Step 1: Write failing API tests** `catalog_crud_requires_manage_resources`, `catalog_replay_compares_payload`, `catalog_edit_requires_current_version`, `archive_retains_historical_reference`, `same_name_conflicts_only_inside_workspace`, `foreign_catalog_id_is_not_found_and_shared_reader_is_read_only`, and `category_kind_is_validated`, `default_category_cannot_be_renamed_or_archived`, `catalog_kind_is_immutable`, `catalog_replay_revalidates_permission_after_workspace_lock`, `catalog_request_id_cannot_be_reused_for_another_resource_kind`, and `catalog_mutation_and_audit_are_atomic`.
-- [ ] **Step 2: Check RAM; run only the filtered catalog and authorization integration tests via wrapper.** Expected RED: routes and permission mapping are missing.
-- [ ] **Step 3: Implement workspace-scoped catalog CRUD/archive and typed DTOs.** Trim new user-entered names once at the write boundary; compare and enforce uniqueness on the exact stored value, case- and space-sensitive. Do not normalize or rewrite historical label buckets.
-- [ ] **Step 4: Rerun filtered tests.** Expected GREEN: versions, permissions, replay and isolation hold.
-- [ ] **Step 5: Commit** (`feat: manage finance catalogs`).
+- [x] **Step 1: Write failing API tests** `catalog_crud_requires_manage_resources`, `catalog_replay_compares_payload`, `catalog_edit_requires_current_version`, `archive_retains_historical_reference`, `same_name_conflicts_only_inside_workspace`, `foreign_catalog_id_is_not_found_and_shared_reader_is_read_only`, and `category_kind_is_validated`, `default_category_cannot_be_renamed_or_archived`, `catalog_kind_is_immutable`, `catalog_replay_revalidates_permission_after_workspace_lock`, `catalog_request_id_cannot_be_reused_for_another_resource_kind`, and `catalog_mutation_and_audit_are_atomic`.
+- [x] **Step 2: Check RAM; run only the filtered catalog and authorization integration tests via wrapper.** Expected RED: routes and permission mapping are missing.
+- [x] **Step 3: Implement workspace-scoped catalog CRUD/archive and typed DTOs.** Trim new user-entered names once at the write boundary; compare and enforce uniqueness on the exact stored value, case- and space-sensitive. Do not normalize or rewrite historical label buckets.
+- [x] **Step 4: Rerun filtered tests.** Expected GREEN: versions, permissions, replay and isolation hold.
+- [x] **Step 5: Commit** (`feat: manage finance catalogs`).
 
 ### Task 3: Attach catalog IDs to operations and purchases
 
@@ -102,11 +102,11 @@
 - New operation, purchase and statement-adjustment forms use active typed category selectors; optional merchants and required new-UI income source. An initially empty source list offers an inline manageResources-only creation action (name and allowed source kind), preserving the movement draft/request on error; users without manageResources receive an explanation to ask an administrator. Do not fabricate a source or weaken server permission. Reuse existing action-dialog/scoped visual styles and context-change guards; no new shell/redesign.
 
 
-- [ ] **Step 1: Write failing tests/specs** `operation_category_and_source_ids_match_workspace_and_kind`, `purchase_merchant_and_category_snapshot_survive_rename`, `legacy_string_resolves_without_fuzzy_match`, `income_source_is_only_valid_for_income`, `structured_selector_preserves_draft_on_failure`, and `archived_catalog_item_is_not_offered_for_new_entry`.
-- [ ] **Step 2: Check RAM; run filtered .NET tests then focused finance Vitest sequentially via wrappers.** Expected RED: request DTOs and form selectors lack IDs.
-- [ ] **Step 3: Implement scoped resolution/snapshots and structured selectors.** Do not alter ledger, cash payment or card-payment behavior.
-- [ ] **Step 4: Rerun both filtered suites sequentially.** Expected GREEN: compatibility, snapshot and draft-retention assertions pass.
-- [ ] **Step 5: Commit** (`feat: classify finance records`).
+- [x] **Step 1: Write failing tests/specs** `operation_category_and_source_ids_match_workspace_and_kind`, `purchase_merchant_and_category_snapshot_survive_rename`, `legacy_string_resolves_without_fuzzy_match`, `income_source_is_only_valid_for_income`, `structured_selector_preserves_draft_on_failure`, and `archived_catalog_item_is_not_offered_for_new_entry`.
+- [x] **Step 2: Check RAM; run filtered .NET tests then focused finance Vitest sequentially via wrappers.** Expected RED: request DTOs and form selectors lack IDs.
+- [x] **Step 3: Implement scoped resolution/snapshots and structured selectors.** Do not alter ledger, cash payment or card-payment behavior.
+- [x] **Step 4: Rerun both filtered suites sequentially.** Expected GREEN: compatibility, snapshot and draft-retention assertions pass.
+- [x] **Step 5: Commit** (`feat: classify finance records`).
 
 ### Task 4: Monthly category budgets and source rows
 
@@ -125,11 +125,11 @@
 - SourceKind is Operation, Installment or StatementAdjustment. SourceId identifies that actual record (installment ID for Installment); optional ComponentId is null for current simple sources, reserved for later genuine components. CategorySnapshot is the stored historical category text. Installment Date uses its purchase date (the budget query period identifies its billing month), adjustment Date uses statement period first day as a labeled period marker, not an invented payment date. Operation amount contributes SpentAmount; installment and signed confirmed adjustment contribute CommittedCardAmount. Already-paid installments remain consumption. No total purchase/statement/payment contribution is added.
 - `RemainingAmount = Limit − SpentAmount − CommittedCardAmount`, unclamped. Final integrated behavior is: gross 1,000 with payroll 300 + bank 700 counts 1,000 in the operation month; gross 1,000 with payroll 300 + card 700 counts 300 in the operation month and 700 in the actual installment month. The Recurring/Healthcare plan supplies this through the shared decimal calculator; a voided operation contributes zero while its real linked installment remains.
 
-- [ ] **Step 1: Write failing tests** `budget_requires_expense_category_and_valid_currency`, `budget_write_requires_manage_resources`, `budget_read_is_workspace_scoped`, `period_validation_is_strict`, `monthly_budget_counts_cash_expense_and_card_installment_once`, `payment_and_statement_total_do_not_count_as_expense`, `overview_operation_expenses_alias_equals_legacy_value`, `uncategorized_expense_remains_visible`, `ars_and_usd_are_never_combined`, `partial_operation_payment_does_not_change_budget_spend`, and `changed_budget_version_conflicts`.
-- [ ] **Step 2: Check RAM; run only `MonthlyBudgetIntegrationTests|CardCycleIntegrationTests` through wrapper.** Expected RED: budget endpoints and aggregator absent.
-- [ ] **Step 3: Implement versioned budget CRUD and read-only aggregation.** In this plan's baseline, feed nonvoid Expense `Amount`, canonical installments and confirmed adjustments into one explainable query. Add `operationExpensesArs/Usd` to `FinanceOverview.budget`; set legacy `cashExpensesArs/Usd` from the same computed values, not a second sum. Preserve this contract so the later Recurring/Healthcare plan replaces only the operation contribution source with `OperationMonthBudgetContribution`.
-- [ ] **Step 4: Rerun filtered tests.** Expected GREEN: each consumption source appears once and periods/currencies isolate.
-- [ ] **Step 5: Commit** (`feat: add monthly category budgets`).
+- [x] **Step 1: Write failing tests** `budget_requires_expense_category_and_valid_currency`, `budget_write_requires_manage_resources`, `budget_read_is_workspace_scoped`, `period_validation_is_strict`, `monthly_budget_counts_cash_expense_and_card_installment_once`, `payment_and_statement_total_do_not_count_as_expense`, `overview_operation_expenses_alias_equals_legacy_value`, `uncategorized_expense_remains_visible`, `ars_and_usd_are_never_combined`, `partial_operation_payment_does_not_change_budget_spend`, and `changed_budget_version_conflicts`.
+- [x] **Step 2: Check RAM; run only `MonthlyBudgetIntegrationTests|CardCycleIntegrationTests` through wrapper.** Expected RED: budget endpoints and aggregator absent.
+- [x] **Step 3: Implement versioned budget CRUD and read-only aggregation.** In this plan's baseline, feed nonvoid Expense `Amount`, canonical installments and confirmed adjustments into one explainable query. Add `operationExpensesArs/Usd` to `FinanceOverview.budget`; set legacy `cashExpensesArs/Usd` from the same computed values, not a second sum. Preserve this contract so the later Recurring/Healthcare plan replaces only the operation contribution source with `OperationMonthBudgetContribution`.
+- [x] **Step 4: Rerun filtered tests.** Expected GREEN: each consumption source appears once and periods/currencies isolate.
+- [x] **Step 5: Commit** (`feat: add monthly category budgets`).
 
 ### Task 5: Catalog and budget screens
 
@@ -146,11 +146,11 @@
 - Source rows are actionable within budget detail: show actual operation/installed quota/confirmed adjustment descriptions, original category snapshot, date with its correct meaning and separate currency amount in a read-only source detail dialog/section. Use the actual backend source ID for selection; no fake external links, raw UUIDs as primary usercopy, or invented payment dates. Installment display identifies number/count from actual stored schedule (the source description may include that label).
 
 
-- [ ] **Step 1: Write focused Vitest specs** for paths/workspace headers, permissions, failed-form draft retention, archive selector state, source detail, Spanish labels, currency filter and responsive component state. Vitest does not certify screenshot overflow.
-- [ ] **Step 2: Check RAM; run focused Vitest through wrapper with Node heap ≤2 GiB and ≤2 workers.** Expected RED: APIs/components/nav absent.
-- [ ] **Step 3: Implement the views with the existing finance shell and dialog patterns.** Clear old query data and drafts on workspace change.
-- [ ] **Step 4: Rerun focused Vitest through wrapper.** Expected GREEN: permission, responsive and source-trace assertions pass.
-- [ ] **Step 5: Commit** (`feat: add catalog and budget screens`).
+- [x] **Step 1: Write focused Vitest specs** for paths/workspace headers, permissions, failed-form draft retention, archive selector state, source detail, Spanish labels, currency filter and responsive component state. Vitest does not certify screenshot overflow.
+- [x] **Step 2: Check RAM; run focused Vitest through wrapper with Node heap ≤2 GiB and ≤2 workers.** Expected RED: APIs/components/nav absent.
+- [x] **Step 3: Implement the views with the existing finance shell and dialog patterns.** Clear old query data and drafts on workspace change.
+- [x] **Step 4: Rerun focused Vitest through wrapper.** Expected GREEN: permission, responsive and source-trace assertions pass.
+- [x] **Step 5: Commit** (`feat: add catalog and budget screens`).
 
 ### Task 6: Live API E2E and Product Design responsive QA
 
@@ -166,11 +166,11 @@
 - Capture actual rendered pages at 360×800, 390×844 and 1280×800 and review those screenshots with the Product Design responsive-audit workflow for clipped controls, horizontal overflow, unreadable tables and lost actions. Vitest/Playwright functional assertions do not claim to prove pixel overflow; the screenshots and visual review are the evidence.
 - Keep screenshots, E2E logs and findings under ignored `work/qa/catalog-budget/`. This task does not publish or commit release evidence; only the controller reviews those artifacts and decides any root-level release evidence.
 
-- [ ] **Step 1: Write the live API Playwright cases** for CRUD/read-only/workspace-switch and the operation-versus-installment month scenario. Assert persisted API responses and visible Spanish content; do not add screenshot-overflow assertions.
-- [ ] **Step 2: Check RAM, confirm ≥6 GiB available, start only the existing app and isolated PostgreSQL fixture, and run Playwright with one worker through the memory wrapper.** Report the actual first result honestly: Tasks1–5 already provide endpoints/screens, so initial GREEN is valid; only real failures justify integration fixes.
-- [ ] **Step 3: Run the live API E2E suite sequentially.** Expected GREEN: the app, API, database and workspace authorization agree on the persisted source rows.
-- [ ] **Step 4: Capture the three specified viewport screenshots and review them visually with the Product Design audit workflow.** Save the images and concise findings only under ignored `work/qa/catalog-budget/`; fix only integration/visual defects in the owned source files, run covering checks and rebuild, then recapture.
-- [ ] **Step 5: Hand the ignored E2E/screenshot evidence paths to the controller for root-only release review.** Do not publish evidence or claim a release from this task. Commit the assigned E2E/source fixes, never ignored evidence; report exact source/artifact hashes, actual runs and owned resources.
+- [x] **Step 1: Write the live API Playwright cases** for CRUD/read-only/workspace-switch and the operation-versus-installment month scenario. Assert persisted API responses and visible Spanish content; do not add screenshot-overflow assertions.
+- [x] **Step 2: Check RAM, confirm ≥6 GiB available, start only the existing app and isolated PostgreSQL fixture, and run Playwright with one worker through the memory wrapper.** Report the actual first result honestly: Tasks1–5 already provide endpoints/screens, so initial GREEN is valid; only real failures justify integration fixes.
+- [x] **Step 3: Run the live API E2E suite sequentially.** Expected GREEN: the app, API, database and workspace authorization agree on the persisted source rows.
+- [x] **Step 4: Capture the three specified viewport screenshots and review them visually with the Product Design audit workflow.** Save the images and concise findings only under ignored `work/qa/catalog-budget/`; fix only integration/visual defects in the owned source files, run covering checks and rebuild, then recapture.
+- [x] **Step 5: Hand the ignored E2E/screenshot evidence paths to the controller for root-only release review.** Do not publish evidence or claim a release from this task. Commit the assigned E2E/source fixes, never ignored evidence; report exact source/artifact hashes, actual runs and owned resources.
 
 ## Self-review
 
@@ -179,3 +179,7 @@
 - **Review focus:** each risky input is pinned to a named test in the task that owns its data.
 - **Proportion:** no recurring behavior or general rule engine is included in this standalone plan.
 
+
+## Entrega verificada
+
+Las seis tareas y su revisión final están completas en `7cb90bc5703aa5c999eb4e000cc8df2d0ab530d9`. CI aprobó 139 pruebas web, 236 de API (ninguna omitida) y 11 recorridos reales. La entrega local conservó sesión, pestañas y valores originales de 37 tablas, con respaldo restaurado y migraciones 14→18 verificadas. La advertencia de bundle inicial de 786,50 kB continúa pendiente de optimización; los límites 760/800 kB se mantuvieron. La aplicación completa sigue en implementación según el seguimiento de producto.
