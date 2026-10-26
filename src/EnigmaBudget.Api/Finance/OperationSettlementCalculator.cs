@@ -20,6 +20,11 @@ internal static class OperationSettlementCalculator
         IReadOnlyList<FinancePayment> cashPayments,
         IReadOnlyList<NonCashSettlement> nonCashSettlements)
     {
+        if (cashPayments.Any(payment => payment.WorkspaceId != operation.WorkspaceId || payment.OperationId != operation.Id || payment.Currency != operation.Currency))
+            throw new InvalidOperationException("Cash payments must belong to this operation and currency.");
+        if (nonCashSettlements.Any(settlement => settlement.WorkspaceId != operation.WorkspaceId || settlement.OperationId != operation.Id || settlement.Currency != operation.Currency))
+            throw new InvalidOperationException("Noncash settlements must belong to this operation and currency.");
+
         var cashPaid = cashPayments.Sum(payment => payment.Amount);
         if (operation.IsVoided)
             return new(0m, cashPaid, 0m, 0m, 0m, 0m, 0m, "Voided");
@@ -29,9 +34,11 @@ internal static class OperationSettlementCalculator
         var amountsByRoot = roots.ToDictionary(settlement => settlement.Id, settlement => settlement.Amount);
         foreach (var reversal in reversals)
         {
-            if (reversal.ReversesSettlementId is not { } rootId || !amountsByRoot.ContainsKey(rootId))
+            if (reversal.ReversesSettlementId is not { } rootId || !amountsByRoot.TryGetValue(rootId, out var rootAmount))
                 throw new InvalidOperationException("A reversal must reference a settlement root for this operation.");
-            amountsByRoot[rootId] -= reversal.Amount;
+            if (reversal.Amount != rootAmount)
+                throw new InvalidOperationException("A reversal must fully compensate its root settlement.");
+            amountsByRoot[rootId] = 0m;
         }
 
         var netSettlementAmounts = roots.ToDictionary(root => root.Id, root => amountsByRoot[root.Id]);

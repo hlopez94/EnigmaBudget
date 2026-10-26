@@ -157,6 +157,135 @@ public sealed class RecurringHealthcareMigrationTests
     }
 
     [Fact]
+    public async Task settlement_source_validator_accepts_persisted_actual_payroll_and_rejects_forecast_or_foreign_operation()
+    {
+        using var migrated = await MigratedDb();
+        var db = migrated.Db;
+        var fixture = await SeedWorkspace(db);
+        var other = await SeedWorkspace(db);
+        var valid = NewSettlement(fixture, "PayrollWithholding", 20m, fixture.ComponentId);
+        Assert.True(await OperationSettlementSourceValidator.ValidateAsync(db, await LoadOperation(db, fixture), valid, CancellationToken.None));
+
+        var plannedComponentId = Guid.NewGuid();
+        await InsertComponent(db, fixture, plannedComponentId, fixture.RevisionId, null);
+        var planned = NewSettlement(fixture, "PayrollWithholding", 20m, plannedComponentId);
+        Assert.False(await OperationSettlementSourceValidator.ValidateAsync(db, await LoadOperation(db, fixture), planned, CancellationToken.None));
+
+        var otherOperationId = await InsertOtherOperation(db, fixture);
+        var otherOperationActionId = Guid.NewGuid();
+        await InsertAction(db, fixture, otherOperationActionId, Guid.NewGuid(), new DateOnly(2026, 10, 2), otherOperationId);
+        var otherOperationComponentId = Guid.NewGuid();
+        await InsertComponent(db, fixture, otherOperationComponentId, fixture.RevisionId, otherOperationActionId);
+        var differentOperationSource = NewSettlement(fixture, "PayrollWithholding", 20m, otherOperationComponentId);
+        Assert.False(await OperationSettlementSourceValidator.ValidateAsync(db, await LoadOperation(db, fixture), differentOperationSource, CancellationToken.None));
+
+        var wrongCurrency = NewSettlement(fixture, "PayrollWithholding", 20m, fixture.ComponentId);
+        wrongCurrency.Currency = "USD";
+        Assert.False(await OperationSettlementSourceValidator.ValidateAsync(db, await LoadOperation(db, fixture), wrongCurrency, CancellationToken.None));
+
+        var foreign = NewSettlement(fixture, "PayrollWithholding", 20m, other.ComponentId);
+        var operationCount = await db.FinanceOperations.CountAsync();
+        var paymentCount = await db.FinancePayments.CountAsync();
+        var settlementCount = await db.NonCashSettlements.CountAsync();
+        Assert.False(await OperationSettlementSourceValidator.ValidateAsync(db, await LoadOperation(db, fixture), foreign, CancellationToken.None));
+        Assert.Equal(operationCount, await db.FinanceOperations.CountAsync());
+        Assert.Equal(paymentCount, await db.FinancePayments.CountAsync());
+        Assert.Equal(settlementCount, await db.NonCashSettlements.CountAsync());
+    }
+
+    [Fact]
+    public async Task settlement_source_validator_checks_persisted_card_purchase_operation_currency_category_and_amount()
+    {
+        using var migrated = await MigratedDb();
+        var db = migrated.Db;
+        var fixture = await SeedWorkspace(db);
+        var otherOperationId = await InsertOtherOperation(db, fixture);
+        var purchaseId = Guid.NewGuid();
+        await InsertPurchase(db, fixture, purchaseId, fixture.OperationId);
+        var operation = await LoadOperation(db, fixture);
+        var valid = NewSettlement(fixture, "CardCharge", 100m, purchaseId: purchaseId);
+        Assert.True(await OperationSettlementSourceValidator.ValidateAsync(db, operation, valid, CancellationToken.None));
+
+        var mismatchedOperationPurchaseId = Guid.NewGuid();
+        await InsertPurchase(db, fixture, mismatchedOperationPurchaseId, otherOperationId);
+        Assert.False(await OperationSettlementSourceValidator.ValidateAsync(db, operation, NewSettlement(fixture, "CardCharge", 100m, purchaseId: mismatchedOperationPurchaseId), CancellationToken.None));
+
+        await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE \"Purchases\" SET \"Currency\" = {"USD"} WHERE \"Id\" = {purchaseId}");
+        Assert.False(await OperationSettlementSourceValidator.ValidateAsync(db, operation, valid, CancellationToken.None));
+        await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE \"Purchases\" SET \"Currency\" = {"ARS"}, \"TotalAmount\" = {99m} WHERE \"Id\" = {purchaseId}");
+        Assert.False(await OperationSettlementSourceValidator.ValidateAsync(db, operation, valid, CancellationToken.None));
+        await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE \"Purchases\" SET \"TotalAmount\" = {100m}, \"CategoryId\" = {(Guid?)null} WHERE \"Id\" = {purchaseId}");
+        Assert.False(await OperationSettlementSourceValidator.ValidateAsync(db, operation, valid, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task settlement_source_validator_accepts_only_full_same_operation_root_reversals()
+    {
+        using var migrated = await MigratedDb();
+        var db = migrated.Db;
+        var fixture = await SeedWorkspace(db);
+        var otherOperationId = await InsertOtherOperation(db, fixture);
+        var rootId = Guid.NewGuid();
+        await InsertSettlement(db, fixture, rootId, "PayrollWithholding", 20m, fixture.ComponentId, null, null, Guid.NewGuid());
+        var operation = await LoadOperation(db, fixture);
+        var full = NewSettlement(fixture, "Reversal", 20m, reversesId: rootId);
+        Assert.True(await OperationSettlementSourceValidator.ValidateAsync(db, operation, full, CancellationToken.None));
+        var partial = NewSettlement(fixture, "Reversal", 10m, reversesId: rootId);
+        Assert.False(await OperationSettlementSourceValidator.ValidateAsync(db, operation, partial, CancellationToken.None));
+
+        var otherOperationRootId = Guid.NewGuid();
+        var otherFixture = fixture with { OperationId = otherOperationId };
+        var otherActionId = Guid.NewGuid();
+        await InsertAction(db, fixture, otherActionId, Guid.NewGuid(), new DateOnly(2026, 10, 2), otherOperationId);
+        var otherComponentId = Guid.NewGuid();
+        await InsertComponent(db, fixture, otherComponentId, fixture.RevisionId, otherActionId);
+        await InsertSettlement(db, otherFixture, otherOperationRootId, "PayrollWithholding", 20m, otherComponentId, null, null, Guid.NewGuid());
+        var foreignRoot = NewSettlement(fixture, "Reversal", 20m, reversesId: otherOperationRootId);
+        Assert.False(await OperationSettlementSourceValidator.ValidateAsync(db, operation, foreignRoot, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task settlement_source_validator_resolves_tracked_added_action_component_purchase_and_root()
+    {
+        using var migrated = await MigratedDb();
+        var db = migrated.Db;
+        var fixture = await SeedWorkspace(db);
+        var operation = await LoadOperation(db, fixture);
+        var actionId = Guid.NewGuid();
+        var action = new RecurringOccurrenceAction
+        {
+            Id = actionId, WorkspaceId = fixture.WorkspaceId, RuleId = fixture.RuleId, RuleRevisionId = fixture.RevisionId,
+            ScheduledDate = new DateOnly(2026, 11, 1), Outcome = "Recorded", FinanceOperationId = fixture.OperationId,
+            RequestId = Guid.NewGuid(), PayloadHash = "tracked"
+        };
+        var componentId = Guid.NewGuid();
+        var component = new HealthcareComponent
+        {
+            Id = componentId, WorkspaceId = fixture.WorkspaceId, RuleRevisionId = fixture.RevisionId, OccurrenceActionId = actionId,
+            Kind = "PayrollWithholding", Amount = 30m, AppliesToProviderBalance = true
+        };
+        db.RecurringOccurrenceActions.Add(action);
+        db.HealthcareComponents.Add(component);
+        Assert.True(await OperationSettlementSourceValidator.ValidateAsync(db, operation, NewSettlement(fixture, "PayrollWithholding", 30m, componentId), CancellationToken.None));
+
+        var trackedPurchaseId = Guid.NewGuid();
+        db.Purchases.Add(new CardPurchase
+        {
+            Id = trackedPurchaseId, WorkspaceId = fixture.WorkspaceId, CardId = fixture.CardId, ExpenseOperationId = fixture.OperationId,
+            Date = new DateOnly(2026, 11, 1), Description = "Compra", Category = "Salud", CategoryId = fixture.CategoryId,
+            Currency = "ARS", TotalAmount = 40m, InstallmentCount = 1, FirstPeriod = "2026-11"
+        });
+        Assert.True(await OperationSettlementSourceValidator.ValidateAsync(db, operation, NewSettlement(fixture, "CardCharge", 40m, purchaseId: trackedPurchaseId), CancellationToken.None));
+
+        var trackedRootId = Guid.NewGuid();
+        var trackedRoot = NewSettlement(fixture, "PayrollWithholding", 30m, componentId);
+        trackedRoot.Id = trackedRootId;
+        db.NonCashSettlements.Add(trackedRoot);
+        var trackedReversal = NewSettlement(fixture, "Reversal", 30m, reversesId: trackedRootId);
+        Assert.True(await OperationSettlementSourceValidator.ValidateAsync(db, operation, trackedReversal, CancellationToken.None));
+    }
+
+    [Fact]
     public async Task migration_does_not_create_future_operations()
     {
         using var migrated = await MigratedDb();
@@ -172,19 +301,30 @@ public sealed class RecurringHealthcareMigrationTests
         var payment = new FinancePayment { Id = Guid.NewGuid(), WorkspaceId = operation.WorkspaceId, OperationId = operation.Id, AccountId = Guid.NewGuid(), Amount = 400m, Currency = "ARS" };
         var root = Settlement(operation, "PayrollWithholding", 300m);
         var card = Settlement(operation, "CardCharge", 200m);
-        var reversal = Settlement(operation, "Reversal", 100m);
+        var reversal = Settlement(operation, "Reversal", 200m);
         reversal.ReversesSettlementId = card.Id;
 
         var result = OperationSettlementCalculator.Calculate(operation, [payment], [root, card, reversal]);
 
         Assert.Equal(1000m, result.GrossConsumption);
         Assert.Equal(400m, result.CashPaidAmount);
-        Assert.Equal(400m, result.NonCashSettledAmount);
-        Assert.Equal(100m, result.CardChargeSettledAmount);
-        Assert.Equal(800m, result.TotalSettledAmount);
-        Assert.Equal(200m, result.PendingAmount);
-        Assert.Equal(900m, result.OperationMonthBudgetContribution);
+        Assert.Equal(300m, result.NonCashSettledAmount);
+        Assert.Equal(0m, result.CardChargeSettledAmount);
+        Assert.Equal(700m, result.TotalSettledAmount);
+        Assert.Equal(300m, result.PendingAmount);
+        Assert.Equal(1000m, result.OperationMonthBudgetContribution);
         Assert.Equal("Partial", result.Status);
+    }
+
+    [Fact]
+    public void operation_settlement_calculator_rejects_partial_root_reversal()
+    {
+        var operation = Operation("Expense", 1000m);
+        var root = Settlement(operation, "CardCharge", 200m);
+        var partial = Settlement(operation, "Reversal", 100m);
+        partial.ReversesSettlementId = root.Id;
+
+        Assert.Throws<InvalidOperationException>(() => OperationSettlementCalculator.Calculate(operation, [], [root, partial]));
     }
 
     [Fact]
@@ -296,8 +436,8 @@ public sealed class RecurringHealthcareMigrationTests
     private static Task<int> InsertRevision(AppDbContext db, Fixture fixture, Guid id, int version, string state) =>
         db.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO \"RecurringRuleRevisions\" (\"Id\", \"WorkspaceId\", \"RuleId\", \"Version\", \"EffectiveFrom\", \"State\", \"ScheduleAnchorDate\", \"Flow\", \"Description\", \"CategoryId\", \"Amount\", \"AmountMode\", \"Currency\", \"Frequency\", \"Interval\") VALUES ({id}, {fixture.WorkspaceId}, {fixture.RuleId}, {version}, {new DateOnly(2026, 10, 1)}, {state}, {new DateOnly(2026, 10, 1)}, {"Expense"}, {"Consulta"}, {fixture.CategoryId}, {100m}, {"Fixed"}, {"ARS"}, {"Monthly"}, {1})");
 
-    private static Task<int> InsertAction(AppDbContext db, Fixture fixture, Guid id, Guid requestId, DateOnly date) =>
-        db.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO \"RecurringOccurrenceActions\" (\"Id\", \"WorkspaceId\", \"RuleId\", \"RuleRevisionId\", \"ScheduledDate\", \"Outcome\", \"FinanceOperationId\", \"RequestId\", \"PayloadHash\") VALUES ({id}, {fixture.WorkspaceId}, {fixture.RuleId}, {fixture.RevisionId}, {date}, {"Recorded"}, {fixture.OperationId}, {requestId}, {"payload"})");
+    private static Task<int> InsertAction(AppDbContext db, Fixture fixture, Guid id, Guid requestId, DateOnly date, Guid? financeOperationId = null) =>
+        db.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO \"RecurringOccurrenceActions\" (\"Id\", \"WorkspaceId\", \"RuleId\", \"RuleRevisionId\", \"ScheduledDate\", \"Outcome\", \"FinanceOperationId\", \"RequestId\", \"PayloadHash\") VALUES ({id}, {fixture.WorkspaceId}, {fixture.RuleId}, {fixture.RevisionId}, {date}, {"Recorded"}, {financeOperationId ?? fixture.OperationId}, {requestId}, {"payload"})");
 
     private static Task<int> InsertComponent(AppDbContext db, Fixture fixture, Guid id, Guid revisionId, Guid? actionId, string kind = "PayrollWithholding", bool appliesToProviderBalance = true) =>
         db.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO \"HealthcareComponents\" (\"Id\", \"WorkspaceId\", \"RuleRevisionId\", \"OccurrenceActionId\", \"Kind\", \"Amount\", \"AppliesToProviderBalance\") VALUES ({id}, {fixture.WorkspaceId}, {revisionId}, {actionId}, {kind}, {20m}, {appliesToProviderBalance})");
@@ -309,7 +449,24 @@ public sealed class RecurringHealthcareMigrationTests
         db.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO \"FinancePayments\" (\"Id\", \"WorkspaceId\", \"OperationId\", \"AccountId\", \"Date\", \"Amount\", \"Currency\") VALUES ({id}, {fixture.WorkspaceId}, {fixture.OperationId}, {accountId}, {new DateOnly(2026, 10, 1)}, {20m}, {"ARS"})");
 
     private static Task<int> InsertPurchase(AppDbContext db, Fixture fixture, Guid id, Guid operationId) =>
-        db.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO \"Purchases\" (\"Id\", \"WorkspaceId\", \"CardId\", \"Date\", \"Description\", \"Category\", \"Currency\", \"TotalAmount\", \"InstallmentCount\", \"FirstPeriod\", \"ExpenseOperationId\") VALUES ({id}, {fixture.WorkspaceId}, {fixture.CardId}, {new DateOnly(2026, 10, 1)}, {"Compra"}, {"Salud"}, {"ARS"}, {100m}, {1}, {"2026-10"}, {operationId})");
+        db.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO \"Purchases\" (\"Id\", \"WorkspaceId\", \"CardId\", \"Date\", \"Description\", \"Category\", \"CategoryId\", \"Currency\", \"TotalAmount\", \"InstallmentCount\", \"FirstPeriod\", \"ExpenseOperationId\") VALUES ({id}, {fixture.WorkspaceId}, {fixture.CardId}, {new DateOnly(2026, 10, 1)}, {"Compra"}, {"Salud"}, {fixture.CategoryId}, {"ARS"}, {100m}, {1}, {"2026-10"}, {operationId})");
+
+    private static async Task<FinanceOperation> LoadOperation(AppDbContext db, Fixture fixture) =>
+        await db.FinanceOperations.SingleAsync(operation => operation.WorkspaceId == fixture.WorkspaceId && operation.Id == fixture.OperationId);
+
+    private static NonCashSettlement NewSettlement(Fixture fixture, string kind, decimal amount, Guid? componentId = null, Guid? purchaseId = null, Guid? reversesId = null) => new()
+    {
+        Id = Guid.NewGuid(), WorkspaceId = fixture.WorkspaceId, OperationId = fixture.OperationId, Currency = "ARS", Kind = kind,
+        Amount = amount, HealthcareComponentId = componentId, CardPurchaseId = purchaseId, ReversesSettlementId = reversesId,
+        RequestId = Guid.NewGuid(), PayloadHash = "source-test", ActorUserId = fixture.UserId, CreatedAt = DateTimeOffset.UtcNow
+    };
+
+    private static async Task<Guid> InsertOtherOperation(AppDbContext db, Fixture fixture)
+    {
+        var id = Guid.NewGuid();
+        await db.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO \"FinanceOperations\" (\"Id\", \"WorkspaceId\", \"Kind\", \"AccountId\", \"Date\", \"Description\", \"Category\", \"CategoryId\", \"Currency\", \"Amount\", \"IsVoided\", \"Version\", \"InitiallyPaid\") VALUES ({id}, {fixture.WorkspaceId}, {"Expense"}, {fixture.AccountId}, {new DateOnly(2026, 10, 2)}, {"Otra consulta"}, {"Salud"}, {fixture.CategoryId}, {"ARS"}, {100m}, {false}, {1}, {false})");
+        return id;
+    }
 
     private static Task<int> InsertOperationWithoutAccount(AppDbContext db, Fixture fixture) =>
         db.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO \"FinanceOperations\" (\"Id\", \"WorkspaceId\", \"Kind\", \"AccountId\", \"Date\", \"Description\", \"Category\", \"CategoryId\", \"Currency\", \"Amount\", \"IsVoided\", \"Version\", \"InitiallyPaid\") VALUES ({Guid.NewGuid()}, {fixture.WorkspaceId}, {"Income"}, {(Guid?)null}, {new DateOnly(2026, 10, 1)}, {"Ingreso"}, {"Salud"}, {fixture.CategoryId}, {"ARS"}, {100m}, {false}, {1}, {false})");
