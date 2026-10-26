@@ -7,6 +7,7 @@ using EnigmaBudget.Api.Savings;
 using EnigmaBudget.Api.Workspaces;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace EnigmaBudget.Api.Projection;
 
@@ -403,9 +404,16 @@ public sealed class ProjectionService(AppDbContext db, BusinessClock clock, Savi
     private static string Date(DateOnly date) => date.ToString("yyyy-MM-dd", Inv);
     private static string? NullableDate(DateOnly? date) => date?.ToString("yyyy-MM-dd", Inv);
 
-    private async Task<T> InSnapshotAsync<T>(Func<Task<T>> action, CancellationToken ct)
+    private async Task<(ProjectionDto? Result, int Status, string? Error)> InSnapshotAsync(
+        Func<Task<(ProjectionDto? Result, int Status, string? Error)>> action, CancellationToken ct)
     {
-        if (db.Database.CurrentTransaction is not null) return await action();
+        if (db.Database.CurrentTransaction is { } callerTransaction)
+        {
+            var isolation = callerTransaction.GetDbTransaction().IsolationLevel;
+            if (isolation is not (IsolationLevel.RepeatableRead or IsolationLevel.Serializable))
+                return (null, 409, "La proyección requiere que la transacción existente use aislamiento RepeatableRead o Serializable.");
+            return await action();
+        }
         await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.RepeatableRead, ct);
         await db.Database.ExecuteSqlRawAsync("SET TRANSACTION READ ONLY", ct);
         var result = await action();

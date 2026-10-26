@@ -3,11 +3,13 @@ using System.Security.Cryptography;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
+using System.Data;
 using EnigmaBudget.Api.Data;
 using EnigmaBudget.Api.Finance;
 using EnigmaBudget.Api.Savings;
 using EnigmaBudget.Api.Workspaces;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace EnigmaBudget.Api.Projection;
 
@@ -40,7 +42,7 @@ public sealed class ProjectionScenarioService(AppDbContext db, WorkspaceMutation
     {
         if (request.Id == Guid.Empty || !ValidName(request.Name) || !ValidAssumptions(request.Assumptions)) return (null, 400, "Revisá el nombre y los supuestos del escenario.");
         var hash = Hash(context.User.Id, "ProjectionScenarioCreate", request);
-        var (lease, failure) = await gate.AcquireAsync(context.Workspace.Id, ct);
+        var (lease, failure) = await AcquireScenarioLeaseAsync(context.Workspace.Id, ct);
         if (lease is null) return (null, failure, "El espacio no está disponible.");
         await using (lease)
         {
@@ -62,6 +64,11 @@ public sealed class ProjectionScenarioService(AppDbContext db, WorkspaceMutation
             lease.MarkChanged();
             try { await db.SaveChangesAsync(ct); await lease.CommitAsync(ct); }
             catch (DbUpdateException) { db.ChangeTracker.Clear(); return (null, 409, "El escenario ya existe o hubo un cambio concurrente."); }
+            catch (Exception ex) when (IsSerializationConflict(ex))
+            {
+                db.ChangeTracker.Clear();
+                return (null, 409, "El escenario cambió. Volvé a intentarlo.");
+            }
             return (await ToDtoAsync(scenario, fresh, ct), 200, null);
         }
     }
@@ -71,7 +78,7 @@ public sealed class ProjectionScenarioService(AppDbContext db, WorkspaceMutation
     {
         if (request.RequestId == Guid.Empty || request.Version < 1 || !ValidName(request.Name) || !ValidAssumptions(request.Assumptions)) return (null, 400, "Revisá el nombre y los supuestos del escenario.");
         var hash = Hash(context.User.Id, "ProjectionScenarioUpdate", new { id, request });
-        var (lease, failure) = await gate.AcquireAsync(context.Workspace.Id, ct);
+        var (lease, failure) = await AcquireScenarioLeaseAsync(context.Workspace.Id, ct);
         if (lease is null) return (null, failure, "El espacio no está disponible.");
         await using (lease)
         {
@@ -111,6 +118,11 @@ public sealed class ProjectionScenarioService(AppDbContext db, WorkspaceMutation
             lease.MarkChanged();
             try { await db.SaveChangesAsync(ct); await lease.CommitAsync(ct); }
             catch (DbUpdateException) { return (null, 409, "El escenario cambió. Actualizá la pantalla antes de guardar."); }
+            catch (Exception ex) when (IsSerializationConflict(ex))
+            {
+                db.ChangeTracker.Clear();
+                return (null, 409, "El escenario cambió. Actualizá la pantalla antes de guardar.");
+            }
             return (await ToDtoAsync(scenario, fresh, ct), 200, null);
         }
     }
@@ -151,6 +163,22 @@ public sealed class ProjectionScenarioService(AppDbContext db, WorkspaceMutation
                 Kind = x.Kind, Date = date, Currency = x.Currency, Amount = amount, Description = x.Description.Trim(), SourceId = x.SourceId,
                 SourceKind = x.SourceKind, ComponentId = x.ComponentId });
         }
+    }
+
+    private async Task<(WorkspaceMutationLease? Lease, int FailureStatus)> AcquireScenarioLeaseAsync(Guid workspaceId, CancellationToken ct)
+    {
+        try { return await gate.AcquireAsync(workspaceId, ct, IsolationLevel.RepeatableRead); }
+        catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.SerializationFailure)
+        {
+            return (null, StatusCodes.Status409Conflict);
+        }
+    }
+
+    private static bool IsSerializationConflict(Exception exception)
+    {
+        for (var current = exception; current is not null; current = current.InnerException)
+            if (current is PostgresException postgres && postgres.SqlState == PostgresErrorCodes.SerializationFailure) return true;
+        return false;
     }
 
     private static bool ValidAssumptions(IReadOnlyList<ProjectionAssumptionInput>? values) => values is not null && values.Count <= 300

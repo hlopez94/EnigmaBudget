@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using EnigmaBudget.Api.Data;
 using EnigmaBudget.Api.Finance;
+using EnigmaBudget.Api.Projection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using EnigmaBudget.Api.Workspaces;
@@ -62,6 +63,41 @@ public sealed class ProjectionScenarioIntegrationTests : IDisposable
         Assert.Equal(HttpStatusCode.OK, (await client.PutAsJsonAsync($"/api/projection/scenarios/{id}", payload)).StatusCode);
         var changed = new { requestId, version = 1, name = "Otro nombre", assumptions = Array.Empty<object>() };
         Assert.Equal(HttpStatusCode.Conflict, (await client.PutAsJsonAsync($"/api/projection/scenarios/{id}", changed)).StatusCode);
+    }
+
+    [Fact]
+    public async Task source_backed_create_update_and_replays_keep_visible_assumptions()
+    {
+        using var client = await _factory.AuthenticatedClientAsync("projection-source-backed-replay");
+        var accountId = Guid.NewGuid();
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/api/accounts", new
+        {
+            id = accountId, name = "Caja", bankName = "Banco", currency = "ARS", openingBalance = "100.00", openingDate = "2026-10-25"
+        })).StatusCode);
+        var operationId = Guid.NewGuid();
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/api/operations", new
+        {
+            id = operationId, kind = "Expense", accountId, date = "2026-10-26", description = "Servicio", category = "Varios",
+            amount = "40.00", paid = false
+        })).StatusCode);
+        ProjectionAssumptionInput[] assumptions = [new(Guid.NewGuid(), "AmountChange", null, "ARS", "5.00", "Ajuste visible",
+            operationId, "FinanceOperation", null)];
+        var scenarioId = Guid.NewGuid();
+        var create = new { id = scenarioId, name = "Escenario con origen", assumptions };
+        async Task AssertVisibleAsync(HttpResponseMessage response)
+        {
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            var assumption = Assert.Single(doc.RootElement.GetProperty("assumptions").EnumerateArray());
+            Assert.Equal(operationId, assumption.GetProperty("sourceId").GetGuid());
+            Assert.Equal("FinanceOperation", assumption.GetProperty("sourceKind").GetString());
+        }
+
+        await AssertVisibleAsync(await client.PostAsJsonAsync("/api/projection/scenarios", create));
+        await AssertVisibleAsync(await client.PostAsJsonAsync("/api/projection/scenarios", create));
+        var update = new { requestId = Guid.NewGuid(), version = 1, name = "Escenario revisado", assumptions };
+        await AssertVisibleAsync(await client.PutAsJsonAsync($"/api/projection/scenarios/{scenarioId}", update));
+        await AssertVisibleAsync(await client.PutAsJsonAsync($"/api/projection/scenarios/{scenarioId}", update));
     }
 
     [Fact]

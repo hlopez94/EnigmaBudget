@@ -1,9 +1,16 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Data;
+using System.Data.Common;
 using System.Text.Json;
 using EnigmaBudget.Api.Data;
 using EnigmaBudget.Api.Finance;
+using EnigmaBudget.Api.Projection;
+using EnigmaBudget.Api.Savings;
+using EnigmaBudget.Api.Workspaces;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace EnigmaBudget.Api.Tests;
 
@@ -261,6 +268,86 @@ public sealed class RecurringProjectionIntegrationTests
         Assert.DoesNotContain("Servicio mensual", body, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData(IsolationLevel.RepeatableRead, "repeatable read")]
+    [InlineData(IsolationLevel.Serializable, "serializable")]
+    public async Task valid_borrowed_projection_transaction_stays_read_write_and_open(IsolationLevel isolationLevel, string expectedIsolation)
+    {
+        using var factory = new ApiFactory(timeProvider: new FixedTimeProvider(TestInstant));
+        using var client = await factory.AuthenticatedClientAsync("recurring-projection-borrowed-valid");
+        var harness = await CreateProjectionHarness(factory, "recurring-projection-borrowed-valid");
+        await using var db = harness.Db;
+        await using var transaction = await db.Database.BeginTransactionAsync(isolationLevel);
+
+        var (confirmed, confirmedStatus, confirmedError) = await harness.Service.GetAsync(harness.Context,
+            DateOnly.FromDateTime(TestInstant.UtcDateTime).AddDays(1), "Confirmed", null, CancellationToken.None);
+        Assert.Equal(200, confirmedStatus);
+        Assert.Null(confirmedError);
+        Assert.NotNull(confirmed);
+        Assert.Same(transaction, db.Database.CurrentTransaction);
+
+        var (estimated, estimatedStatus, estimatedError) = await harness.Service.CalculateAsync(harness.Context,
+            DateOnly.FromDateTime(TestInstant.UtcDateTime).AddDays(1), [], null, CancellationToken.None);
+        Assert.Equal(200, estimatedStatus);
+        Assert.Null(estimatedError);
+        Assert.NotNull(estimated);
+        Assert.Same(transaction, db.Database.CurrentTransaction);
+        Assert.Equal(expectedIsolation, await ReadCurrentTransactionSetting(db, "transaction_isolation", transaction));
+        Assert.Equal("off", await ReadCurrentTransactionSetting(db, "transaction_read_only", transaction));
+        await db.Database.ExecuteSqlRawAsync("CREATE TEMP TABLE borrowed_projection_still_writeable (id integer)");
+        Assert.Same(transaction, db.Database.CurrentTransaction);
+    }
+
+    [Fact]
+    public async Task get_rejects_read_committed_borrowed_transaction_before_projection_reads()
+    {
+        using var factory = new ApiFactory(timeProvider: new FixedTimeProvider(TestInstant));
+        using var client = await factory.AuthenticatedClientAsync("recurring-projection-borrowed-weak-get");
+        var probe = new ProjectionSourceReadProbeInterceptor();
+        var harness = await CreateProjectionHarness(factory, "recurring-projection-borrowed-weak-get", probe);
+        await using var db = harness.Db;
+        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted);
+        probe.Arm();
+
+        var (projection, status, error) = await harness.Service.GetAsync(harness.Context,
+            DateOnly.FromDateTime(TestInstant.UtcDateTime).AddDays(1), "Confirmed", null, CancellationToken.None);
+
+        Assert.Equal(409, status);
+        Assert.Null(projection);
+        Assert.Contains("RepeatableRead o Serializable", error, StringComparison.Ordinal);
+        Assert.Equal(0, probe.ReadCount);
+        Assert.Same(transaction, db.Database.CurrentTransaction);
+        Assert.Equal("read committed", await ReadCurrentTransactionSetting(db, "transaction_isolation", transaction));
+        Assert.Equal("off", await ReadCurrentTransactionSetting(db, "transaction_read_only", transaction));
+        await db.Database.ExecuteSqlRawAsync("CREATE TEMP TABLE weak_projection_rejection_keeps_transaction (id integer)");
+        Assert.Same(transaction, db.Database.CurrentTransaction);
+    }
+
+    [Fact]
+    public async Task calculate_rejects_read_committed_borrowed_transaction_before_projection_reads()
+    {
+        using var factory = new ApiFactory(timeProvider: new FixedTimeProvider(TestInstant));
+        using var client = await factory.AuthenticatedClientAsync("recurring-projection-borrowed-weak-calculate");
+        var probe = new ProjectionSourceReadProbeInterceptor();
+        var harness = await CreateProjectionHarness(factory, "recurring-projection-borrowed-weak-calculate", probe);
+        await using var db = harness.Db;
+        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted);
+        probe.Arm();
+
+        var (projection, status, error) = await harness.Service.CalculateAsync(harness.Context,
+            DateOnly.FromDateTime(TestInstant.UtcDateTime).AddDays(1), [], null, CancellationToken.None);
+
+        Assert.Equal(409, status);
+        Assert.Null(projection);
+        Assert.Contains("RepeatableRead o Serializable", error, StringComparison.Ordinal);
+        Assert.Equal(0, probe.ReadCount);
+        Assert.Same(transaction, db.Database.CurrentTransaction);
+        Assert.Equal("read committed", await ReadCurrentTransactionSetting(db, "transaction_isolation", transaction));
+        Assert.Equal("off", await ReadCurrentTransactionSetting(db, "transaction_read_only", transaction));
+        await db.Database.ExecuteSqlRawAsync("CREATE TEMP TABLE weak_calculation_rejection_keeps_transaction (id integer)");
+        Assert.Same(transaction, db.Database.CurrentTransaction);
+    }
+
     [Fact]
     public async Task concurrent_occurrence_record_during_projection_never_counts_estimate_and_actual_together()
     {
@@ -326,6 +413,43 @@ public sealed class RecurringProjectionIntegrationTests
         return await db.Workspaces.Where(x => x.OwnerSubject == subject).Select(x => x.Id).SingleAsync();
     }
 
+    private static async Task<ProjectionHarness> CreateProjectionHarness(ApiFactory factory, string subject, DbCommandInterceptor? interceptor = null)
+    {
+        var options = new DbContextOptionsBuilder<AppDbContext>().UseNpgsql(factory.TestConnection);
+        if (interceptor is not null) options.AddInterceptors(interceptor);
+        var db = new AppDbContext(options.Options);
+        var user = await db.ApplicationUsers.SingleAsync(x => x.Subject == subject);
+        var workspace = await db.Workspaces.SingleAsync(x => x.OwnerUserId == user.Id && x.Kind == "Personal");
+        var context = new WorkspaceRequestContext(user, workspace, "Owner", WorkspacePermissions.For("Owner", personalOwner: true));
+        var clock = new BusinessClock(new FixedTimeProvider(TestInstant));
+        var balances = new SavingsAccountBalanceQuery(db, clock);
+        var adapter = new RecurringProjectionAdapter(db, new RecurringCalendar(db), clock);
+        return new ProjectionHarness(db, new ProjectionService(db, clock, balances, adapter), context);
+    }
+
+    private static async Task<string> ReadCurrentTransactionSetting(AppDbContext db, string setting, IDbContextTransaction transaction)
+    {
+        await using var command = db.Database.GetDbConnection().CreateCommand();
+        command.Transaction = transaction.GetDbTransaction();
+        command.CommandText = $"SHOW {setting}";
+        return (string)(await command.ExecuteScalarAsync())!;
+    }
+
     private static AppDbContext Db(string connection) => new(new DbContextOptionsBuilder<AppDbContext>().UseNpgsql(connection).Options);
+    private sealed record ProjectionHarness(AppDbContext Db, ProjectionService Service, WorkspaceRequestContext Context);
     private sealed class FixedTimeProvider(DateTimeOffset utcNow) : TimeProvider { public override DateTimeOffset GetUtcNow() => utcNow; }
+}
+
+public sealed class ProjectionSourceReadProbeInterceptor : DbCommandInterceptor
+{
+    private int _armed;
+    private int _readCount;
+    public int ReadCount => Volatile.Read(ref _readCount);
+    public void Arm() { Volatile.Write(ref _readCount, 0); Volatile.Write(ref _armed, 1); }
+    public override ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(DbCommand command, CommandEventData eventData,
+        InterceptionResult<DbDataReader> result, CancellationToken cancellationToken = default)
+    {
+        if (Volatile.Read(ref _armed) == 1) Interlocked.Increment(ref _readCount);
+        return ValueTask.FromResult(result);
+    }
 }
