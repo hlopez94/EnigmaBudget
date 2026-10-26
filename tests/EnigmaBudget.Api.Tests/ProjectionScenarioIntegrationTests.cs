@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using EnigmaBudget.Api.Data;
+using EnigmaBudget.Api.Finance;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using EnigmaBudget.Api.Workspaces;
@@ -87,6 +88,48 @@ public sealed class ProjectionScenarioIntegrationTests : IDisposable
         var after = JsonDocument.Parse(await (await client.GetAsync("/api/accounts")).Content.ReadAsStringAsync()).RootElement.GetRawText();
         var afterOperations = JsonDocument.Parse(await (await client.GetAsync("/api/operations")).Content.ReadAsStringAsync()).RootElement.GetRawText();
         Assert.Equal(before, after); Assert.Equal(beforeOperations, afterOperations);
+    }
+
+    [Fact]
+    public async Task scenario_calculation_does_not_mutate_rules_or_settlements()
+    {
+        using var client = await _factory.AuthenticatedClientAsync("projection-recurring-read-only");
+        Guid workspaceId;
+        Guid categoryId;
+        await using (var db = Db(_factory))
+        {
+            var userId = await db.ApplicationUsers.Where(x => x.Subject == "projection-recurring-read-only").Select(x => x.Id).SingleAsync();
+            workspaceId = await db.Workspaces.Where(x => x.OwnerUserId == userId && x.Kind == "Personal").Select(x => x.Id).SingleAsync();
+            categoryId = await db.FinanceCategories.Where(x => x.WorkspaceId == workspaceId && x.Kind == "Expense" && x.IsDefault)
+                .Select(x => x.Id).SingleAsync();
+        }
+        var ruleId = Guid.NewGuid();
+        Assert.Equal(HttpStatusCode.Created, (await client.PostAsJsonAsync("/api/recurrences", new
+        {
+            id = ruleId, flow = "Expense", description = "Servicio mensual", categoryId, incomeSourceId = (Guid?)null,
+            merchantId = (Guid?)null, amount = "1000.00", amountMode = "Fixed", currency = "ARS", frequency = "Monthly",
+            interval = 1, startDate = "2026-10-25", endDate = (string?)null, dueDay = (int?)null,
+            preferredAccountId = (Guid?)null, preferredCardId = (Guid?)null, healthcareComponents = Array.Empty<object>()
+        })).StatusCode);
+        var occurrenceId = RecurringCalendar.StableOccurrenceId(workspaceId, ruleId, new DateOnly(2026, 10, 25));
+        var assumptions = new[]
+        {
+            new { id = Guid.NewGuid(), kind = "AmountChange", date = (string?)null, currency = "ARS", amount = "10.00",
+                description = "Ajuste temporal", sourceId = (Guid?)occurrenceId, sourceKind = "RecurringOccurrence", componentId = (string?)null }
+        };
+        using var response = await client.PostAsJsonAsync("/api/projection/calculate", new
+        {
+            through = "2026-10-26", scenario = "Estimated", assumptions
+        });
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using (var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync()))
+            Assert.Equal("1010.00", Assert.Single(doc.RootElement.GetProperty("rows").EnumerateArray(),
+                x => x.GetProperty("sourceKind").GetString() == "RecurringOccurrence").GetProperty("amount").GetString());
+        await using var verify = Db(_factory);
+        Assert.Equal(1000m, await verify.RecurringRuleRevisions.Where(x => x.WorkspaceId == workspaceId && x.RuleId == ruleId).Select(x => x.Amount).SingleAsync());
+        Assert.Empty(await verify.RecurringOccurrenceActions.Where(x => x.WorkspaceId == workspaceId && x.RuleId == ruleId).ToArrayAsync());
+        Assert.Empty(await verify.NonCashSettlements.Where(x => x.WorkspaceId == workspaceId).ToArrayAsync());
+        Assert.Empty(await verify.FinanceOperations.Where(x => x.WorkspaceId == workspaceId).ToArrayAsync());
     }
 
     [Fact]

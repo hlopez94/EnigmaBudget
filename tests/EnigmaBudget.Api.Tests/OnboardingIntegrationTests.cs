@@ -397,6 +397,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
     public WorkspaceLockCommandBarrierInterceptor WorkspaceLockBarrier { get; } = new();
     public WorkspaceAuditInsertProbeInterceptor WorkspaceAuditInsertProbe { get; } = new();
     public SavingsLedgerReadBarrierInterceptor SavingsLedgerReadBarrier { get; } = new();
+    public RecurringProjectionReadBarrierInterceptor RecurringProjectionReadBarrier { get; } = new();
     internal string TestConnection => _connection;
     public ApiFactory(bool relaxSecureCookiesForTests = true, string environment = "Development", TimeProvider? timeProvider = null, IReadOnlyDictionary<string, string?>? extraConfiguration = null, QueuedGoogleValidator? googleValidator = null, Func<HttpMessageHandler>? exchangeRateHandlerFactory = null)
     {
@@ -425,7 +426,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
             services.AddSingleton(SaveBarrier);
             services.AddHttpClient<EnigmaBudget.Api.ExchangeRates.DolarApiClient>()
                 .ConfigurePrimaryHttpMessageHandler(() => _exchangeRateHandlerFactory?.Invoke() ?? new HttpClientHandler { UseCookies = false, AllowAutoRedirect = false });
-            services.AddDbContext<AppDbContext>((serviceProvider, options) => options.AddInterceptors(serviceProvider.GetRequiredService<SaveChangesBarrierInterceptor>(), WorkspaceLockBarrier, WorkspaceAuditInsertProbe, SavingsLedgerReadBarrier));
+            services.AddDbContext<AppDbContext>((serviceProvider, options) => options.AddInterceptors(serviceProvider.GetRequiredService<SaveChangesBarrierInterceptor>(), WorkspaceLockBarrier, WorkspaceAuditInsertProbe, SavingsLedgerReadBarrier, RecurringProjectionReadBarrier));
             services.AddAuthentication(o => { o.DefaultScheme = "TestOrCookie"; o.DefaultAuthenticateScheme = "TestOrCookie"; o.DefaultChallengeScheme = "TestOrCookie"; }).AddPolicyScheme("TestOrCookie", "Test identity or cookie", o => o.ForwardDefaultSelector = context => context.Request.Headers.ContainsKey("Authorization") ? NativeBearerHandler.SchemeName : context.Request.Headers.ContainsKey("X-Test-Identity") ? "TestIdentity" : CookieAuthenticationDefaults.AuthenticationScheme).AddScheme<AuthenticationSchemeOptions, TestIdentityHandler>("TestIdentity", _ => { });
             services.RemoveAll<IGoogleIdTokenValidator>();
             services.AddSingleton<IGoogleIdTokenValidator>(GoogleValidator);
@@ -503,6 +504,27 @@ public sealed class SavingsLedgerReadBarrierInterceptor : DbCommandInterceptor
             && Interlocked.Exchange(ref _armed, 0) == 1)
         {
             BackendPid = (command.Connection as NpgsqlConnection)?.ProcessID;
+            _arrived.TrySetResult();
+            await _release.Task.WaitAsync(cancellationToken);
+        }
+        return result;
+    }
+    private static TaskCompletionSource NewSignal() => new(TaskCreationOptions.RunContinuationsAsynchronously);
+}
+
+public sealed class RecurringProjectionReadBarrierInterceptor : DbCommandInterceptor
+{
+    private int _armed;
+    private TaskCompletionSource _arrived = NewSignal();
+    private TaskCompletionSource _release = NewSignal();
+    public void Arm() { _arrived = NewSignal(); _release = NewSignal(); Volatile.Write(ref _armed, 1); }
+    public Task WaitUntilReadAsync() => _arrived.Task;
+    public void Release() => _release.TrySetResult();
+    public override async ValueTask<DbDataReader> ReaderExecutedAsync(DbCommand command, CommandExecutedEventData eventData, DbDataReader result, CancellationToken cancellationToken = default)
+    {
+        if (command.CommandText.Contains("\"FinanceOperations\"", StringComparison.OrdinalIgnoreCase)
+            && Interlocked.Exchange(ref _armed, 0) == 1)
+        {
             _arrived.TrySetResult();
             await _release.Task.WaitAsync(cancellationToken);
         }

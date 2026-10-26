@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Data;
 using EnigmaBudget.Api.Data;
 using EnigmaBudget.Api.Finance;
 using EnigmaBudget.Api.Identity;
@@ -9,12 +10,16 @@ using Microsoft.EntityFrameworkCore;
 
 namespace EnigmaBudget.Api.Projection;
 
-public sealed class ProjectionService(AppDbContext db, BusinessClock clock, SavingsAccountBalanceQuery balances)
+public sealed class ProjectionService(AppDbContext db, BusinessClock clock, SavingsAccountBalanceQuery balances, RecurringProjectionAdapter recurring)
 {
     private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
     public async Task<(ProjectionDto? Result, int Status, string? Error)> GetAsync(WorkspaceRequestContext context,
-        DateOnly through, string? scenario, Guid? scenarioId, CancellationToken ct)
+        DateOnly through, string? scenario, Guid? scenarioId, CancellationToken ct, bool includeRecurringEstimates = false) =>
+        await InSnapshotAsync(() => GetCoreAsync(context, through, scenario, scenarioId, ct, includeRecurringEstimates), ct);
+
+    private async Task<(ProjectionDto? Result, int Status, string? Error)> GetCoreAsync(WorkspaceRequestContext context,
+        DateOnly through, string? scenario, Guid? scenarioId, CancellationToken ct, bool includeRecurringEstimates)
     {
         var today = clock.Today;
         var selectedScenario = string.IsNullOrWhiteSpace(scenario) ? "Confirmed" : scenario;
@@ -43,6 +48,13 @@ public sealed class ProjectionService(AppDbContext db, BusinessClock clock, Savi
         var payments = await db.CardPayments.AsNoTracking().Where(x => x.WorkspaceId == ws.Id && x.Date <= today).ToArrayAsync(ct);
         var accountBalances = await balances.GetAsync(ws.Id, ct);
         var rows = new List<ProjectionRowDto>();
+        IReadOnlyList<ProjectionAlertDto> recurringAlerts = [];
+        if (includeRecurringEstimates)
+        {
+            var (estimatedRows, historyAlerts) = await recurring.GetRowsAndAlertsAsync(context, AddMonthsClamped(today, -36), through, ct);
+            rows.AddRange(estimatedRows);
+            recurringAlerts = historyAlerts;
+        }
         foreach (var account in accounts)
         {
             if (account.OpeningDate > today && account.OpeningDate <= through && account.OpeningBalance != 0m)
@@ -116,7 +128,7 @@ public sealed class ProjectionService(AppDbContext db, BusinessClock clock, Savi
 
         var currencyCodes = new[] { "ARS", "USD" };
         var output = new List<CurrencyProjectionDto>();
-        var alerts = new List<ProjectionAlertDto>();
+        var alerts = recurringAlerts.ToList();
         foreach (var currency in currencyCodes)
         {
             var currencyAccounts = accounts.Where(x => x.Currency == currency).ToArray();
@@ -135,14 +147,14 @@ public sealed class ProjectionService(AppDbContext db, BusinessClock clock, Savi
                 {
                     var amount = account.OpeningDate <= date ? account.OpeningBalance : 0m;
                     amount += ledger.Where(x => x.AccountId == account.Id && x.Date <= date).Sum(x => x.Amount);
-                    var dailyOperations = rows.Where(x => x.SourceKind == "FinanceOperation" && x.AccountId == account.Id && EventDate(x, today) <= date)
+                    var dailyOperations = rows.Where(x => (x.SourceKind is "FinanceOperation" or "RecurringOccurrence") && x.AccountId == account.Id && EventDate(x, today) <= date)
                         .Sum(x => x.Direction == "Incoming" ? decimal.Parse(x.Amount, Inv) : -decimal.Parse(x.Amount, Inv));
                     amount += dailyOperations;
                     cash += amount;
                     var availableFrom = account.FundsAvailableFrom is { } from ? (from > account.OpeningDate ? from : account.OpeningDate) : account.OpeningDate;
                     if (availableFrom <= date) available += amount;
                 }
-                var unassignedOperations = rows.Where(x => x.SourceKind == "FinanceOperation" && x.AccountId is null && x.Currency == currency && EventDate(x, today) <= date)
+                var unassignedOperations = rows.Where(x => (x.SourceKind is "FinanceOperation" or "RecurringOccurrence") && x.AccountId is null && x.Currency == currency && EventDate(x, today) <= date)
                     .Sum(x => x.Direction == "Incoming" ? decimal.Parse(x.Amount, Inv) : -decimal.Parse(x.Amount, Inv));
                 cash += unassignedOperations;
                 available += unassignedOperations;
@@ -172,12 +184,16 @@ public sealed class ProjectionService(AppDbContext db, BusinessClock clock, Savi
 
     public async Task<(ProjectionDto? Result, int Status, string? Error)> CalculateAsync(WorkspaceRequestContext context,
         DateOnly through, IReadOnlyList<ProjectionAssumptionInput> requested, IReadOnlyList<ProjectionAssumptionInput>? saved,
+        CancellationToken ct) => await InSnapshotAsync(() => CalculateCoreAsync(context, through, requested, saved, ct), ct);
+
+    private async Task<(ProjectionDto? Result, int Status, string? Error)> CalculateCoreAsync(WorkspaceRequestContext context,
+        DateOnly through, IReadOnlyList<ProjectionAssumptionInput> requested, IReadOnlyList<ProjectionAssumptionInput>? saved,
         CancellationToken ct)
     {
         if (through < clock.Today || through > clock.Today.AddMonths(36)) return (null, 400, "El horizonte debe estar entre hoy y los próximos 36 meses.");
         var inputs = saved is null ? requested : saved.Concat(requested).ToArray();
         if (requested.Count > 300 || inputs.Count > 300 || inputs.Select(x => x.Id).Distinct().Count() != inputs.Count) return (null, 400, "El escenario supera el máximo de supuestos permitido.");
-        var baseResult = await GetAsync(context, through, "Confirmed", null, ct);
+        var baseResult = await GetAsync(context, through, "Confirmed", null, ct, includeRecurringEstimates: true);
         if (baseResult.Result is null) return baseResult;
         var original = baseResult.Result;
         var rows = original.Rows.ToList();
@@ -335,12 +351,12 @@ public sealed class ProjectionService(AppDbContext db, BusinessClock clock, Savi
                 var updated = change.Updated;
                 var oldEffect = old is null ? 0m : Effect(old, date, today);
                 var newEffect = Effect(updated, date, today);
-                var appliesToCash = updated.SourceKind is "Income" or "Expense" or "GroupReceivable" or "FinanceOperation" or "LedgerEntry" or "AccountOpening" or "CardObligation";
+                var appliesToCash = updated.SourceKind is "Income" or "Expense" or "GroupReceivable" or "FinanceOperation" or "RecurringOccurrence" or "LedgerEntry" or "AccountOpening" or "CardObligation";
                 if (!appliesToCash) continue;
                 var difference = newEffect - oldEffect;
                 cashDelta += difference;
                 if (updated.SourceKind is "Income" or "Expense" or "GroupReceivable" or "CardObligation") availableDelta += difference;
-                else if (updated.SourceKind == "FinanceOperation" && updated.AccountId is null) availableDelta += difference;
+                else if ((updated.SourceKind is "FinanceOperation" or "RecurringOccurrence") && updated.AccountId is null) availableDelta += difference;
                 else if (updated.AccountId is { } accountId && accounts.TryGetValue(accountId, out var account)
                     && account.OpeningDate <= date && (account.FundsAvailableFrom is null || account.FundsAvailableFrom <= date))
                     availableDelta += difference;
@@ -386,6 +402,22 @@ public sealed class ProjectionService(AppDbContext db, BusinessClock clock, Savi
     private static string F(decimal amount) => amount.ToString("0.00", Inv);
     private static string Date(DateOnly date) => date.ToString("yyyy-MM-dd", Inv);
     private static string? NullableDate(DateOnly? date) => date?.ToString("yyyy-MM-dd", Inv);
+
+    private async Task<T> InSnapshotAsync<T>(Func<Task<T>> action, CancellationToken ct)
+    {
+        if (db.Database.CurrentTransaction is not null) return await action();
+        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.RepeatableRead, ct);
+        await db.Database.ExecuteSqlRawAsync("SET TRANSACTION READ ONLY", ct);
+        var result = await action();
+        await transaction.CommitAsync(ct);
+        return result;
+    }
+
+    private static DateOnly AddMonthsClamped(DateOnly date, int months)
+    {
+        try { return date.AddMonths(months); }
+        catch (ArgumentOutOfRangeException) { return months < 0 ? DateOnly.MinValue : DateOnly.MaxValue; }
+    }
 }
 
 public static class ProjectionEndpoints
