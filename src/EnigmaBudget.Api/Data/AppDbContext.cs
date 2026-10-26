@@ -104,6 +104,7 @@ public sealed class FinancePayment
     public Guid Id { get; set; }
     public Guid WorkspaceId { get; set; }
     public Guid OperationId { get; set; }
+    public Guid? LegacyFinanceOperationId { get; set; }
     public Guid AccountId { get; set; }
     public DateOnly Date { get; set; }
     public decimal Amount { get; set; }
@@ -278,7 +279,6 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         model.Entity<FinanceOperation>().Property(x => x.CatalogSelectionHash).HasMaxLength(64);
         model.Entity<FinanceOperation>().Property(x => x.Version).IsConcurrencyToken();
         model.Entity<FinanceOperation>().HasIndex(x => new { x.WorkspaceId, x.Id }).IsUnique();
-        model.Entity<FinanceOperation>().ToTable(t => t.HasCheckConstraint("CK_FinanceOperations_NullAccountExpenseOnly", "\"AccountId\" IS NOT NULL OR \"Kind\" = 'Expense'"));
         model.Entity<FinanceOperation>().HasOne<BankAccount>().WithMany().HasForeignKey(x => new { x.WorkspaceId, x.AccountId }).HasPrincipalKey(x => new { x.WorkspaceId, x.Id }).OnDelete(DeleteBehavior.Restrict);
         model.Entity<FinanceCategory>().HasKey(x => x.Id);
         model.Entity<FinanceCategory>().HasAlternateKey(x => new { x.WorkspaceId, x.Id });
@@ -317,8 +317,10 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         model.Entity<FinanceOperation>().HasOne<FinanceMerchant>().WithMany().HasForeignKey(x => new { x.WorkspaceId, x.MerchantId }).HasPrincipalKey(x => new { x.WorkspaceId, x.Id }).OnDelete(DeleteBehavior.Restrict);
         model.Entity<FinanceOperation>().HasOne<FinanceIncomeSource>().WithMany().HasForeignKey(x => new { x.WorkspaceId, x.IncomeSourceId }).HasPrincipalKey(x => new { x.WorkspaceId, x.Id }).OnDelete(DeleteBehavior.Restrict);
         model.Entity<FinancePayment>().Property(x => x.Amount).HasPrecision(18, 2);
+        model.Entity<FinancePayment>().Property(x => x.LegacyFinanceOperationId).HasColumnName("FinanceOperationId");
         model.Entity<FinancePayment>().HasAlternateKey(x => new { x.WorkspaceId, x.Id });
         model.Entity<FinancePayment>().HasOne<BankAccount>().WithMany().HasForeignKey(x => new { x.WorkspaceId, x.AccountId }).HasPrincipalKey(x => new { x.WorkspaceId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+        model.Entity<FinancePayment>().HasOne<FinanceOperation>().WithMany().HasForeignKey(x => x.LegacyFinanceOperationId).OnDelete(DeleteBehavior.NoAction);
         model.Entity<FinancePayment>().HasOne<FinanceOperation>().WithMany(x => x.Payments).HasForeignKey(x => new { x.WorkspaceId, x.OperationId }).HasPrincipalKey(x => new { x.WorkspaceId, x.Id }).OnDelete(DeleteBehavior.Cascade);
         model.Entity<BankAccount>().HasAlternateKey(x => new { x.WorkspaceId, x.Id });
         model.Entity<LedgerEntry>().Property(x => x.Amount).HasPrecision(18, 2);

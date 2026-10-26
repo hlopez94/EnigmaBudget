@@ -353,10 +353,7 @@ namespace EnigmaBudget.Api.Data.Migrations
 
                     b.HasIndex("WorkspaceId", "MerchantId");
 
-                    b.ToTable("FinanceOperations", t =>
-                        {
-                            t.HasCheckConstraint("CK_FinanceOperations_NullAccountExpenseOnly", "\"AccountId\" IS NOT NULL OR \"Kind\" = 'Expense'");
-                        });
+                    b.ToTable("FinanceOperations");
                 });
 
             modelBuilder.Entity("EnigmaBudget.Api.Data.FinancePayment", b =>
@@ -379,6 +376,10 @@ namespace EnigmaBudget.Api.Data.Migrations
                     b.Property<DateOnly>("Date")
                         .HasColumnType("date");
 
+                    b.Property<Guid?>("LegacyFinanceOperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("FinanceOperationId");
+
                     b.Property<Guid>("OperationId")
                         .HasColumnType("uuid");
 
@@ -386,6 +387,8 @@ namespace EnigmaBudget.Api.Data.Migrations
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("LegacyFinanceOperationId");
 
                     b.HasIndex("WorkspaceId", "AccountId");
 
@@ -2222,6 +2225,11 @@ namespace EnigmaBudget.Api.Data.Migrations
 
             modelBuilder.Entity("EnigmaBudget.Api.Data.FinancePayment", b =>
                 {
+                    b.HasOne("EnigmaBudget.Api.Data.FinanceOperation", null)
+                        .WithMany()
+                        .HasForeignKey("LegacyFinanceOperationId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
                     b.HasOne("EnigmaBudget.Api.Data.BankAccount", null)
                         .WithMany()
                         .HasForeignKey("WorkspaceId", "AccountId")

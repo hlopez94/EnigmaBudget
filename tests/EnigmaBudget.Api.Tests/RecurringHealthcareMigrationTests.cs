@@ -73,8 +73,42 @@ public sealed class RecurringHealthcareMigrationTests
         var fixture = await SeedWorkspace(db, nullableAccount: true);
         Assert.True(await IsNullable(db, "FinanceOperations", "AccountId"));
         Assert.Null(new OperationDto(Guid.NewGuid(), "Expense", null, "2026-10-25", "Consulta", "Salud", "100.00", "ARS", "0.00", "100.00", "Pending", 1, [] ).AccountId);
-        var incomeWithoutAccount = await Assert.ThrowsAsync<PostgresException>(() => InsertOperationWithoutAccount(db, fixture));
-        Assert.Equal(PostgresErrorCodes.CheckViolation, incomeWithoutAccount.SqlState);
+        Assert.Equal(1, await InsertOperationWithoutAccount(db, fixture));
+        Assert.Equal(1, await Scalar<int>(db, "SELECT count(*) FROM \"FinanceOperations\" WHERE \"WorkspaceId\" = @workspace AND \"Kind\" = 'Income' AND \"AccountId\" IS NULL", fixture.WorkspaceId));
+    }
+
+    [Fact]
+    public async Task migration_preserves_legacy_finance_operation_fk_values_and_payment_payload()
+    {
+        using var factory = new ApiFactory(environment: "Testing");
+        await using var db = Db(factory);
+        var migrator = db.GetService<IMigrator>();
+        await migrator.MigrateAsync("20261025212354_MonthlyFinanceBudgets");
+        var legacy = await SeedLegacyPayment(db);
+
+        await migrator.MigrateAsync();
+
+        Assert.Equal(legacy.FinanceOperationId, await Scalar<Guid>(db, "SELECT \"FinanceOperationId\" FROM \"FinancePayments\" WHERE \"Id\" = @id", legacy.PaymentId));
+        Assert.Equal(legacy.OperationId, await Scalar<Guid>(db, "SELECT \"OperationId\" FROM \"FinancePayments\" WHERE \"Id\" = @id", legacy.PaymentId));
+        Assert.Equal(legacy.AccountId, await Scalar<Guid>(db, "SELECT \"AccountId\" FROM \"FinancePayments\" WHERE \"Id\" = @id", legacy.PaymentId));
+        Assert.Equal(123.45m, await Scalar<decimal>(db, "SELECT \"Amount\" FROM \"FinancePayments\" WHERE \"Id\" = @id", legacy.PaymentId));
+        Assert.Equal("ARS", await Scalar<string>(db, "SELECT \"Currency\" FROM \"FinancePayments\" WHERE \"Id\" = @id", legacy.PaymentId));
+        Assert.Equal(new DateOnly(2026, 10, 15), await Scalar<DateOnly>(db, "SELECT \"Date\" FROM \"FinancePayments\" WHERE \"Id\" = @id", legacy.PaymentId));
+        Assert.Equal("Legacy pago sueldo", await Scalar<string>(db, "SELECT \"Description\" FROM \"FinanceOperations\" WHERE \"Id\" = @id", legacy.OperationId));
+        Assert.Equal("Sueldo", await Scalar<string>(db, "SELECT \"Category\" FROM \"FinanceOperations\" WHERE \"Id\" = @id", legacy.OperationId));
+    }
+
+    [Fact]
+    public async Task migration_down_does_not_fabricate_an_account_for_unassigned_operations()
+    {
+        using var migrated = await MigratedDb();
+        var db = migrated.Db;
+        var fixture = await SeedWorkspace(db, nullableAccount: true);
+
+        var failure = await Assert.ThrowsAsync<PostgresException>(() => db.GetService<IMigrator>().MigrateAsync("20261025212354_MonthlyFinanceBudgets"));
+        Assert.Equal(PostgresErrorCodes.NotNullViolation, failure.SqlState);
+        Assert.Equal(1, await Scalar<int>(db, "SELECT count(*) FROM \"FinanceOperations\" WHERE \"WorkspaceId\" = @workspace AND \"AccountId\" IS NULL", fixture.WorkspaceId));
+        Assert.Equal(1, await Scalar<int>(db, "SELECT count(*) FROM \"RecurringRules\" WHERE \"WorkspaceId\" = @workspace", fixture.WorkspaceId));
     }
 
     [Fact]
@@ -195,6 +229,26 @@ public sealed class RecurringHealthcareMigrationTests
             await db.Database.MigrateAsync();
         return new(factory, db);
     }
+
+    private static AppDbContext Db(ApiFactory factory) => new(new DbContextOptionsBuilder<AppDbContext>().UseNpgsql(factory.TestConnection).Options);
+
+    private static async Task<LegacyPayment> SeedLegacyPayment(AppDbContext db)
+    {
+        var userId = Guid.NewGuid();
+        var workspaceId = Guid.NewGuid();
+        var subject = $"legacy-payment-{Guid.NewGuid():N}";
+        var accountId = Guid.NewGuid();
+        var operationId = Guid.NewGuid();
+        var paymentId = Guid.NewGuid();
+        await db.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO \"ApplicationUsers\" (\"Id\", \"Subject\", \"EmailVerified\", \"CreatedAt\") VALUES ({userId}, {subject}, {false}, {DateTimeOffset.UtcNow})");
+        await db.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO \"Workspaces\" (\"Id\", \"OwnerSubject\", \"Name\", \"Kind\", \"OwnerUserId\", \"IsArchived\", \"Version\") VALUES ({workspaceId}, {subject}, {"Legacy"}, {"Personal"}, {userId}, {false}, {1})");
+        await db.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO \"Accounts\" (\"Id\", \"WorkspaceId\", \"Name\", \"BankName\", \"Currency\", \"OpeningBalance\", \"OpeningDate\", \"IsArchived\", \"Version\") VALUES ({accountId}, {workspaceId}, {"Sueldo"}, {"Banco"}, {"ARS"}, {0m}, {new DateOnly(2026, 1, 1)}, {false}, {1})");
+        await db.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO \"FinanceOperations\" (\"Id\", \"WorkspaceId\", \"Kind\", \"AccountId\", \"Date\", \"Description\", \"Category\", \"Currency\", \"Amount\", \"IsVoided\", \"Version\", \"InitiallyPaid\") VALUES ({operationId}, {workspaceId}, {"Income"}, {accountId}, {new DateOnly(2026, 10, 15)}, {"Legacy pago sueldo"}, {"Sueldo"}, {"ARS"}, {123.45m}, {false}, {2}, {true})");
+        await db.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO \"FinancePayments\" (\"Id\", \"WorkspaceId\", \"OperationId\", \"AccountId\", \"Date\", \"Amount\", \"Currency\", \"FinanceOperationId\") VALUES ({paymentId}, {workspaceId}, {operationId}, {accountId}, {new DateOnly(2026, 10, 15)}, {123.45m}, {"ARS"}, {operationId})");
+        return new(workspaceId, accountId, operationId, paymentId, operationId);
+    }
+
+    private sealed record LegacyPayment(Guid WorkspaceId, Guid AccountId, Guid OperationId, Guid PaymentId, Guid FinanceOperationId);
 
     private sealed class MigratedDatabase(ApiFactory factory, AppDbContext db) : IDisposable
     {

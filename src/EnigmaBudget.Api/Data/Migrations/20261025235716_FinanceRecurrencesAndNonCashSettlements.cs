@@ -11,21 +11,9 @@ namespace EnigmaBudget.Api.Data.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropForeignKey(
-                name: "FK_FinancePayments_FinanceOperations_FinanceOperationId",
-                table: "FinancePayments");
-
-            migrationBuilder.DropIndex(
-                name: "IX_FinancePayments_FinanceOperationId",
-                table: "FinancePayments");
-
             migrationBuilder.DropIndex(
                 name: "IX_Cards_WorkspaceId",
                 table: "Cards");
-
-            migrationBuilder.DropColumn(
-                name: "FinanceOperationId",
-                table: "FinancePayments");
 
             migrationBuilder.AddColumn<Guid>(
                 name: "ExpenseOperationId",
@@ -366,11 +354,6 @@ namespace EnigmaBudget.Api.Data.Migrations
                 table: "FinanceOperations",
                 columns: new[] { "WorkspaceId", "AccountId" });
 
-            migrationBuilder.AddCheckConstraint(
-                name: "CK_FinanceOperations_NullAccountExpenseOnly",
-                table: "FinanceOperations",
-                sql: "\"AccountId\" IS NOT NULL OR \"Kind\" = 'Expense'");
-
             migrationBuilder.CreateIndex(
                 name: "IX_HealthcareComponents_WorkspaceId_OccurrenceActionId_RuleRev~",
                 table: "HealthcareComponents",
@@ -593,10 +576,6 @@ namespace EnigmaBudget.Api.Data.Migrations
                 name: "IX_FinanceOperations_WorkspaceId_AccountId",
                 table: "FinanceOperations");
 
-            migrationBuilder.DropCheckConstraint(
-                name: "CK_FinanceOperations_NullAccountExpenseOnly",
-                table: "FinanceOperations");
-
             migrationBuilder.DropUniqueConstraint(
                 name: "AK_Cards_WorkspaceId_Id",
                 table: "Cards");
@@ -605,38 +584,19 @@ namespace EnigmaBudget.Api.Data.Migrations
                 name: "ExpenseOperationId",
                 table: "Purchases");
 
-            migrationBuilder.AddColumn<Guid>(
-                name: "FinanceOperationId",
-                table: "FinancePayments",
-                type: "uuid",
-                nullable: true);
-
             migrationBuilder.AlterColumn<Guid>(
                 name: "AccountId",
                 table: "FinanceOperations",
                 type: "uuid",
                 nullable: false,
-                defaultValue: new Guid("00000000-0000-0000-0000-000000000000"),
                 oldClrType: typeof(Guid),
                 oldType: "uuid",
                 oldNullable: true);
 
             migrationBuilder.CreateIndex(
-                name: "IX_FinancePayments_FinanceOperationId",
-                table: "FinancePayments",
-                column: "FinanceOperationId");
-
-            migrationBuilder.CreateIndex(
                 name: "IX_Cards_WorkspaceId",
                 table: "Cards",
                 column: "WorkspaceId");
-
-            migrationBuilder.AddForeignKey(
-                name: "FK_FinancePayments_FinanceOperations_FinanceOperationId",
-                table: "FinancePayments",
-                column: "FinanceOperationId",
-                principalTable: "FinanceOperations",
-                principalColumn: "Id");
         }
     }
 }
