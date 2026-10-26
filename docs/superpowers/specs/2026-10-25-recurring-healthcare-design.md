@@ -86,3 +86,7 @@ La compensación siempre es completa por el importe original de una raíz Payrol
 `StateForToday=NotStarted` identifica una regla cuyo primer inicio efectivo todavía es futuro; la UI lo muestra como «Programada». No es Ended, y no cambia los estados persistidos Active/Paused/Ended.
 
 El aviso de fechas antiguas obtiene la primera fecha pendiente omitida mediante una consulta escalar apoyada en índices, sin descargar todas las acciones históricas ni volver a generar calendarios anteriores. La consulta de ocurrencias conserva su ventana máxima de 36 meses y su límite de 200 filas. No se afirma tiempo constante para una consulta SQL; se exige resultado de metadatos acotado y ausencia de materialización completa del historial en memoria de la aplicación.
+
+## Cuenta prevista opcional al confirmar
+
+Cuando no hay efectivo cobrado/pagado en ese momento, el usuario puede elegir explícitamente «Registrar sin cuenta prevista» (`ClearPreferredAccount=true`). La operación queda sin cuenta aunque la regla tuviera una preferida, incluso si esa cuenta fue archivada. Sin esa elección, se valida la cuenta explícita o heredada y se informa el conflicto para que el usuario decida. Una parte de efectivo positiva siempre exige la cuenta real; la opción de quitar preferencia no permite omitirla. No se mueve dinero ni se reescribe la regla al cambiar esta preferencia de una ocurrencia.
