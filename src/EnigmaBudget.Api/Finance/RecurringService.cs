@@ -101,6 +101,264 @@ public sealed class RecurringService(AppDbContext db, WorkspaceAccessService acc
         return Ok(new RecurringRuleDto(rule.Id, workspaceId, rule.CurrentVersion, rule.State));
     });
 
+    public Task<IResult> RecordOccurrenceAsync(HttpContext http, Guid ruleId, string scheduledDateText, RecurringOccurrenceRecord request) =>
+        OccurrenceActionAsync(http, ruleId, scheduledDateText, "Recorded", request.RequestId, request,
+            (workspaceId, actorId, revision, scheduledDate, ct) => RecordOccurrenceCoreAsync(http, workspaceId, actorId, ruleId, revision, scheduledDate, request, ct));
+
+    public Task<IResult> SkipOccurrenceAsync(HttpContext http, Guid ruleId, string scheduledDateText, RecurringOccurrenceSkip request) =>
+        OccurrenceActionAsync(http, ruleId, scheduledDateText, "Skipped", request.RequestId, request,
+            (workspaceId, actorId, revision, scheduledDate, ct) => SkipOccurrenceCoreAsync(workspaceId, actorId, ruleId, revision, scheduledDate, request, ct));
+
+    private async Task<IResult> OccurrenceActionAsync<T>(HttpContext http, Guid ruleId, string scheduledDateText, string outcome,
+        Guid requestId, T request, Func<Guid, Guid, RecurringRuleRevision, DateOnly, CancellationToken, Task<OccurrenceResult>> apply)
+    {
+        if (!await NativeAuthCsrf.ValidateRequestAsync(http, csrf)) return Problem(400, "La validación de seguridad de la solicitud no fue válida.");
+        if (ruleId == Guid.Empty || requestId == Guid.Empty
+            || !DateOnly.TryParseExact(scheduledDateText, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var scheduledDate))
+            return Problem(400, "Revisá la fecha y los identificadores de la ocurrencia.");
+
+        var initial = FinanceWorkspaceFilter.Get(http)!;
+        var (lease, lockStatus) = await gate.AcquireAsync(initial.Workspace.Id, http.RequestAborted);
+        if (lease is null) return Problem(lockStatus, "El espacio no existe.");
+        await using var mutation = lease;
+        var (context, authStatus) = await access.ResolveWithinLockedWorkspaceAsync(http.User, mutation.Workspace, WorkspacePermissions.RecordFinance, http.RequestAborted);
+        if (context is null) return Problem(authStatus, "No tenés permiso para registrar movimientos.");
+
+        var workspaceId = context.Workspace.Id;
+        var serialized = JsonSerializer.Serialize(request, JsonOptions);
+        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes($"{outcome}\n{ruleId:D}\n{scheduledDate:yyyy-MM-dd}\n{serialized}")));
+        var priorRequest = await db.RecurringOccurrenceActions.SingleOrDefaultAsync(x => x.WorkspaceId == workspaceId && x.RequestId == requestId, http.RequestAborted);
+        if (priorRequest is not null)
+            return priorRequest.RuleId == ruleId && priorRequest.ScheduledDate == scheduledDate && priorRequest.Outcome == outcome && priorRequest.PayloadHash == hash
+                ? Results.Ok(ActionResult(priorRequest)) : Problem(409, "El identificador de solicitud ya se usó con otros datos.");
+
+        var lockedRule = await db.RecurringRules.FromSqlInterpolated($"SELECT * FROM \"RecurringRules\" WHERE \"WorkspaceId\" = {workspaceId} AND \"Id\" = {ruleId} FOR UPDATE").SingleOrDefaultAsync(http.RequestAborted);
+        if (lockedRule is null) return Problem(404, "La regla recurrente no existe.");
+        var ruleVersion = request switch
+        {
+            RecurringOccurrenceRecord record => record.RuleVersion,
+            RecurringOccurrenceSkip skip => skip.RuleVersion,
+            _ => 0
+        };
+        if (ruleVersion < 1 || ruleVersion != lockedRule.CurrentVersion) return Problem(409, "La regla cambió. Actualizá la pantalla.");
+        var existing = await db.RecurringOccurrenceActions.FromSqlInterpolated($"SELECT * FROM \"RecurringOccurrenceActions\" WHERE \"WorkspaceId\" = {workspaceId} AND \"RuleId\" = {ruleId} AND \"ScheduledDate\" = {scheduledDate} FOR UPDATE").SingleOrDefaultAsync(http.RequestAborted);
+        if (existing is not null) return Problem(409, "Esta fecha ya tiene una acción registrada.");
+
+        var calendar = new RecurringCalendar(db);
+        var revision = await calendar.ResolveRevisionAsync(workspaceId, ruleId, scheduledDate, http.RequestAborted);
+        if (revision is null) return Problem(409, "La fecha no corresponde a una ocurrencia activa de esta regla.");
+        var result = await apply(workspaceId, context.User.Id, revision, scheduledDate, http.RequestAborted);
+        if (result.Error is not null) return Problem(result.Status, result.Error);
+
+        var action = result.Action!;
+        db.RecurringOccurrenceActions.Add(action);
+        db.WorkspaceAuditEvents.Add(new WorkspaceAuditEvent { WorkspaceId = workspaceId, ActorUserId = context.User.Id,
+            Action = $"finance.recurring.occurrence.{outcome.ToLowerInvariant()}", ResourceType = "RecurringOccurrence",
+            ResourceId = RecurringCalendar.StableOccurrenceId(workspaceId, ruleId, scheduledDate).ToString("D"),
+            OccurredAt = clock.GetUtcNow(), ChangesJson = JsonSerializer.Serialize(new { requestId, ruleId, scheduledDate, outcome }, JsonOptions) });
+        mutation.MarkChanged();
+        try
+        {
+            await db.SaveChangesAsync(http.RequestAborted);
+            await mutation.CommitAsync(http.RequestAborted);
+        }
+        catch (DbUpdateConcurrencyException) { return Problem(409, "La fecha ya cambió. Actualizá la pantalla."); }
+        catch (DbUpdateException ex) when (ex.GetBaseException() is PostgresException pg && pg.SqlState is "23505" or "23503")
+        { return Problem(409, "La fecha ya tiene una acción registrada o algún recurso cambió."); }
+        return Results.Ok(ActionResult(action));
+    }
+
+    private Task<OccurrenceResult> SkipOccurrenceCoreAsync(Guid workspaceId, Guid actorId, Guid ruleId,
+        RecurringRuleRevision revision, DateOnly scheduledDate, RecurringOccurrenceSkip request, CancellationToken ct)
+    {
+        if (request.RuleVersion < 1 || string.IsNullOrWhiteSpace(request.Reason) || request.Reason.Trim().Length > 240)
+            return Task.FromResult(OccurrenceFail(400, "Indicá un motivo de hasta 240 caracteres."));
+        var hash = OccurrenceHash("Skipped", ruleId, scheduledDate, request);
+        var action = new RecurringOccurrenceAction { Id = ChildId(workspaceId, request.RequestId, "action", "skip"),
+            WorkspaceId = workspaceId, RuleId = ruleId, RuleRevisionId = revision.Id, ScheduledDate = scheduledDate,
+            Outcome = "Skipped", Reason = request.Reason.Trim(), RequestId = request.RequestId, PayloadHash = hash };
+        return Task.FromResult(new OccurrenceResult(action, 200, null));
+    }
+
+    private async Task<OccurrenceResult> RecordOccurrenceCoreAsync(HttpContext http, Guid workspaceId, Guid actorId, Guid ruleId,
+        RecurringRuleRevision revision, DateOnly scheduledDate, RecurringOccurrenceRecord request, CancellationToken ct)
+    {
+        if (request.RuleVersion < 1 || !DateOnly.TryParseExact(request.ActualDate, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var actualDate)
+            || !MoneyRules.Money(request.ActualAmount, false, out var gross) || gross <= 0m
+            || !MoneyRules.Money(request.ActualCashAmount, false, out var cash) || !MoneyRules.Money(request.CardChargeAmount, false, out var cardAmount)
+            || cash > gross || cardAmount > gross || request.ActualHealthcareComponents is null || request.ActualHealthcareComponents.Count > 100
+            || request.ActualHealthcareComponents.Select(x => x.Id).Any(x => x == Guid.Empty)
+            || request.ActualHealthcareComponents.Select(x => x.Id).Distinct().Count() != request.ActualHealthcareComponents.Count)
+            return OccurrenceFail(400, "Revisá el importe, la fecha y el desglose real.");
+        if (actualDate > businessClock.Today) return OccurrenceFail(400, "La fecha real no puede ser futura.");
+        foreach (var component in request.ActualHealthcareComponents)
+            if (!ComponentKinds.Contains(component.Kind) || component.AppliesToProviderBalance && component.Kind != "PayrollWithholding"
+                || !MoneyRules.Money(component.Amount, false, out var part) || part <= 0m)
+                return OccurrenceFail(400, "Revisá los componentes reales de la cobertura.");
+
+        var plannedComponents = await db.HealthcareComponents.AsNoTracking()
+            .Where(x => x.WorkspaceId == workspaceId && x.RuleRevisionId == revision.Id && x.OccurrenceActionId == null).ToArrayAsync(ct);
+        var isHealthcare = plannedComponents.Any(x => x.Kind is "ProviderCharge" or "ProviderDiscount");
+        var actualCharges = request.ActualHealthcareComponents.Where(x => x.Kind == "ProviderCharge").Sum(x => Parse(x.Amount));
+        var actualDiscounts = request.ActualHealthcareComponents.Where(x => x.Kind == "ProviderDiscount").Sum(x => Parse(x.Amount));
+        if (isHealthcare || actualCharges > 0m || actualDiscounts > 0m)
+            if (actualCharges <= 0m || actualCharges - actualDiscounts != gross)
+                return OccurrenceFail(400, "El importe debe coincidir con los cargos reales del proveedor menos sus descuentos.");
+
+        if (revision.Flow == "Income")
+        {
+            if (cardAmount != 0m || request.CardId is not null || request.CardFirstPeriod is not null
+                || request.ActualHealthcareComponents.Count != 0 || request.CatalogOverride is { MerchantId: not null }
+                || request.CatalogOverride is { CategoryId: null } || request.CatalogOverride is { IncomeSourceId: null })
+                return OccurrenceFail(400, "Un ingreso no admite tarjeta ni componentes de gasto.");
+        }
+        else if (request.CatalogOverride is { IncomeSourceId: not null }) return OccurrenceFail(400, "Un gasto no admite fuente de ingreso.");
+        if (request.CatalogOverride is { CategoryId: null }) return OccurrenceFail(400, "La selección de catálogo explícita debe incluir una categoría activa.");
+
+        BankAccount? cashAccount = null;
+        if (cash > 0m)
+        {
+            if (request.CashAccountId is not Guid cashAccountId || request.ClearPreferredAccount)
+                return OccurrenceFail(400, "Elegí una cuenta activa para el importe pagado en efectivo.");
+            cashAccount = await db.Accounts.SingleOrDefaultAsync(x => x.WorkspaceId == workspaceId && x.Id == cashAccountId, ct);
+            if (cashAccount is null) return OccurrenceFail(404, "La cuenta indicada no existe en este espacio.");
+            if (cashAccount.IsArchived || cashAccount.Currency != revision.Currency || actualDate < cashAccount.OpeningDate)
+                return OccurrenceFail(409, "La cuenta no admite este pago real.");
+        }
+        else if (request.CashAccountId is not null) return OccurrenceFail(400, "No elijas una cuenta de pago si no se cobró ni pagó efectivo.");
+
+        Guid? operationAccountId = cashAccount?.Id;
+        if (cash == 0m)
+        {
+            if (request.ClearPreferredAccount)
+            {
+                if (request.PreferredAccountId is not null) return OccurrenceFail(400, "Para quitar la cuenta prevista, PreferredAccountId debe quedar vacío.");
+                operationAccountId = null;
+            }
+            else
+            {
+                var preferredId = request.PreferredAccountId ?? revision.PreferredAccountId;
+                if (preferredId is Guid id)
+                {
+                    var preferred = await db.Accounts.SingleOrDefaultAsync(x => x.WorkspaceId == workspaceId && x.Id == id, ct);
+                    if (preferred is null) return OccurrenceFail(404, "La cuenta prevista no existe en este espacio.");
+                    if (preferred.IsArchived || preferred.Currency != revision.Currency)
+                        return OccurrenceFail(409, "La cuenta prevista está archivada o usa otra moneda. Elegí una cuenta activa o quitá explícitamente la cuenta prevista.");
+                    operationAccountId = preferred.Id;
+                }
+            }
+        }
+
+        ResolvedOperationCatalog selected;
+        var overrideCategory = request.CatalogOverride?.CategoryId ?? (request.CatalogOverride is null ? revision.CategoryId : null);
+        var overrideMerchant = request.CatalogOverride?.MerchantId ?? (request.CatalogOverride is null ? revision.MerchantId : null);
+        var overrideSource = request.CatalogOverride?.IncomeSourceId ?? (request.CatalogOverride is null ? revision.IncomeSourceId : null);
+        selected = await CatalogSelectionResolver.ResolveOperationAsync(db, workspaceId, revision.Flow, null, overrideCategory, overrideMerchant, overrideSource, ct);
+        if (selected.FailureStatus != 0) return OccurrenceFail(selected.FailureStatus, selected.FailureDetail!);
+
+        PaymentCard? card = null;
+        string? cardPeriod = request.CardFirstPeriod;
+        if (cardAmount > 0m)
+        {
+            if (revision.Flow != "Expense" || request.CardId is not Guid cardId || !MoneyRules.IsPeriod(cardPeriod ?? ""))
+                return OccurrenceFail(400, "Elegí una tarjeta activa y el primer período para el importe cargado.");
+            card = await db.Cards.SingleOrDefaultAsync(x => x.WorkspaceId == workspaceId && x.Id == cardId, ct);
+            if (card is null) return OccurrenceFail(404, "La tarjeta indicada no existe en este espacio.");
+            if (card.IsArchived || actualDate < card.AsOfDate || cardPeriod!.CompareTo(card.AsOfDate.ToString("yyyy-MM", CultureInfo.InvariantCulture)) < 0)
+                return OccurrenceFail(409, "La tarjeta no admite compras en esa fecha o período.");
+            if (await db.CardStatements.AnyAsync(x => x.WorkspaceId == workspaceId && x.CardId == card.Id && x.Period == cardPeriod && x.Currency == revision.Currency && x.State == "Confirmed", ct))
+                return OccurrenceFail(409, "El resumen de ese período está confirmado.");
+        }
+        else if (request.CardId is not null || request.CardFirstPeriod is not null)
+            return OccurrenceFail(400, "La tarjeta y el período solo corresponden a un cargo positivo.");
+
+        foreach (var participantId in request.ActualHealthcareComponents.Where(x => x.ParticipantId.HasValue).Select(x => x.ParticipantId!.Value).Distinct())
+            if (!await db.Participants.AnyAsync(x => x.WorkspaceId == workspaceId && x.Id == participantId, ct))
+                return OccurrenceFail(404, "La persona indicada no pertenece a este espacio.");
+
+        var appliedPayroll = request.ActualHealthcareComponents.Where(x => x.Kind == "PayrollWithholding" && x.AppliesToProviderBalance).Sum(x => Parse(x.Amount));
+        if (revision.Flow == "Expense" && cash + cardAmount + appliedPayroll > gross)
+            return OccurrenceFail(400, "Las partes confirmadas superan el importe bruto del gasto.");
+        if (revision.Flow == "Income" && cash > gross) return OccurrenceFail(400, "El cobro no puede superar el ingreso total.");
+
+        var commandHash = OccurrenceHash("Recorded", ruleId, scheduledDate, request);
+        var actionId = ChildId(workspaceId, request.RequestId, "action", "recorded");
+        var operationId = ChildId(workspaceId, request.RequestId, "operation", "root");
+        var operation = new FinanceOperation { Id = operationId, WorkspaceId = workspaceId, Kind = revision.Flow,
+            AccountId = operationAccountId, Date = actualDate, Description = revision.Description, Category = selected.CategoryName,
+            CategoryId = selected.CategoryId, MerchantId = selected.MerchantId, MerchantNameSnapshot = selected.MerchantName,
+            IncomeSourceId = selected.IncomeSourceId, IncomeSourceNameSnapshot = selected.IncomeSourceName,
+            CatalogSelectionHash = selected.SelectionHash, Currency = revision.Currency, Amount = gross, InitiallyPaid = cash == gross };
+        var action = new RecurringOccurrenceAction { Id = actionId, WorkspaceId = workspaceId, RuleId = ruleId,
+            RuleRevisionId = revision.Id, ScheduledDate = scheduledDate, Outcome = "Recorded", FinanceOperationId = operationId,
+            RequestId = request.RequestId, PayloadHash = commandHash };
+        FinanceRecordWriter.AddOperation(db, operation);
+        db.RecurringOccurrenceActions.Add(action);
+        var actualComponents = request.ActualHealthcareComponents.Select(x => new HealthcareComponent
+        {
+            Id = ChildId(workspaceId, request.RequestId, "healthcare-component", x.Id.ToString("D")), WorkspaceId = workspaceId,
+            RuleRevisionId = revision.Id, OccurrenceActionId = actionId, Kind = x.Kind, Amount = Parse(x.Amount),
+            AppliesToProviderBalance = x.AppliesToProviderBalance, ParticipantId = x.ParticipantId
+        }).ToArray();
+        db.HealthcareComponents.AddRange(actualComponents);
+
+        var settlementRows = new List<NonCashSettlement>();
+        if (cash > 0m) FinanceRecordWriter.AddPayment(db, operation, cashAccount!, actualDate, cash,
+            ChildId(workspaceId, request.RequestId, "payment", "cash"), ledgerEntryId: ChildId(workspaceId, request.RequestId, "ledger-entry", "cash"));
+        if (cardAmount > 0m)
+        {
+            var selectedPurchase = await CatalogSelectionResolver.ResolvePurchaseAsync(db, workspaceId, null, selected.CategoryId, selected.MerchantId, ct);
+            if (selectedPurchase.FailureStatus != 0) return OccurrenceFail(selectedPurchase.FailureStatus, selectedPurchase.FailureDetail!);
+            var purchaseId = ChildId(workspaceId, request.RequestId, "purchase", "card-charge");
+            var purchase = new CardPurchase { Id = purchaseId, WorkspaceId = workspaceId, CardId = card!.Id, Date = actualDate,
+                Description = revision.Description, Category = selectedPurchase.CategoryName, CategoryId = selectedPurchase.CategoryId,
+                ExpenseOperationId = operationId, MerchantId = selectedPurchase.MerchantId, MerchantNameSnapshot = selectedPurchase.MerchantName,
+                CatalogSelectionHash = selectedPurchase.SelectionHash, Currency = revision.Currency, TotalAmount = cardAmount,
+                InstallmentCount = 1, FirstPeriod = cardPeriod! };
+            FinanceRecordWriter.AddPurchase(db, purchase, number => ChildId(workspaceId, request.RequestId, "installment", number.ToString(CultureInfo.InvariantCulture)));
+            action.CardPurchaseId = purchaseId;
+            card!.Version++;
+            settlementRows.Add(new NonCashSettlement { Id = ChildId(workspaceId, request.RequestId, "settlement", "card-charge"),
+                WorkspaceId = workspaceId, OperationId = operationId, Currency = revision.Currency, Kind = "CardCharge",
+                Amount = cardAmount, CardPurchaseId = purchaseId, RequestId = ChildId(workspaceId, request.RequestId, "settlement-request", "card-charge"),
+                PayloadHash = commandHash, ActorUserId = actorId, CreatedAt = clock.GetUtcNow() });
+        }
+        foreach (var input in request.ActualHealthcareComponents.Where(x => x.Kind == "PayrollWithholding" && x.AppliesToProviderBalance))
+        {
+            var component = actualComponents.Single(x => x.Id == ChildId(workspaceId, request.RequestId, "healthcare-component", input.Id.ToString("D")));
+            settlementRows.Add(new NonCashSettlement { Id = ChildId(workspaceId, request.RequestId, "settlement", input.Id.ToString("D")),
+                WorkspaceId = workspaceId, OperationId = operationId, Currency = revision.Currency, Kind = "PayrollWithholding",
+                Amount = component.Amount, HealthcareComponentId = component.Id,
+                RequestId = ChildId(workspaceId, request.RequestId, "settlement-request", input.Id.ToString("D")), PayloadHash = commandHash,
+                ActorUserId = actorId, CreatedAt = clock.GetUtcNow() });
+        }
+        db.NonCashSettlements.AddRange(settlementRows);
+        foreach (var settlement in settlementRows)
+        {
+            if (!await OperationSettlementSourceValidator.ValidateAsync(db, operation, settlement, ct))
+                return OccurrenceFail(409, "El origen de una parte de la liquidación no es válido.");
+        }
+        return new OccurrenceResult(action, 200, null);
+    }
+
+    private static object ActionResult(RecurringOccurrenceAction action) => new
+    {
+        occurrenceId = action.Id, ruleId = action.RuleId, scheduledDate = action.ScheduledDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+        outcome = action.Outcome, financeOperationId = action.FinanceOperationId, cardPurchaseId = action.CardPurchaseId, reason = action.Reason
+    };
+
+    private static string OccurrenceHash<T>(string outcome, Guid ruleId, DateOnly scheduledDate, T request) =>
+        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes($"{outcome}\n{ruleId:D}\n{scheduledDate:yyyy-MM-dd}\n{JsonSerializer.Serialize(request, JsonOptions)}")));
+
+    private static Guid ChildId(Guid workspaceId, Guid requestId, string role, string source)
+    {
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes($"{workspaceId:D}/{requestId:D}/{role}/{source}"));
+        return new Guid(hash.AsSpan(0, 16));
+    }
+
+    private static OccurrenceResult OccurrenceFail(int status, string detail) => new(null, status, detail);
+    private sealed record OccurrenceResult(RecurringOccurrenceAction? Action, int Status, string? Error);
+
     private async Task<IResult> MutateAsync<T>(HttpContext http, string kind, Guid ruleId, Guid requestId, T payload, int successStatus, Func<Guid, Guid, CancellationToken, Task<MutationResult>> apply)
     {
         if (!await NativeAuthCsrf.ValidateRequestAsync(http, csrf)) return Problem(400, "La validación de seguridad de la solicitud no fue válida.");

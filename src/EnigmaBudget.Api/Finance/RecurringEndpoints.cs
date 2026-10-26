@@ -16,5 +16,7 @@ public static class RecurringEndpoints
         routes.MapPost("", (HttpContext http, [FromBody] RecurringRuleCreate request, [FromServices] RecurringService service) => service.CreateAsync(http, request));
         routes.MapPut("/{id:guid}", (HttpContext http, [FromRoute] Guid id, [FromBody] RecurringRuleUpdate request, [FromServices] RecurringService service) => service.UpdateAsync(http, id, request));
         routes.MapPost("/{id:guid}/state", (HttpContext http, [FromRoute] Guid id, [FromBody] RecurringRuleStateChange request, [FromServices] RecurringService service) => service.ChangeStateAsync(http, id, request));
+        routes.MapPost("/{ruleId:guid}/occurrences/{scheduledDate}/record", (HttpContext http, [FromRoute] Guid ruleId, [FromRoute] string scheduledDate, [FromBody] RecurringOccurrenceRecord request, [FromServices] RecurringService service) => service.RecordOccurrenceAsync(http, ruleId, scheduledDate, request));
+        routes.MapPost("/{ruleId:guid}/occurrences/{scheduledDate}/skip", (HttpContext http, [FromRoute] Guid ruleId, [FromRoute] string scheduledDate, [FromBody] RecurringOccurrenceSkip request, [FromServices] RecurringService service) => service.SkipOccurrenceAsync(http, ruleId, scheduledDate, request));
     }
 }

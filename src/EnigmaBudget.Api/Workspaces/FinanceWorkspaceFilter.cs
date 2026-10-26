@@ -24,6 +24,9 @@ public sealed class FinanceWorkspaceFilter : IEndpointFilter
         var p = path.Value ?? "";
         if (p.Equals("/api/finance/catalog", StringComparison.OrdinalIgnoreCase) && method == "GET")
             return WorkspacePermissions.Read;
+        if (p.StartsWith("/api/recurrences/", StringComparison.OrdinalIgnoreCase) && p.Contains("/occurrences/", StringComparison.OrdinalIgnoreCase)
+            && (p.EndsWith("/record", StringComparison.OrdinalIgnoreCase) || p.EndsWith("/skip", StringComparison.OrdinalIgnoreCase)) && method == "POST")
+            return WorkspacePermissions.RecordFinance;
         if (p.Equals("/api/recurrences", StringComparison.OrdinalIgnoreCase)
             || p.StartsWith("/api/recurrences/", StringComparison.OrdinalIgnoreCase))
             return method == "GET" ? WorkspacePermissions.Read : WorkspacePermissions.ManageResources;

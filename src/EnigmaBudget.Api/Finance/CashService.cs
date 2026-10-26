@@ -91,30 +91,10 @@ public static partial class FinanceEndpoints
             Amount = amount,
             InitiallyPaid = r.Paid,
         };
-        db.FinanceOperations.Add(op);
+        FinanceRecordWriter.AddOperation(db, op);
         if (r.Paid)
         {
-            var pay = new FinancePayment
-            {
-                Id = r.Id,
-                WorkspaceId = ws.Id,
-                OperationId = r.Id,
-                AccountId = account.Id,
-                Date = date,
-                Amount = amount,
-                Currency = account.Currency,
-            };
-            db.FinancePayments.Add(pay);
-            db.LedgerEntries.Add(
-                Entry(
-                    ws.Id,
-                    account,
-                    date,
-                    r.Kind == "Income" ? amount : -amount,
-                    "operation-payment",
-                    r.Id
-                )
-            );
+            FinanceRecordWriter.AddPayment(db, op, account, date, amount, r.Id);
         }
         try
         {
@@ -220,29 +200,7 @@ public static partial class FinanceEndpoints
         if (amount > calculation.PendingAmount)
             return Problem(400, "El importe supera el saldo pendiente.");
         if (op.AccountId is null) op.AccountId = account.Id;
-        db.FinancePayments.Add(
-            new FinancePayment
-            {
-                Id = r.Id,
-                WorkspaceId = ws.Id,
-                OperationId = id,
-                AccountId = account.Id,
-                Date = date,
-                Amount = amount,
-                Currency = account.Currency,
-                CommandPayloadHash = hash,
-            }
-        );
-        db.LedgerEntries.Add(
-            Entry(
-                ws.Id,
-                account,
-                date,
-                op.Kind == "Income" ? amount : -amount,
-                "operation-payment",
-                r.Id
-            )
-        );
+        FinanceRecordWriter.AddPayment(db, op, account, date, amount, r.Id, hash);
         op.Version++;
         try
         {
@@ -310,7 +268,7 @@ public static partial class FinanceEndpoints
             );
             if (!already)
                 db.LedgerEntries.Add(
-                    Entry(
+                    FinanceRecordWriter.Entry(
                         ws.Id,
                         account,
                         p.Date,
@@ -412,8 +370,8 @@ public static partial class FinanceEndpoints
                 DestinationAmount = dest,
             }
         );
-        db.LedgerEntries.Add(Entry(ws.Id, from, date, -amount, "transfer-out", r.Id));
-        db.LedgerEntries.Add(Entry(ws.Id, to, date, dest, "transfer-in", r.Id));
+        db.LedgerEntries.Add(FinanceRecordWriter.Entry(ws.Id, from, date, -amount, "transfer-out", r.Id));
+        db.LedgerEntries.Add(FinanceRecordWriter.Entry(ws.Id, to, date, dest, "transfer-in", r.Id));
         await db.SaveChangesAsync();
         return Results.Ok(new { id = r.Id });
     }
@@ -427,25 +385,8 @@ public static partial class FinanceEndpoints
         return OperationSettlementMapping.Map(op, ps, settlements);
     }
 
-    private static LedgerEntry Entry(
-        Guid ws,
-        BankAccount a,
-        DateOnly date,
-        decimal amount,
-        string source,
-        Guid id
-    ) =>
-        new()
-        {
-            Id = Guid.NewGuid(),
-            WorkspaceId = ws,
-            AccountId = a.Id,
-            Date = date,
-            Currency = a.Currency,
-            Amount = amount,
-            Source = source,
-            SourceId = id,
-        };
+    private static LedgerEntry Entry(Guid ws, BankAccount a, DateOnly date, decimal amount, string source, Guid id) =>
+        FinanceRecordWriter.Entry(ws, a, date, amount, source, id);
 
     private static Guid DeterministicGuid(string value)
     {

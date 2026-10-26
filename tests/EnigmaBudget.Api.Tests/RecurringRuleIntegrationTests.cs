@@ -324,6 +324,8 @@ public sealed class RecurringRuleIntegrationTests
     [InlineData("POST", "/api/recurrences", WorkspacePermissions.ManageResources)]
     [InlineData("PUT", "/api/recurrences/00000000-0000-0000-0000-000000000001", WorkspacePermissions.ManageResources)]
     [InlineData("POST", "/api/recurrences/00000000-0000-0000-0000-000000000001/state", WorkspacePermissions.ManageResources)]
+    [InlineData("POST", "/api/recurrences/00000000-0000-0000-0000-000000000001/occurrences/2026-10-01/record", WorkspacePermissions.RecordFinance)]
+    [InlineData("POST", "/api/recurrences/00000000-0000-0000-0000-000000000001/occurrences/2026-10-01/skip", WorkspacePermissions.RecordFinance)]
     public void recurring_routes_require_explicit_workspace_permission(string method, string path, string expected)
     {
         var classifier = typeof(FinanceWorkspaceFilter).GetMethod("RequiredPermission", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;

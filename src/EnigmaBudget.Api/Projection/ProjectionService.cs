@@ -35,6 +35,9 @@ public sealed class ProjectionService(AppDbContext db, BusinessClock clock, Savi
         var nonCashSettlements = await db.NonCashSettlements.AsNoTracking().Where(x => x.WorkspaceId == ws.Id).ToArrayAsync(ct);
         var cards = await db.Cards.AsNoTracking().Where(x => x.WorkspaceId == ws.Id).ToArrayAsync(ct);
         var installments = await db.Installments.AsNoTracking().Where(x => x.WorkspaceId == ws.Id).ToArrayAsync(ct);
+        var linkedPurchaseIds = await db.Purchases.AsNoTracking().Where(x => x.WorkspaceId == ws.Id && x.ExpenseOperationId != null)
+            .Select(x => x.Id).ToArrayAsync(ct);
+        var linkedInstallmentIds = installments.Where(x => linkedPurchaseIds.Contains(x.PurchaseId)).Select(x => x.Id).ToHashSet();
         var statements = await db.CardStatements.AsNoTracking().Where(x => x.WorkspaceId == ws.Id).ToArrayAsync(ct);
         var adjustments = await db.StatementAdjustments.AsNoTracking().Where(x => x.WorkspaceId == ws.Id).ToArrayAsync(ct);
         var payments = await db.CardPayments.AsNoTracking().Where(x => x.WorkspaceId == ws.Id && x.Date <= today).ToArrayAsync(ct);
@@ -83,7 +86,8 @@ public sealed class ProjectionService(AppDbContext db, BusinessClock clock, Savi
             {
                 if (component.Period is null) continue;
                 var statementConfirmed = component.SummaryId is not null;
-                if (component.ComponentKind == "Installment" && component.Period.CompareTo(today.ToString("yyyy-MM", Inv)) > 0 && !statementConfirmed)
+                if (component.ComponentKind == "Installment" && component.Period.CompareTo(today.ToString("yyyy-MM", Inv)) > 0
+                    && !statementConfirmed && !linkedInstallmentIds.Contains(component.SourceId))
                     continue;
                 if (component.DueDate is { } due && due > through) continue;
                 if (component.DueDate is null && component.Period.CompareTo(through.ToString("yyyy-MM", Inv)) > 0) continue;

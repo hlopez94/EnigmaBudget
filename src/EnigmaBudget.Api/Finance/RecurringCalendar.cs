@@ -97,6 +97,17 @@ public sealed class RecurringCalendar(AppDbContext db)
             ordered = ordered.Where(x => StringComparer.Ordinal.Compare(x.ScheduledDate, state.LastDate) > 0
                 || x.ScheduledDate == state.LastDate && x.RuleId.CompareTo(state.LastRuleId!.Value) > 0).ToArray();
         var items = ordered.Take(PageSize).ToArray();
+        var linkedOperationIds = items.Where(x => x.FinanceOperationId.HasValue).Select(x => x.FinanceOperationId!.Value).Distinct().ToArray();
+        if (linkedOperationIds.Length > 0)
+        {
+            var actuals = await db.FinanceOperations.AsNoTracking()
+                .Where(x => x.WorkspaceId == workspaceId && linkedOperationIds.Contains(x.Id))
+                .Select(x => new { x.Id, x.Amount, x.Date, x.IsVoided }).ToDictionaryAsync(x => x.Id, ct);
+            items = items.Select(item => item.FinanceOperationId is Guid operationId && actuals.TryGetValue(operationId, out var actual)
+                ? item with { ActualAmount = actual.Amount.ToString("0.00", CultureInfo.InvariantCulture),
+                    ActualDate = actual.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), OperationVoided = actual.IsVoided }
+                : item).ToArray();
+        }
         string? next = null;
         if (ordered.Length > PageSize)
         {

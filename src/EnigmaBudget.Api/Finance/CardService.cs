@@ -124,32 +124,8 @@ public static partial class FinanceEndpoints
             InstallmentCount = r.InstallmentCount,
             FirstPeriod = r.FirstPeriod,
         };
-        db.Purchases.Add(p);
+        FinanceRecordWriter.AddPurchase(db, p, _ => Guid.NewGuid());
         card.Version++;
-        for (var i = 0; i < r.InstallmentCount; i++)
-        {
-            var c = cents / r.InstallmentCount + (i < cents % r.InstallmentCount ? 1 : 0);
-            var month = DateOnly
-                .ParseExact(r.FirstPeriod + "-01", "yyyy-MM-dd", Invariant)
-                .AddMonths(i)
-                .ToString("yyyy-MM", Invariant);
-            db.Installments.Add(
-                new CardInstallment
-                {
-                    Id = Guid.NewGuid(),
-                    WorkspaceId = ws.Id,
-                    PurchaseId = p.Id,
-                    CardId = p.CardId,
-                    GroupId = p.GroupId,
-                    Number = i + 1,
-                    Count = p.InstallmentCount,
-                    Period = month,
-                    Amount = c / 100m,
-                    Currency = p.Currency,
-                    Description = p.Description,
-                }
-            );
-        }
         try
         {
             mutation.MarkChanged();
