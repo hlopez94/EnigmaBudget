@@ -1,9 +1,12 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Data.Common;
 using System.Text.Json;
 using EnigmaBudget.Api.Data;
+using EnigmaBudget.Api.Finance;
 using EnigmaBudget.Api.Workspaces;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 
 namespace EnigmaBudget.Api.Tests;
 
@@ -71,6 +74,83 @@ public sealed class RecurringRuleIntegrationTests
         using var response = JsonDocument.Parse(await client.GetStringAsync("/api/recurrences/occurrences?from=2026-01-01&through=2026-03-31"));
         Assert.True(response.RootElement.GetProperty("olderOccurrencesIncomplete").GetBoolean());
         Assert.Equal("2025-01-15", response.RootElement.GetProperty("earliestOmittedScheduledDate").GetString());
+    }
+
+    [Fact]
+    public async Task older_warning_uses_one_scalar_query_instead_of_loading_historical_rows()
+    {
+        using var factory = new ApiFactory(timeProvider: new FixedTimeProvider(DateTimeOffset.Parse("2026-10-25T12:00:00Z")));
+        using var client = await factory.AuthenticatedClientAsync("recurring-scalar-warning");
+        var workspaceId = await WorkspaceId(factory, "recurring-scalar-warning");
+        var categoryId = await DefaultCategoryId(factory, workspaceId, "Expense");
+        var ruleId = Guid.NewGuid();
+        Assert.Equal(HttpStatusCode.Created, (await CreateRule(client, ruleId, categoryId, "2025-01-15", "Monthly")).StatusCode);
+        Guid latestRevisionId;
+        await using (var seed = Db(factory.TestConnection))
+        {
+            var rule = await seed.RecurringRules.SingleAsync(x => x.WorkspaceId == workspaceId && x.Id == ruleId);
+            var original = await seed.RecurringRuleRevisions.SingleAsync(x => x.WorkspaceId == workspaceId && x.RuleId == ruleId);
+            for (var version = 2; version <= 20; version++)
+            {
+                var copy = CopyRevision(original, version);
+                seed.RecurringRuleRevisions.Add(copy);
+                latestRevisionId = copy.Id;
+            }
+            seed.RecurringOccurrenceActions.Add(new RecurringOccurrenceAction
+            {
+                Id = Guid.NewGuid(), WorkspaceId = workspaceId, RuleId = ruleId, RuleRevisionId = original.Id,
+                ScheduledDate = new DateOnly(2025, 1, 15), Outcome = "Skipped", RequestId = Guid.NewGuid(), PayloadHash = new string('A', 64)
+            });
+            rule.CurrentVersion = 20;
+            await seed.SaveChangesAsync();
+            latestRevisionId = seed.RecurringRuleRevisions.Local.Single(x => x.RuleId == ruleId && x.Version == 20).Id;
+        }
+        var probe = new HistoricalWarningQueryProbe();
+        var options = new DbContextOptionsBuilder<AppDbContext>().UseNpgsql(factory.TestConnection).AddInterceptors(probe).Options;
+        await using var db = new AppDbContext(options);
+        var result = await new RecurringCalendar(db).GetPageAsync(workspaceId, "2026-01-01", "2026-03-31", null, CancellationToken.None);
+        Assert.Equal(200, result.Status);
+        Assert.Equal("2025-02-15", result.Page!.EarliestOmittedScheduledDate);
+        Assert.Single(probe.Queries);
+        Assert.Equal(1, probe.FieldCounts.Single());
+        Assert.Contains("WITH RECURSIVE", probe.Queries.Single(), StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("NOT EXISTS", probe.Queries.Single(), StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("MIN(w.\"ScheduledDate\")", probe.Queries.Single(), StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("SELECT action.\"", probe.Queries.Single(), StringComparison.OrdinalIgnoreCase);
+        Assert.Single(probe.RevisionQueries);
+        Assert.Contains("EffectiveFrom\" >=", probe.RevisionQueries.Single(), StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Version\" >", probe.RevisionQueries.Single(), StringComparison.OrdinalIgnoreCase);
+        Assert.All(result.Page.Items, item => Assert.Equal(latestRevisionId, item.RevisionId));
+    }
+
+    [Fact]
+    public async Task future_start_rule_is_not_started_in_today_list_state()
+    {
+        using var factory = new ApiFactory(timeProvider: new FixedTimeProvider(DateTimeOffset.Parse("2026-10-25T12:00:00Z")));
+        using var client = await factory.AuthenticatedClientAsync("recurring-future-start");
+        var workspaceId = await WorkspaceId(factory, "recurring-future-start");
+        var categoryId = await DefaultCategoryId(factory, workspaceId, "Expense");
+        var ruleId = Guid.NewGuid();
+        Assert.Equal(HttpStatusCode.Created, (await CreateRule(client, ruleId, categoryId, "2027-01-01", "Monthly")).StatusCode);
+        using var list = JsonDocument.Parse(await client.GetStringAsync("/api/recurrences"));
+        var rule = list.RootElement.EnumerateArray().Single(x => x.GetProperty("rule").GetProperty("id").GetGuid() == ruleId);
+        Assert.Equal("NotStarted", rule.GetProperty("stateForToday").GetString());
+        Assert.Equal("Active", rule.GetProperty("rule").GetProperty("state").GetString());
+    }
+
+    [Fact]
+    public void weekly_occurrence_resolver_uses_wide_interval_arithmetic()
+    {
+        var anchor = new DateOnly(2026, 1, 1);
+        var revision = new RecurringRuleRevision
+        {
+            ScheduleAnchorDate = anchor,
+            Frequency = "Weekly",
+            Interval = 613566757
+        };
+
+        Assert.True(RecurringCalendar.IsOccurrenceDate(revision, anchor));
+        Assert.False(RecurringCalendar.IsOccurrenceDate(revision, anchor.AddDays(3)));
     }
 
     [Fact]
@@ -252,6 +332,16 @@ public sealed class RecurringRuleIntegrationTests
 
     private static Task<HttpResponseMessage> CreateRule(HttpClient client, Guid id, Guid categoryId, string startDate, string frequency) => client.PostAsJsonAsync("/api/recurrences", RuleRequest(id, categoryId, startDate, frequency));
 
+    private static RecurringRuleRevision CopyRevision(RecurringRuleRevision source, int version) => new()
+    {
+        Id = Guid.NewGuid(), WorkspaceId = source.WorkspaceId, RuleId = source.RuleId, Version = version,
+        EffectiveFrom = source.EffectiveFrom, State = source.State, ScheduleAnchorDate = source.ScheduleAnchorDate,
+        Flow = source.Flow, Description = source.Description, CategoryId = source.CategoryId, IncomeSourceId = source.IncomeSourceId,
+        MerchantId = source.MerchantId, Amount = source.Amount, AmountMode = source.AmountMode, Currency = source.Currency,
+        Frequency = source.Frequency, Interval = source.Interval, EndDate = source.EndDate, DueDay = source.DueDay,
+        PreferredAccountId = source.PreferredAccountId, PreferredCardId = source.PreferredCardId
+    };
+
     private static object RuleRequest(Guid id, Guid categoryId, string startDate, string frequency) => new
     {
         id, flow = "Expense", description = "Gasto recurrente", categoryId, incomeSourceId = (Guid?)null, merchantId = (Guid?)null,
@@ -290,6 +380,27 @@ public sealed class RecurringRuleIntegrationTests
     }
 
     private static AppDbContext Db(string connection) => new(new DbContextOptionsBuilder<AppDbContext>().UseNpgsql(connection).Options);
+
+    private sealed class HistoricalWarningQueryProbe : DbCommandInterceptor
+    {
+        public List<string> Queries { get; } = [];
+        public List<int> FieldCounts { get; } = [];
+        public List<string> RevisionQueries { get; } = [];
+
+        public override ValueTask<DbDataReader> ReaderExecutedAsync(DbCommand command, CommandExecutedEventData eventData, DbDataReader result, CancellationToken cancellationToken = default)
+        {
+            if (command.CommandText.Contains("WITH RECURSIVE", StringComparison.OrdinalIgnoreCase))
+            {
+                Queries.Add(command.CommandText);
+                FieldCounts.Add(result.FieldCount);
+            }
+            else if (command.CommandText.Contains("FROM \"RecurringRuleRevisions\"", StringComparison.OrdinalIgnoreCase))
+            {
+                RevisionQueries.Add(command.CommandText);
+            }
+            return ValueTask.FromResult(result);
+        }
+    }
 
     private sealed class FixedTimeProvider(DateTimeOffset utcNow) : TimeProvider
     {

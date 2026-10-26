@@ -43,11 +43,22 @@ public sealed class RecurringCalendar(AppDbContext db)
         var windowThrough = AddMonthsClamped(state.WindowStart, MaximumWindowMonths, inclusiveEnd: true);
         if (windowThrough > through) windowThrough = through;
         var rules = await db.RecurringRules.AsNoTracking().Where(x => x.WorkspaceId == workspaceId).OrderBy(x => x.Id).ToListAsync(ct);
-        var revisions = await db.RecurringRuleRevisions.AsNoTracking().Where(x => x.WorkspaceId == workspaceId).OrderBy(x => x.RuleId).ThenBy(x => x.EffectiveFrom).ThenBy(x => x.Version).ToListAsync(ct);
+        var revisionRows = db.RecurringRuleRevisions.AsNoTracking().Where(x => x.WorkspaceId == workspaceId && x.EffectiveFrom <= windowThrough);
+        var revisions = await revisionRows
+            .Where(x => x.EffectiveFrom >= state.WindowStart
+                || !db.RecurringRuleRevisions.Any(previous => previous.WorkspaceId == workspaceId && previous.RuleId == x.RuleId
+                    && previous.EffectiveFrom <= state.WindowStart && previous.EffectiveFrom > x.EffectiveFrom))
+            .Where(x => !db.RecurringRuleRevisions.Any(newer => newer.WorkspaceId == workspaceId && newer.RuleId == x.RuleId
+                && newer.EffectiveFrom == x.EffectiveFrom && newer.Version > x.Version))
+            .OrderBy(x => x.RuleId).ThenBy(x => x.EffectiveFrom).ToListAsync(ct);
         var revisionGroups = revisions.GroupBy(x => x.RuleId).ToDictionary(x => x.Key, x => x.ToArray());
         var actions = await db.RecurringOccurrenceActions.AsNoTracking()
             .Where(x => x.WorkspaceId == workspaceId && x.ScheduledDate >= state.WindowStart && x.ScheduledDate <= windowThrough)
             .OrderBy(x => x.ScheduledDate).ThenBy(x => x.RuleId).ToListAsync(ct);
+        var actionRevisionIds = actions.Select(x => x.RuleRevisionId).Except(revisions.Select(x => x.Id)).Distinct().ToArray();
+        var actionRevisionHistory = actionRevisionIds.Length == 0 ? [] : await db.RecurringRuleRevisions.AsNoTracking()
+            .Where(x => x.WorkspaceId == workspaceId && actionRevisionIds.Contains(x.Id)).ToListAsync(ct);
+        var revisionsById = revisions.Concat(actionRevisionHistory).ToDictionary(x => x.Id);
         var actionMap = actions.ToDictionary(x => (x.RuleId, x.ScheduledDate));
         var occurrences = new Dictionary<(Guid RuleId, DateOnly Date), RecurrenceOccurrenceDto>();
 
@@ -74,7 +85,8 @@ public sealed class RecurringCalendar(AppDbContext db)
         foreach (var action in actions)
         {
             var rule = rules.SingleOrDefault(x => x.Id == action.RuleId);
-            var revision = revisions.SingleOrDefault(x => x.Id == action.RuleRevisionId && x.RuleId == action.RuleId);
+            revisionsById.TryGetValue(action.RuleRevisionId, out var revision);
+            if (revision?.RuleId != action.RuleId) revision = null;
             if (rule is null || revision is null) continue;
             var status = action.Outcome;
             occurrences[(action.RuleId, action.ScheduledDate)] = ToDto(workspaceId, rule, revision, action.ScheduledDate, action, status);
@@ -120,7 +132,7 @@ public sealed class RecurringCalendar(AppDbContext db)
             _ => -1
         };
         if (distance < 0) return false;
-        if (revision.Frequency == "Weekly") return distance % (revision.Interval * 7) == 0;
+        if (revision.Frequency == "Weekly") return distance % ((long)revision.Interval * 7L) == 0;
         if (revision.Frequency == "Monthly")
         {
             if (distance % revision.Interval != 0) return false;
@@ -143,33 +155,120 @@ public sealed class RecurringCalendar(AppDbContext db)
     private async Task<DateOnly?> FindEarliestOmittedAsync(Guid workspaceId, DateOnly from, CancellationToken ct)
     {
         if (from == DateOnly.MinValue) return null;
-        var previous = from.AddDays(-1);
-        var revisions = await db.RecurringRuleRevisions.AsNoTracking().Where(x => x.WorkspaceId == workspaceId && x.EffectiveFrom < from)
-            .OrderBy(x => x.RuleId).ThenBy(x => x.EffectiveFrom).ThenBy(x => x.Version).ToListAsync(ct);
-        var actions = await db.RecurringOccurrenceActions.AsNoTracking().Where(x => x.WorkspaceId == workspaceId && x.ScheduledDate < from)
-            .Select(x => new { x.RuleId, x.ScheduledDate }).ToListAsync(ct);
-        var handled = actions.Select(x => (x.RuleId, x.ScheduledDate)).ToHashSet();
-        DateOnly? earliest = null;
-        foreach (var group in revisions.GroupBy(x => x.RuleId))
-        {
-            var effective = group.GroupBy(x => x.EffectiveFrom).Select(x => x.OrderByDescending(y => y.Version).First()).OrderBy(x => x.EffectiveFrom).ToArray();
-            for (var i = 0; i < effective.Length; i++)
-            {
-                var revision = effective[i];
-                if (revision.State != "Active") continue;
-                var start = Max(revision.EffectiveFrom, revision.ScheduleAnchorDate);
-                var end = Min(previous, revision.EndDate ?? DateOnly.MaxValue);
-                if (i + 1 < effective.Length) end = Min(end, effective[i + 1].EffectiveFrom.AddDays(-1));
-                if (start > end) continue;
-                foreach (var date in Dates(revision, start, end))
-                {
-                    if (handled.Contains((revision.RuleId, date))) continue;
-                    if (earliest is null || date < earliest) earliest = date;
-                    break;
-                }
-            }
-        }
-        return earliest;
+        var before = from.AddDays(-1);
+        return await db.Database.SqlQuery<DateOnly?>($"""
+            WITH RECURSIVE latest_revisions AS
+            (
+                SELECT r."WorkspaceId", r."RuleId", r."Id" AS "RevisionId", r."EffectiveFrom", r."State",
+                       r."ScheduleAnchorDate", r."Frequency", r."Interval", r."EndDate"
+                FROM "RecurringRuleRevisions" AS r
+                WHERE r."WorkspaceId" = {workspaceId} AND r."EffectiveFrom" < {from}
+                  AND NOT EXISTS
+                  (
+                      SELECT 1 FROM "RecurringRuleRevisions" AS newer
+                      WHERE newer."WorkspaceId" = r."WorkspaceId" AND newer."RuleId" = r."RuleId"
+                        AND newer."EffectiveFrom" = r."EffectiveFrom" AND newer."Version" > r."Version"
+                  )
+            ), revision_segments AS
+            (
+                SELECT r.*,
+                       LEAD(r."EffectiveFrom") OVER (PARTITION BY r."RuleId" ORDER BY r."EffectiveFrom") AS "NextEffectiveFrom"
+                FROM latest_revisions AS r
+            ), bounded_segments AS
+            (
+                SELECT s.*,
+                       GREATEST(s."EffectiveFrom", s."ScheduleAnchorDate") AS "LowerDate",
+                       LEAST({before}, COALESCE(s."EndDate", {before}), COALESCE(s."NextEffectiveFrom" - 1, {before})) AS "UpperDate"
+                FROM revision_segments AS s
+                WHERE s."State" = 'Active'
+            ), indexed_candidates AS
+            (
+                SELECT b.*,
+                       GREATEST(0::bigint,
+                           CASE b."Frequency"
+                               WHEN 'Weekly' THEN CEILING((b."LowerDate" - b."ScheduleAnchorDate")::numeric / (b."Interval"::numeric * 7))::bigint
+                               WHEN 'Monthly' THEN CEILING((((EXTRACT(YEAR FROM b."LowerDate") - EXTRACT(YEAR FROM b."ScheduleAnchorDate")) * 12
+                                   + EXTRACT(MONTH FROM b."LowerDate") - EXTRACT(MONTH FROM b."ScheduleAnchorDate")) / b."Interval")::numeric)::bigint
+                               WHEN 'Annual' THEN CEILING((EXTRACT(YEAR FROM b."LowerDate") - EXTRACT(YEAR FROM b."ScheduleAnchorDate"))::numeric / b."Interval")::bigint
+                               ELSE 0::bigint
+                           END) AS "CandidateIndex"
+                FROM bounded_segments AS b
+                WHERE b."LowerDate" <= b."UpperDate"
+            ), first_dates AS
+            (
+                SELECT c.*,
+                       CASE c."Frequency"
+                           WHEN 'Weekly' THEN CASE WHEN c."CandidateIndex" * c."Interval" * 7 <= c."UpperDate" - c."ScheduleAnchorDate"
+                               THEN c."ScheduleAnchorDate" + (c."CandidateIndex" * c."Interval" * 7)::integer ELSE NULL::date END
+                           WHEN 'Monthly' THEN CASE WHEN c."CandidateIndex" * c."Interval" <=
+                               (EXTRACT(YEAR FROM c."UpperDate") - EXTRACT(YEAR FROM c."ScheduleAnchorDate")) * 12
+                                   + EXTRACT(MONTH FROM c."UpperDate") - EXTRACT(MONTH FROM c."ScheduleAnchorDate")
+                               THEN (c."ScheduleAnchorDate" + make_interval(months => (c."CandidateIndex" * c."Interval")::integer))::date ELSE NULL::date END
+                           WHEN 'Annual' THEN CASE WHEN c."CandidateIndex" * c."Interval" <= EXTRACT(YEAR FROM c."UpperDate") - EXTRACT(YEAR FROM c."ScheduleAnchorDate")
+                               THEN (c."ScheduleAnchorDate" + make_interval(years => (c."CandidateIndex" * c."Interval")::integer))::date ELSE NULL::date END
+                           ELSE c."ScheduleAnchorDate"
+                       END AS "CandidateDate"
+                FROM indexed_candidates AS c
+            ), adjusted_candidates AS
+            (
+                SELECT f.*,
+                       f."CandidateIndex" + CASE WHEN f."CandidateDate" < f."LowerDate" THEN 1 ELSE 0 END AS "FirstIndex"
+                FROM first_dates AS f
+            ), safe_candidates AS
+            (
+                SELECT a.* FROM adjusted_candidates AS a
+                WHERE (a."Frequency" = 'Weekly' AND (a."FirstIndex"::numeric * a."Interval" * 7) <= a."UpperDate" - a."ScheduleAnchorDate")
+                   OR (a."Frequency" = 'Monthly' AND (a."FirstIndex"::numeric * a."Interval") <=
+                       (EXTRACT(YEAR FROM a."UpperDate") - EXTRACT(YEAR FROM a."ScheduleAnchorDate")) * 12
+                           + EXTRACT(MONTH FROM a."UpperDate") - EXTRACT(MONTH FROM a."ScheduleAnchorDate"))
+                   OR (a."Frequency" = 'Annual' AND (a."FirstIndex"::numeric * a."Interval") <= EXTRACT(YEAR FROM a."UpperDate") - EXTRACT(YEAR FROM a."ScheduleAnchorDate"))
+            ), occurrence_walk ("WorkspaceId", "RuleId", "Frequency", "Interval", "AnchorDate", "UpperDate", "OccurrenceIndex", "ScheduledDate") AS
+            (
+                SELECT a."WorkspaceId", a."RuleId", a."Frequency", a."Interval", a."ScheduleAnchorDate", a."UpperDate", a."FirstIndex",
+                       CASE a."Frequency"
+                           WHEN 'Weekly' THEN CASE WHEN (a."FirstIndex"::numeric * a."Interval" * 7) <= a."UpperDate" - a."ScheduleAnchorDate"
+                               THEN a."ScheduleAnchorDate" + (a."FirstIndex" * a."Interval" * 7)::integer ELSE NULL::date END
+                           WHEN 'Monthly' THEN CASE WHEN (a."FirstIndex"::numeric * a."Interval") <=
+                               (EXTRACT(YEAR FROM a."UpperDate") - EXTRACT(YEAR FROM a."ScheduleAnchorDate")) * 12
+                                   + EXTRACT(MONTH FROM a."UpperDate") - EXTRACT(MONTH FROM a."ScheduleAnchorDate")
+                               THEN (a."ScheduleAnchorDate" + make_interval(months => (a."FirstIndex" * a."Interval")::integer))::date ELSE NULL::date END
+                           WHEN 'Annual' THEN CASE WHEN (a."FirstIndex"::numeric * a."Interval") <= EXTRACT(YEAR FROM a."UpperDate") - EXTRACT(YEAR FROM a."ScheduleAnchorDate")
+                               THEN (a."ScheduleAnchorDate" + make_interval(years => (a."FirstIndex" * a."Interval")::integer))::date ELSE NULL::date END
+                           ELSE a."ScheduleAnchorDate"
+                       END
+                FROM safe_candidates AS a
+                UNION ALL
+                SELECT w."WorkspaceId", w."RuleId", w."Frequency", w."Interval", w."AnchorDate", w."UpperDate", w."OccurrenceIndex" + 1,
+                       CASE w."Frequency"
+                           WHEN 'Weekly' THEN CASE WHEN ((w."OccurrenceIndex" + 1)::numeric * w."Interval" * 7) <= w."UpperDate" - w."AnchorDate"
+                               THEN w."AnchorDate" + ((w."OccurrenceIndex" + 1) * w."Interval" * 7)::integer ELSE NULL::date END
+                           WHEN 'Monthly' THEN CASE WHEN ((w."OccurrenceIndex" + 1)::numeric * w."Interval") <=
+                               (EXTRACT(YEAR FROM w."UpperDate") - EXTRACT(YEAR FROM w."AnchorDate")) * 12
+                                   + EXTRACT(MONTH FROM w."UpperDate") - EXTRACT(MONTH FROM w."AnchorDate")
+                               THEN (w."AnchorDate" + make_interval(months => ((w."OccurrenceIndex" + 1) * w."Interval")::integer))::date ELSE NULL::date END
+                           WHEN 'Annual' THEN CASE WHEN ((w."OccurrenceIndex" + 1)::numeric * w."Interval") <= EXTRACT(YEAR FROM w."UpperDate") - EXTRACT(YEAR FROM w."AnchorDate")
+                               THEN (w."AnchorDate" + make_interval(years => ((w."OccurrenceIndex" + 1) * w."Interval")::integer))::date ELSE NULL::date END
+                           ELSE w."AnchorDate"
+                       END
+                FROM occurrence_walk AS w
+                WHERE w."ScheduledDate" <= w."UpperDate"
+                  AND EXISTS
+                  (
+                      SELECT 1 FROM "RecurringOccurrenceActions" AS action
+                      WHERE action."WorkspaceId" = w."WorkspaceId" AND action."RuleId" = w."RuleId"
+                        AND action."ScheduledDate" = w."ScheduledDate"
+                  )
+            )
+            SELECT MIN(w."ScheduledDate")::date AS "Value"
+            FROM occurrence_walk AS w
+            WHERE w."ScheduledDate" <= w."UpperDate"
+              AND NOT EXISTS
+              (
+                  SELECT 1 FROM "RecurringOccurrenceActions" AS action
+                  WHERE action."WorkspaceId" = w."WorkspaceId" AND action."RuleId" = w."RuleId"
+                    AND action."ScheduledDate" = w."ScheduledDate"
+              )
+            """).SingleOrDefaultAsync(ct);
     }
 
     private static IEnumerable<DateOnly> Dates(RecurringRuleRevision revision, DateOnly from, DateOnly through)

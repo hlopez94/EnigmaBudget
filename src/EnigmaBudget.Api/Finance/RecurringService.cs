@@ -32,7 +32,7 @@ public sealed class RecurringService(AppDbContext db, WorkspaceAccessService acc
             var effectiveDto = effective is null ? null : ToDto(effective);
             var ruleDto = new RecurringRuleDto(rule.Id, rule.WorkspaceId, rule.CurrentVersion, rule.State);
             var planned = components.Where(x => history.Any(revision => revision.Id == x.RuleRevisionId)).Select(ToComponentDto).ToArray();
-            return new RecurringRuleViewDto(ruleDto, effective?.State ?? "Ended", effectiveDto, history.Select(ToDto).ToArray(), planned);
+            return new RecurringRuleViewDto(ruleDto, effective?.State ?? "NotStarted", effectiveDto, history.Select(ToDto).ToArray(), planned);
         }).ToArray();
         return Results.Ok(items);
     }
