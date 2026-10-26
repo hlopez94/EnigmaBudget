@@ -90,3 +90,11 @@ El aviso de fechas antiguas obtiene la primera fecha pendiente omitida mediante 
 ## Cuenta prevista opcional al confirmar
 
 Cuando no hay efectivo cobrado/pagado en ese momento, el usuario puede elegir explícitamente «Registrar sin cuenta prevista» (`ClearPreferredAccount=true`). La operación queda sin cuenta aunque la regla tuviera una preferida, incluso si esa cuenta fue archivada. Sin esa elección, se valida la cuenta explícita o heredada y se informa el conflicto para que el usuario decida. Una parte de efectivo positiva siempre exige la cuenta real; la opción de quitar preferencia no permite omitirla. No se mueve dinero ni se reescribe la regla al cambiar esta preferencia de una ocurrencia.
+
+## Escenarios y alcance de la previsión recurrente
+
+El escenario Confirmado conserva los hechos registrados y sus pendientes reales; las fechas recurrentes todavía no atendidas se incorporan únicamente al escenario Estimado. Una previsión no aumenta el saldo actual ni convierte una fecha pendiente en deuda confirmada. El cálculo estimado mantiene las identidades de las fuentes confirmadas y permite ajustar una fecha recurrente por su identidad estable.
+
+El horizonte futuro sigue limitado a 36 meses. Para incluir pendientes vencidos, el cálculo estimado consulta además los 36 meses anteriores a hoy, conservando cada fecha original y consumiendo las páginas del calendario. Esta consulta explícita puede recorrer más de una ventana; cada llamada al calendario mantiene su límite de 36 meses y 200 filas. Si quedan fechas no atendidas anteriores a ese inicio, una alerta indica la primera omitida y permite revisar ese tramo desde el calendario. No se descarga todo el historial para calcular la alerta.
+
+Todas las lecturas de una respuesta de proyección comparten la misma instantánea de PostgreSQL, incluidas las páginas de recurrencias y el cálculo de escenarios. Si existe una transacción del llamador se reutiliza; en otro caso, la proyección posee una transacción RepeatableRead exclusivamente para sus lecturas. Un registro concurrente debe aparecer como estimación previa o como hecho registrado, nunca como ambos ni como ninguno.
