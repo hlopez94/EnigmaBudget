@@ -173,7 +173,8 @@ Task1 owns additive rule-command schema (Id, WorkspaceId, RequestId, CommandKind
 
 **Files:**
 - Create: `src/EnigmaBudget.Api/Projection/RecurringProjectionAdapter.cs`
-- Modify: `src/EnigmaBudget.Api/Projection/ProjectionService.cs`, `ProjectionContracts.cs`
+- Modify: `src/EnigmaBudget.Api/Projection/ProjectionService.cs`, `src/EnigmaBudget.Api/Program.cs` (adapter registration)
+- Reuse unchanged: `src/EnigmaBudget.Api/Projection/ProjectionContracts.cs`; the existing row and alert contracts already carry the required data.
 - Test: `tests/EnigmaBudget.Api.Tests/RecurringProjectionIntegrationTests.cs`, `ProjectionScenarioIntegrationTests.cs`
 
 **Interfaces:**
