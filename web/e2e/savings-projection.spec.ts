@@ -173,10 +173,17 @@ const createOperation = async (
   await form.locator('[name="opDate"]').fill(input.date);
   await form.locator('[name="opDescription"]').fill(input.description);
   await form.locator('[name="opCategory"]').selectOption({ label: 'Sin clasificar' });
+  let incomeSourceId: string | undefined;
   if (input.kind === 'Income') {
     await form.locator('[name="sourceCreateName"]').fill('Fuente de prueba');
     await form.locator('[name="sourceCreateKind"]').selectOption('Salary');
+    const createdSource = waitForApi(page, 'POST', '/api/finance/catalog/income-sources');
     await form.getByRole('button', { name: 'Crear fuente y continuar' }).click();
+    const sourceResponse = await createdSource;
+    expect(sourceResponse.status()).toBe(201);
+    const source = (await sourceResponse.json()) as { incomeSourceId: string };
+    incomeSourceId = source.incomeSourceId;
+    await expect(form.locator('[name="opIncomeSource"]')).toHaveValue(incomeSourceId);
   }
   await form.locator('[name="opAmount"]').fill(input.amount);
   if (input.paid) await form.locator('[name="opPaid"]').check();
@@ -189,6 +196,7 @@ const createOperation = async (
   expect(created.description).toBe(input.description);
   expect(created.date).toBe(input.date);
   expect(created.amount).toBe(`${input.amount}.00`);
+  if (incomeSourceId) expect(created.incomeSourceId).toBe(incomeSourceId);
   if (input.paid) await expect(page.locator('.operation-row').filter({ hasText: input.description })).toBeVisible();
   return created;
 };
@@ -437,7 +445,7 @@ test('real savings, existing payment, projection and scenario journey stays resp
     kind: 'Expense', accountLabel: accountLabels[0], date: futureExpenseDate,
     description: expenseDescription, amount: '40000', paid: false,
   });
-  await createOperation(page, {
+  const futureIncome = await createOperation(page, {
     kind: 'Income', accountLabel: accountLabels[0], date: futureIncomeDate,
     description: incomeDescription, amount: '50000', paid: false,
   });
@@ -460,8 +468,21 @@ test('real savings, existing payment, projection and scenario journey stays resp
   const arsProjection = confirmedData.currencies.find((currency: { currency: string }) => currency.currency === 'ARS');
   const usdProjection = confirmedData.currencies.find((currency: { currency: string }) => currency.currency === 'USD');
   expect(arsProjection.cashBalance).toBe('25000.00');
+  expect(arsProjection.minimumFreeBalance).toBe('-15000.00');
   expect(arsProjection.firstShortfallDate).toBe(futureExpenseDate);
-  expect(arsProjection.dailyBalances.at(-1).cashBalance).toBe('-15000.00');
+  const futureIncomeRows = confirmedData.rows.filter((row: { sourceKind: string; sourceId: string }) =>
+    row.sourceKind === 'FinanceOperation' && row.sourceId === futureIncome.id);
+  expect(futureIncomeRows).toHaveLength(1);
+  expect(futureIncomeRows[0]).toMatchObject({
+    sourceKind: 'FinanceOperation', sourceId: futureIncome.id, direction: 'Incoming', date: futureIncomeDate, amount: '50000.00',
+  });
+  const confirmedDay = (targetDate: string) => arsProjection.dailyBalances.find((balance: { date: string }) => balance.date === targetDate);
+  expect(confirmedDay(date)?.cashBalance).toBe('25000.00');
+  expect(confirmedDay(futureExpenseDate)?.cashBalance).toBe('-15000.00');
+  expect(confirmedDay(futureExpenseDate)?.freeBalance).toBe('-15000.00');
+  expect(confirmedDay(futureIncomeDate)?.cashBalance).toBe('35000.00');
+  expect(confirmedDay(futureIncomeDate)?.freeBalance).toBe('35000.00');
+  expect(arsProjection.dailyBalances.at(-1).cashBalance).toBe('35000.00');
   expect(usdProjection.cashBalance).toBe('120.00');
   expect(usdProjection).toBeTruthy();
   await expect(page.getByText('ARS y USD permanecen separados')).toBeVisible();
@@ -489,8 +510,22 @@ test('real savings, existing payment, projection and scenario journey stays resp
   const estimatedData = await estimatedResponse.json();
   const estimatedArs = estimatedData.currencies.find((currency: { currency: string }) => currency.currency === 'ARS');
   expect(estimatedArs.firstShortfallDate).toBe(futureExpenseDate);
-  expect(Number(estimatedArs.dailyBalances.at(-1).cashBalance)).toBeGreaterThan(0);
-  expect(Number(estimatedArs.dailyBalances.at(-1).cashBalance)).toBeGreaterThan(Number(arsProjection.dailyBalances.at(-1).cashBalance));
+  expect(estimatedArs.minimumFreeBalance).toBe('-15000.00');
+  const estimatedIncomeRows = estimatedData.rows.filter((row: { sourceKind: string; sourceId: string }) =>
+    row.sourceKind === 'FinanceOperation' && row.sourceId === futureIncome.id);
+  expect(estimatedIncomeRows).toHaveLength(1);
+  expect(estimatedIncomeRows[0]).toMatchObject({
+    sourceKind: 'FinanceOperation', sourceId: futureIncome.id, direction: 'Incoming', date: futureIncomeDate, amount: '50000.00',
+  });
+  const estimateDate = addDays(date, 5);
+  const estimatedDay = (targetDate: string) => estimatedArs.dailyBalances.find((balance: { date: string }) => balance.date === targetDate);
+  expect(estimatedDay(futureExpenseDate)?.cashBalance).toBe('-15000.00');
+  expect(estimatedDay(futureExpenseDate)?.freeBalance).toBe('-15000.00');
+  expect(estimatedDay(estimateDate)?.cashBalance).toBe('5000.00');
+  expect(estimatedDay(estimateDate)?.freeBalance).toBe('5000.00');
+  expect(estimatedDay(futureIncomeDate)?.cashBalance).toBe('55000.00');
+  expect(estimatedDay(futureIncomeDate)?.freeBalance).toBe('55000.00');
+  expect(estimatedArs.dailyBalances.at(-1).cashBalance).toBe('55000.00');
   await expect(page.getByText('Ingreso estimado de prueba')).toBeVisible();
 
   await page.getByRole('button', { name: 'Guardar escenario' }).click();
