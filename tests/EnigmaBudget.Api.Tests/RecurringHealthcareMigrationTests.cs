@@ -328,6 +328,40 @@ public sealed class RecurringHealthcareMigrationTests
     }
 
     [Fact]
+    public void voided_operation_rejects_partial_root_reversal()
+    {
+        var operation = Operation("Expense", 1000m);
+        operation.IsVoided = true;
+        var root = Settlement(operation, "CardCharge", 200m);
+        var partial = Settlement(operation, "Reversal", 100m);
+        partial.ReversesSettlementId = root.Id;
+
+        Assert.Throws<InvalidOperationException>(() => OperationSettlementCalculator.Calculate(operation, [], [root, partial]));
+    }
+
+    [Fact]
+    public void voided_operation_valid_full_reversal_keeps_historical_cash_and_zeroes_active_totals()
+    {
+        var operation = Operation("Expense", 1000m);
+        operation.IsVoided = true;
+        var payment = new FinancePayment { Id = Guid.NewGuid(), WorkspaceId = operation.WorkspaceId, OperationId = operation.Id, AccountId = Guid.NewGuid(), Amount = 300m, Currency = "ARS" };
+        var root = Settlement(operation, "CardCharge", 200m);
+        var reversal = Settlement(operation, "Reversal", 200m);
+        reversal.ReversesSettlementId = root.Id;
+
+        var result = OperationSettlementCalculator.Calculate(operation, [payment], [root, reversal]);
+
+        Assert.Equal(0m, result.GrossConsumption);
+        Assert.Equal(300m, result.CashPaidAmount);
+        Assert.Equal(0m, result.NonCashSettledAmount);
+        Assert.Equal(0m, result.CardChargeSettledAmount);
+        Assert.Equal(0m, result.TotalSettledAmount);
+        Assert.Equal(0m, result.PendingAmount);
+        Assert.Equal(0m, result.OperationMonthBudgetContribution);
+        Assert.Equal("Voided", result.Status);
+    }
+
+    [Fact]
     public void voided_operation_keeps_cash_history_but_clears_active_settlement_totals()
     {
         var operation = Operation("Expense", 1000m);
