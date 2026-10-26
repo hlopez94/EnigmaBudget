@@ -80,3 +80,9 @@ La versión optimista de operación viaja en cada nuevo pago. La tarea que incor
 ## Guardas de origen de liquidación
 
 La compensación siempre es completa por el importe original de una raíz PayrollWithholding/CardCharge de la misma operación y moneda; una reversa parcial o de otra reversa es inválida. Las FKs y checks de base verifican espacio, forma y unicidad; una guarda compartida de aplicación valida las relaciones entre filas antes de aceptar cada escritura: componente real aplicado de la misma acción/operación, compra vinculada por operación/moneda/categoría/importe y raíz correcta. La guarda debe leer también el grafo nuevo aún seguido por EF para que la confirmación ocurra en una única escritura atómica. Las tareas de comandos deben invocarla obligatoriamente y probar el rechazo sin filas financieras nuevas; no se afirma que esos cruces estén impuestos por un simple CHECK SQL.
+
+## Estado previo al inicio y consulta de historial omitido
+
+`StateForToday=NotStarted` identifica una regla cuyo primer inicio efectivo todavía es futuro; la UI lo muestra como «Programada». No es Ended, y no cambia los estados persistidos Active/Paused/Ended.
+
+El aviso de fechas antiguas obtiene la primera fecha pendiente omitida mediante una consulta escalar apoyada en índices, sin descargar todas las acciones históricas ni volver a generar calendarios anteriores. La consulta de ocurrencias conserva su ventana máxima de 36 meses y su límite de 200 filas. No se afirma tiempo constante para una consulta SQL; se exige resultado de metadatos acotado y ausencia de materialización completa del historial en memoria de la aplicación.
