@@ -108,6 +108,7 @@ Task1 owns additive rule-command schema (Id, WorkspaceId, RequestId, CommandKind
 
 **Files:**
 - Create: `src/EnigmaBudget.Api/Finance/OperationSettlementService.cs`
+- Modify: `src/EnigmaBudget.Api/Program.cs` (service DI), `src/EnigmaBudget.Api/Finance/FinanceEndpoints.cs` (noncash routes inside existing finance group).
 - Modify: `src/EnigmaBudget.Api/Data/AppDbContext.cs` (nullable payment command hash), generated migration/designer/snapshot for that additive field; `web/src/app/core/api.models.ts`, `api.service.ts`, `web/src/app/finance/operations.ts` (typed OperationPaymentCreate and current OperationVersion), corresponding unit/API/browser fixture request callers. These minimal wire changes belong to Task3 so existing payment journeys remain usable immediately.
 - Modify: `src/EnigmaBudget.Api/Finance/CashService.cs`, `Contracts.cs`, `FinanceQueries.cs`, `src/EnigmaBudget.Api/Projection/ProjectionService.cs`, `src/EnigmaBudget.Api/Finance/BudgetService.cs`, `src/EnigmaBudget.Api/Workspaces/FinanceWorkspaceFilter.cs`
 - Test: `tests/EnigmaBudget.Api.Tests/OperationSettlementIntegrationTests.cs`, `FinanceIntegrationTests.cs`, `MonthlyBudgetIntegrationTests.cs`, `ProjectionIntegrationTests.cs`
