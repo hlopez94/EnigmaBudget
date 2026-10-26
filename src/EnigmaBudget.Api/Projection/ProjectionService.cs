@@ -336,6 +336,7 @@ public sealed class ProjectionService(AppDbContext db, BusinessClock clock, Savi
                 var difference = newEffect - oldEffect;
                 cashDelta += difference;
                 if (updated.SourceKind is "Income" or "Expense" or "GroupReceivable" or "CardObligation") availableDelta += difference;
+                else if (updated.SourceKind == "FinanceOperation" && updated.AccountId is null) availableDelta += difference;
                 else if (updated.AccountId is { } accountId && accounts.TryGetValue(accountId, out var account)
                     && account.OpeningDate <= date && (account.FundsAvailableFrom is null || account.FundsAvailableFrom <= date))
                     availableDelta += difference;

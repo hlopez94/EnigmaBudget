@@ -184,6 +184,71 @@ public sealed class ProjectionScenarioIntegrationTests : IDisposable
     }
 
     [Fact]
+    public async Task scenario_adjustments_keep_unassigned_pending_operations_in_available_cash()
+    {
+        using var client = await _factory.AuthenticatedClientAsync();
+        var today = DateOnly.FromDateTime(TestInstant.UtcDateTime);
+        var accountId = Guid.NewGuid();
+        var incomeId = Guid.NewGuid();
+        var expenseId = Guid.NewGuid();
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/api/accounts", new
+        {
+            id = accountId, name = "Caja", bankName = "Banco", currency = "ARS", openingBalance = "0.00", openingDate = today.ToString("yyyy-MM-dd")
+        })).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/api/operations", new
+        {
+            id = incomeId, kind = "Income", accountId, date = today.AddDays(1).ToString("yyyy-MM-dd"), description = "Ingreso pendiente", category = "Trabajo", amount = "125.00", paid = false
+        })).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/api/operations", new
+        {
+            id = expenseId, kind = "Expense", accountId, date = today.AddDays(2).ToString("yyyy-MM-dd"), description = "Gasto pendiente", category = "Comida", amount = "40.00", paid = false
+        })).StatusCode);
+        await using (var db = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>().UseNpgsql(_factory.TestConnection).Options))
+        {
+            var operations = await db.FinanceOperations.Where(x => x.Id == incomeId || x.Id == expenseId).ToArrayAsync();
+            Assert.Equal(2, operations.Length);
+            foreach (var operation in operations) operation.AccountId = null;
+            await db.SaveChangesAsync();
+        }
+
+        var through = today.AddDays(3).ToString("yyyy-MM-dd");
+        using (var baseline = await client.GetAsync($"/api/projection?through={through}&scenario=Confirmed"))
+        {
+            Assert.Equal(HttpStatusCode.OK, baseline.StatusCode);
+            using var baselineDoc = JsonDocument.Parse(await baseline.Content.ReadAsStringAsync());
+            var currency = Assert.Single(baselineDoc.RootElement.GetProperty("currencies").EnumerateArray(), x => x.GetProperty("currency").GetString() == "ARS");
+            var daily = currency.GetProperty("dailyBalances").EnumerateArray().ToDictionary(x => x.GetProperty("date").GetString()!);
+            Assert.Equal("125.00", daily[today.AddDays(1).ToString("yyyy-MM-dd")].GetProperty("availableCash").GetString());
+            Assert.Equal("85.00", daily[today.AddDays(2).ToString("yyyy-MM-dd")].GetProperty("freeBalance").GetString());
+        }
+
+        var assumptions = new object[]
+        {
+            new { id = Guid.NewGuid(), kind = "AmountChange", date = (string?)null, currency = "ARS", amount = "25.00", description = "Ingreso ajustado", sourceId = incomeId, sourceKind = "FinanceOperation", componentId = (string?)null },
+            new { id = Guid.NewGuid(), kind = "DateChange", date = today.AddDays(2).ToString("yyyy-MM-dd"), currency = (string?)null, amount = (string?)null, description = "Ingreso reprogramado", sourceId = incomeId, sourceKind = "FinanceOperation", componentId = (string?)null },
+            new { id = Guid.NewGuid(), kind = "AmountChange", date = (string?)null, currency = "ARS", amount = "20.00", description = "Gasto ajustado", sourceId = expenseId, sourceKind = "FinanceOperation", componentId = (string?)null },
+            new { id = Guid.NewGuid(), kind = "DateChange", date = today.AddDays(3).ToString("yyyy-MM-dd"), currency = (string?)null, amount = (string?)null, description = "Gasto reprogramado", sourceId = expenseId, sourceKind = "FinanceOperation", componentId = (string?)null },
+        };
+        using var response = await client.PostAsJsonAsync("/api/projection/calculate", new { through, scenario = "Estimated", assumptions });
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var rows = doc.RootElement.GetProperty("rows").EnumerateArray().Where(x => x.GetProperty("sourceKind").GetString() == "FinanceOperation").ToArray();
+        Assert.Equal("150.00", Assert.Single(rows, x => x.GetProperty("sourceId").GetGuid() == incomeId).GetProperty("amount").GetString());
+        Assert.Equal("60.00", Assert.Single(rows, x => x.GetProperty("sourceId").GetGuid() == expenseId).GetProperty("amount").GetString());
+        var result = Assert.Single(doc.RootElement.GetProperty("currencies").EnumerateArray(), x => x.GetProperty("currency").GetString() == "ARS");
+        var projected = result.GetProperty("dailyBalances").EnumerateArray().ToDictionary(x => x.GetProperty("date").GetString()!);
+        Assert.Equal("0.00", projected[today.ToString("yyyy-MM-dd")].GetProperty("cashBalance").GetString());
+        Assert.Equal("0.00", projected[today.AddDays(1).ToString("yyyy-MM-dd")].GetProperty("availableCash").GetString());
+        Assert.Equal("150.00", projected[today.AddDays(2).ToString("yyyy-MM-dd")].GetProperty("cashBalance").GetString());
+        Assert.Equal("150.00", projected[today.AddDays(2).ToString("yyyy-MM-dd")].GetProperty("availableCash").GetString());
+        Assert.Equal("0.00", projected[today.AddDays(2).ToString("yyyy-MM-dd")].GetProperty("restrictedCash").GetString());
+        Assert.Equal("90.00", projected[today.AddDays(3).ToString("yyyy-MM-dd")].GetProperty("cashBalance").GetString());
+        Assert.Equal("90.00", projected[today.AddDays(3).ToString("yyyy-MM-dd")].GetProperty("availableCash").GetString());
+        Assert.Equal("90.00", projected[today.AddDays(3).ToString("yyyy-MM-dd")].GetProperty("freeBalance").GetString());
+        Assert.Equal("0.00", projected[today.AddDays(3).ToString("yyyy-MM-dd")].GetProperty("restrictedCash").GetString());
+    }
+
+    [Fact]
     public async Task source_identity_ambiguity_is_rejected_and_component_targets_one_participant()
     {
         using var client = await _factory.AuthenticatedClientAsync();
