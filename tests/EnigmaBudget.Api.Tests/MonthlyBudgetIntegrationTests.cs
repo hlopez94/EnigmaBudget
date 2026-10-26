@@ -11,6 +11,8 @@ namespace EnigmaBudget.Api.Tests;
 
 public sealed class MonthlyBudgetIntegrationTests
 {
+    private static readonly DateTimeOffset CiUtcBoundaryInstant = DateTimeOffset.Parse("2026-10-26T00:19:00Z");
+
     [Fact]
     public async Task budget_requires_expense_category_and_valid_currency()
     {
@@ -31,7 +33,7 @@ public sealed class MonthlyBudgetIntegrationTests
     [Fact]
     public async Task monthly_budget_counts_cash_expense_and_card_installment_once()
     {
-        using var factory = new ApiFactory();
+        using var factory = new ApiFactory(timeProvider: new FixedTimeProvider(CiUtcBoundaryInstant));
         await MigrateAsync(factory);
         using var client = await factory.AuthenticatedClientAsync("budget-source-aggregation");
         var workspaceId = await WorkspaceIdAsync(factory, "budget-source-aggregation");
@@ -56,7 +58,10 @@ public sealed class MonthlyBudgetIntegrationTests
         var statementVersion = statementJson.RootElement.GetProperty("version").GetInt32();
         using var confirmed = await client.PostAsJsonAsync($"/api/cards/{card}/statement/confirm", new { id = statementId, version = statementVersion });
         Assert.Equal(HttpStatusCode.OK, confirmed.StatusCode);
-        var paymentDate = DateOnly.FromDateTime(DateTime.UtcNow).ToString("yyyy-MM-dd");
+        var paymentDate = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(
+            CiUtcBoundaryInstant,
+            TimeZoneInfo.FindSystemTimeZoneById("America/Argentina/Buenos_Aires")
+        ).DateTime).ToString("yyyy-MM-dd");
         using var cardPayment = await client.PostAsJsonAsync($"/api/cards/{card}/payments", new { id = Guid.NewGuid(), accountId = account, date = paymentDate, amount = "20.00", currency = "ARS", appliedAmount = "20.00", statementId });
         Assert.Equal(HttpStatusCode.OK, cardPayment.StatusCode);
         var budgetId = Guid.NewGuid();
@@ -278,5 +283,10 @@ public sealed class MonthlyBudgetIntegrationTests
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var user = await db.ApplicationUsers.SingleAsync(x => x.Subject == subject);
         return await db.Workspaces.Where(x => x.OwnerUserId == user.Id && x.Kind == "Personal").Select(x => x.Id).SingleAsync();
+    }
+
+    private sealed class FixedTimeProvider(DateTimeOffset utcNow) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => utcNow;
     }
 }

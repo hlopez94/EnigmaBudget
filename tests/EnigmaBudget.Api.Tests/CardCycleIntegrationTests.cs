@@ -5,7 +5,8 @@ namespace EnigmaBudget.Api.Tests;
 
 public sealed class CardCycleIntegrationTests : IDisposable
 {
-    private readonly ApiFactory _factory = new();
+    private static readonly DateTimeOffset CiUtcBoundaryInstant = DateTimeOffset.Parse("2026-10-26T00:19:00Z");
+    private readonly ApiFactory _factory = new(timeProvider: new FixedTimeProvider(CiUtcBoundaryInstant));
 
     public void Dispose() => _factory.Dispose();
 
@@ -13,7 +14,7 @@ public sealed class CardCycleIntegrationTests : IDisposable
     public async Task Future_card_opening_is_excluded_consistently_from_current_debt_views()
     {
         using var client = await _factory.AuthenticatedClientAsync();
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = Today();
         var pastDate = today.AddDays(-2).ToString("yyyy-MM-dd");
         var todayDate = today.ToString("yyyy-MM-dd");
         var futureDate = today.AddDays(2).ToString("yyyy-MM-dd");
@@ -62,24 +63,20 @@ public sealed class CardCycleIntegrationTests : IDisposable
                 )
             ).StatusCode
         );
-        Assert.Equal(
-            HttpStatusCode.OK,
-            (
-                await client.PostAsJsonAsync(
-                    $"/api/cards/{pastCard}/payments",
-                    new
-                    {
-                        id = Guid.NewGuid(),
-                        accountId = account,
-                        date = todayDate,
-                        amount = "130.00",
-                        currency = "ARS",
-                        appliedAmount = "130.00",
-                        statementId = (Guid?)null,
-                    }
-                )
-            ).StatusCode
+        using var cardPayment = await client.PostAsJsonAsync(
+            $"/api/cards/{pastCard}/payments",
+            new
+            {
+                id = Guid.NewGuid(),
+                accountId = account,
+                date = todayDate,
+                amount = "130.00",
+                currency = "ARS",
+                appliedAmount = "130.00",
+                statementId = (Guid?)null,
+            }
         );
+        Assert.Equal(HttpStatusCode.OK, cardPayment.StatusCode);
 
         var cards = await client.GetFromJsonAsync<CardDebtSummary[]>("/api/cards");
         Assert.Equal("0.00", Assert.Single(cards!, x => x.Id == futureCard).DebtArs);
