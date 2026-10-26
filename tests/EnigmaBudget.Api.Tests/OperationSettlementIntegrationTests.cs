@@ -8,8 +8,10 @@ namespace EnigmaBudget.Api.Tests;
 
 public sealed class OperationSettlementIntegrationTests : IDisposable
 {
-    private readonly ApiFactory _factory = new();
+    private static readonly DateTimeOffset TestInstant = DateTimeOffset.Parse("2026-10-25T15:00:00Z");
+    private readonly ApiFactory _factory = new(timeProvider: new FixedTimeProvider(TestInstant));
     public void Dispose() => _factory.Dispose();
+    private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider { public override DateTimeOffset GetUtcNow() => now; }
 
     [Fact]
     public async Task noncash_settlement_is_scoped_idempotent_and_does_not_create_a_ledger_entry()
