@@ -38,6 +38,8 @@ builder.Services.AddScoped<ProjectionService>();
 builder.Services.AddScoped<ProjectionScenarioService>();
 builder.Services.AddScoped<ExchangeRateService>();
 builder.Services.AddScoped<CatalogService>();
+builder.Services.AddScoped<RecurringService>();
+builder.Services.AddScoped<RecurringCalendar>();
 builder.Services.AddScoped<BudgetService>();
 builder.Services.AddSingleton<ExchangeRateRefreshCoordinator>();
 if (builder.Configuration.GetValue("ExchangeRates:AutomaticRefreshEnabled", true))

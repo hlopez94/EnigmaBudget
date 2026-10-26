@@ -17,6 +17,7 @@ public static partial class FinanceEndpoints
     {
         var finance = api.MapGroup("").AddEndpointFilter<FinanceWorkspaceFilter>();
         finance.MapCatalogEndpoints();
+        finance.MapRecurringEndpoints();
         finance.MapGet("/accounts", Accounts);
         finance.MapGet("/finance", FinanceOverview);
         finance.MapPost("/accounts", CreateAccount);
