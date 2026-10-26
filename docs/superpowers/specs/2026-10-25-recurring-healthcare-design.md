@@ -76,3 +76,7 @@ La columna nullable heredada `FinancePayments.FinanceOperationId` se conserva ju
 ## Compatibilidad del contrato de pagos
 
 La versión optimista de operación viaja en cada nuevo pago. La tarea que incorpora el requisito en el backend actualiza también el formulario existente, su contrato tipado y los payloads de sus pruebas; no se difiere esa conexión hasta la nueva pantalla de recurrencias. Los pagos nuevos conservan un hash nullable del comando completo, incluida su versión original, para aceptar un reintento idéntico antes de comprobar la versión actual y rechazar un payload cambiado. Las filas heredadas sin hash mantienen el comparador financiero previo sin inventar recibos históricos.
+
+## Guardas de origen de liquidación
+
+La compensación siempre es completa por el importe original de una raíz PayrollWithholding/CardCharge de la misma operación y moneda; una reversa parcial o de otra reversa es inválida. Las FKs y checks de base verifican espacio, forma y unicidad; una guarda compartida de aplicación valida las relaciones entre filas antes de aceptar cada escritura: componente real aplicado de la misma acción/operación, compra vinculada por operación/moneda/categoría/importe y raíz correcta. La guarda debe leer también el grafo nuevo aún seguido por EF para que la confirmación ocurra en una única escritura atómica. Las tareas de comandos deben invocarla obligatoriamente y probar el rechazo sin filas financieras nuevas; no se afirma que esos cruces estén impuestos por un simple CHECK SQL.
