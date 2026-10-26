@@ -72,3 +72,7 @@ Angular 22, OptimusUI 2 compatible, .NET 10, PostgreSQL, un host ASP.NET, no Ion
 ## Preservación de datos al migrar
 
 La columna nullable heredada `FinancePayments.FinanceOperationId` se conserva junto a todos sus valores aunque la relación usada por los nuevos escritores sea la FK compuesta WorkspaceId/OperationId. No borrar un dato previo porque el camino actual no lo escriba. La cuenta nullable de operación admite tanto Expense recurrente como Income sin cobrar; las cuentas de cada pago real siguen siendo obligatorias. La prueba de migración debe sembrar un valor heredado no null en la base anterior y comprobar que permanece idéntico al actualizar.
+
+## Compatibilidad del contrato de pagos
+
+La versión optimista de operación viaja en cada nuevo pago. La tarea que incorpora el requisito en el backend actualiza también el formulario existente, su contrato tipado y los payloads de sus pruebas; no se difiere esa conexión hasta la nueva pantalla de recurrencias. Los pagos nuevos conservan un hash nullable del comando completo, incluida su versión original, para aceptar un reintento idéntico antes de comprobar la versión actual y rechazar un payload cambiado. Las filas heredadas sin hash mantienen el comparador financiero previo sin inventar recibos históricos.
