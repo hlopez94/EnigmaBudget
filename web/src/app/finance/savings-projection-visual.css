@@ -1,0 +1,306 @@
+/* Shared, intentionally scoped visual base for Savings and Projection. */
+.savings-screen,
+.projection-screen {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+}
+
+.savings-screen .section-heading,
+.projection-screen .section-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px 16px;
+}
+
+.savings-screen .section-heading > div,
+.projection-screen .section-heading > div {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.savings-screen .goal-actions,
+.projection-screen .control-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+app-savings button.primary,
+app-projection button.primary,
+.savings-screen button.primary,
+.projection-screen button.primary,
+app-savings app-action-dialog button.primary,
+app-projection app-action-dialog button.primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  border: 1px solid var(--green, #376c4b);
+  border-radius: 9px;
+  padding: 10px 14px;
+  background: var(--green, #376c4b);
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.25;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+app-savings button.primary:hover:not(:disabled),
+app-projection button.primary:hover:not(:disabled),
+.savings-screen button.primary:hover:not(:disabled),
+.projection-screen button.primary:hover:not(:disabled),
+app-savings app-action-dialog button.primary:hover:not(:disabled),
+app-projection app-action-dialog button.primary:hover:not(:disabled) {
+  border-color: #2e5d40;
+  background: #2e5d40;
+}
+
+app-savings button.secondary,
+app-projection button.secondary,
+.savings-screen button.secondary,
+.projection-screen button.secondary,
+app-savings button.quiet-button,
+app-projection button.quiet-button,
+app-savings app-action-dialog button.secondary,
+app-projection app-action-dialog button.secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  border: 1px solid #d5dfd4;
+  border-radius: 9px;
+  padding: 9px 13px;
+  background: #f3f6f1;
+  color: #315b3e;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.25;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+app-savings button.secondary:hover:not(:disabled),
+app-projection button.secondary:hover:not(:disabled),
+.savings-screen button.secondary:hover:not(:disabled),
+.projection-screen button.secondary:hover:not(:disabled),
+app-savings button.quiet-button:hover:not(:disabled),
+app-projection button.quiet-button:hover:not(:disabled),
+app-savings app-action-dialog button.secondary:hover:not(:disabled),
+app-projection app-action-dialog button.secondary:hover:not(:disabled) {
+  border-color: #c3d3c2;
+  background: #eaf2e9;
+}
+
+app-savings button.text-action,
+app-projection button.text-action,
+.savings-screen button.text-action,
+.projection-screen button.text-action,
+app-savings app-action-dialog button.text-action,
+app-projection app-action-dialog button.text-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 8px 9px;
+  background: transparent;
+  color: #315b3e;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+  text-align: center;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+app-savings button.text-action:hover:not(:disabled),
+app-projection button.text-action:hover:not(:disabled),
+.savings-screen button.text-action:hover:not(:disabled),
+.projection-screen button.text-action:hover:not(:disabled),
+app-savings app-action-dialog button.text-action:hover:not(:disabled),
+app-projection app-action-dialog button.text-action:hover:not(:disabled) {
+  background: #f3f6f1;
+  color: #234a2b;
+}
+
+app-savings button.danger-text,
+app-projection button.danger-text,
+.savings-screen button.danger-text,
+.projection-screen button.danger-text {
+  color: #91432e;
+}
+
+app-savings button:disabled,
+app-projection button:disabled,
+.savings-screen button:disabled,
+.projection-screen button:disabled {
+  cursor: not-allowed;
+  opacity: .55;
+}
+
+app-savings button:focus-visible,
+app-projection button:focus-visible,
+.savings-screen button:focus-visible,
+.projection-screen button:focus-visible {
+  outline: 3px solid #a7c7a7;
+  outline-offset: 2px;
+}
+
+body .finance-action-dialog.savings-projection-dialog button.primary,
+body .finance-action-dialog.savings-projection-dialog button.secondary,
+body .finance-action-dialog.savings-projection-dialog button.text-action {
+  min-height: 44px;
+}
+
+body .finance-action-dialog.savings-projection-dialog button.primary {
+  border: 1px solid var(--green, #376c4b);
+  border-radius: 9px;
+  padding: 10px 14px;
+  background: var(--green, #376c4b);
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+body .finance-action-dialog.savings-projection-dialog button.secondary {
+  border: 1px solid #d5dfd4;
+  border-radius: 9px;
+  padding: 9px 13px;
+  background: #f3f6f1;
+  color: #315b3e;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+body .finance-action-dialog.savings-projection-dialog button.primary:hover:not(:disabled) {
+  border-color: #2e5d40;
+  background: #2e5d40;
+}
+
+body .finance-action-dialog.savings-projection-dialog button.secondary:hover:not(:disabled) {
+  border-color: #c3d3c2;
+  background: #eaf2e9;
+}
+
+body .finance-action-dialog.savings-projection-dialog button:focus-visible {
+  outline: 3px solid #a7c7a7;
+  outline-offset: 2px;
+}
+
+body .finance-action-dialog.savings-projection-dialog button:disabled {
+  cursor: not-allowed;
+  opacity: .55;
+}
+
+body .finance-action-dialog.savings-projection-dialog .form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: end;
+  gap: 13px;
+}
+
+body .finance-action-dialog.savings-projection-dialog .form-grid label {
+  display: grid;
+  min-width: 0;
+  gap: 6px;
+  color: #546052;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+body .finance-action-dialog.savings-projection-dialog .form-grid label:has(textarea),
+body .finance-action-dialog.savings-projection-dialog .form-grid .helper {
+  grid-column: 1 / -1;
+}
+
+body .finance-action-dialog.savings-projection-dialog .form-grid input:not([type='checkbox']),
+body .finance-action-dialog.savings-projection-dialog .form-grid select,
+body .finance-action-dialog.savings-projection-dialog .form-grid textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  border: 1px solid #cfd8cd;
+  border-radius: 8px;
+  padding: 9px 10px;
+  background: #fff;
+  color: #263126;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 400;
+}
+
+body .finance-action-dialog.savings-projection-dialog .form-grid textarea {
+  min-height: 88px;
+  resize: vertical;
+}
+
+body .finance-action-dialog.savings-projection-dialog .form-grid input:focus-visible,
+body .finance-action-dialog.savings-projection-dialog .form-grid select:focus-visible,
+body .finance-action-dialog.savings-projection-dialog .form-grid textarea:focus-visible {
+  border-color: #52835a;
+  outline: 3px solid #a7c7a7;
+  outline-offset: 1px;
+}
+
+body .finance-action-dialog.savings-projection-dialog .form-grid button {
+  width: 100%;
+}
+
+body .finance-action-dialog.savings-projection-dialog .form-grid label.check {
+  display: flex;
+  grid-column: 1 / -1;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  color: #263126;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+body .finance-action-dialog.savings-projection-dialog .form-grid label.check input {
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  min-height: 18px;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--green, #376c4b);
+}
+
+@media (max-width: 560px) {
+  .savings-screen .section-heading,
+  .projection-screen .section-heading {
+    align-items: flex-start;
+  }
+
+  .savings-screen .goal-actions,
+  .projection-screen .control-actions {
+    gap: 6px;
+  }
+
+  body .finance-action-dialog.savings-projection-dialog .form-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  body .finance-action-dialog.savings-projection-dialog .form-grid label:has(textarea),
+  body .finance-action-dialog.savings-projection-dialog .form-grid .helper {
+    grid-column: auto;
+  }
+}

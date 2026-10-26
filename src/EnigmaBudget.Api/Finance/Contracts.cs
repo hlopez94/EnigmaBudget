@@ -1,0 +1,181 @@
+namespace EnigmaBudget.Api.Finance;
+
+public sealed record AccountCreate(
+    Guid Id,
+    string Name,
+    string BankName,
+    string Currency,
+    string OpeningBalance,
+    string OpeningDate
+);
+
+public sealed record AccountUpdate(int Version, string Name, string BankName, bool IsArchived);
+
+public sealed record AccountAdjustmentCreate(
+    Guid Id,
+    string Date,
+    string ObservedBalance,
+    string Reason
+);
+
+public sealed record CardUpdate(
+    int Version,
+    string Name,
+    string BankName,
+    int? ClosingDay,
+    int? DueDay,
+    bool IsArchived
+);
+
+public sealed record AccountDto(
+    Guid Id,
+    string Name,
+    string BankName,
+    string Currency,
+    string OpeningBalance,
+    string OpeningDate,
+    string CurrentBalance,
+    bool IsArchived,
+    int Version
+);
+
+public sealed record OperationCreate(
+    Guid Id,
+    string Kind,
+    Guid AccountId,
+    string Date,
+    string Description,
+    string? Category,
+    string Amount,
+    bool Paid,
+    Guid? CategoryId = null,
+    Guid? MerchantId = null,
+    Guid? IncomeSourceId = null
+);
+
+public sealed record PaymentCreate(Guid Id, Guid AccountId, string Date, string Amount, int OperationVersion);
+
+public sealed record NonCashSettlementCreate(Guid RequestId, int OperationVersion, string Currency, string Amount, Guid? HealthcareComponentId, Guid? CardPurchaseId);
+public sealed record NonCashSettlementReverse(Guid RequestId, int OperationVersion, string Reason);
+public sealed record NonCashSettlementDto(Guid Id, string Kind, string Currency, string Amount, Guid? HealthcareComponentId, Guid? CardPurchaseId, Guid? ReversesSettlementId, Guid ActorUserId, string CreatedAt);
+
+public sealed record OperationVoid(Guid Id, int Version, string Reason);
+
+public sealed record TransferCreate(
+    Guid Id,
+    Guid FromAccountId,
+    Guid ToAccountId,
+    string Date,
+    string Amount,
+    string DestinationAmount
+);
+
+public sealed record CardCreate(
+    Guid Id,
+    string Name,
+    string BankName,
+    int? ClosingDay,
+    int? DueDay,
+    string StatementDebtArs,
+    string StatementDebtUsd,
+    string AsOfDate
+);
+
+public sealed record GroupCreate(Guid Id, string Name, ParticipantCreate[] Participants);
+
+public sealed record ParticipantCreate(Guid Id, string Name, bool IsSelf);
+
+public sealed record RuleCreate(
+    int Version,
+    string Mode,
+    string BasisCurrency,
+    WeightCreate[] Weights
+);
+
+public sealed record WeightCreate(Guid ParticipantId, string Value);
+
+public sealed record VersionRequest(int Version);
+
+public sealed record StatementConfirm(Guid Id, int Version);
+
+public sealed record PurchaseCreate(
+    Guid Id,
+    Guid CardId,
+    string Date,
+    string Description,
+    string? Category,
+    string Currency,
+    string TotalAmount,
+    int InstallmentCount,
+    string FirstPeriod,
+    Guid? GroupId,
+    Guid? CategoryId = null,
+    Guid? MerchantId = null
+);
+
+public sealed record CollectionCreate(
+    Guid Id,
+    Guid InstallmentId,
+    Guid ParticipantId,
+    Guid AccountId,
+    string Date,
+    string Amount,
+    string AppliedAmount,
+    int RuleVersion
+);
+
+public sealed record StatementSave(
+    Guid Id,
+    string Period,
+    string Currency,
+    int Version,
+    string? DueDate,
+    string ActualTotal,
+    AdjustmentCreate[] Adjustments
+);
+
+public sealed record AdjustmentCreate(Guid Id, string Description, string? Category, string Amount, Guid? CategoryId = null);
+
+public sealed record CardPaymentCreate(
+    Guid Id,
+    Guid AccountId,
+    string Date,
+    string Amount,
+    string Currency,
+    string AppliedAmount,
+    Guid? StatementId
+);
+
+public sealed record PaymentDto(Guid Id, Guid AccountId, string Date, string Amount);
+
+public sealed record OperationDto(
+    Guid Id,
+    string Kind,
+    Guid? AccountId,
+    string Date,
+    string Description,
+    string Category,
+    string Amount,
+    string Currency,
+    string PaidAmount,
+    string PendingAmount,
+    string Status,
+    int Version,
+    PaymentDto[] Payments,
+    Guid? CategoryId = null,
+    Guid? MerchantId = null,
+    Guid? IncomeSourceId = null,
+    string? MerchantNameSnapshot = null,
+    string? IncomeSourceNameSnapshot = null,
+    string? CashPaidAmount = null,
+    string? NonCashSettledAmount = null,
+    NonCashSettlementDto[]? NonCashSettlements = null
+);
+
+public sealed record CatalogCreate(Guid Id, string Name, string? Kind = null);
+public sealed record CatalogUpdate(Guid RequestId, int Version, string Name, string? Kind = null);
+public sealed record CatalogArchive(Guid RequestId, int Version);
+public sealed record CategoryCatalogDto(Guid ItemId, string Name, string Kind, bool IsArchived, bool IsDefault, int Version);
+public sealed record MerchantCatalogDto(Guid MerchantId, string Name, bool IsArchived, int Version);
+public sealed record IncomeSourceCatalogDto(Guid IncomeSourceId, string Name, string Kind, bool IsArchived, int Version);
+public sealed record FinanceCatalogDto(CategoryCatalogDto[] Categories, MerchantCatalogDto[] Merchants, IncomeSourceCatalogDto[] IncomeSources);

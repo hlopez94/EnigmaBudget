@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">EnigmaBudget</string>
+    <string name="title_activity_main">EnigmaBudget</string>
+    <string name="package_name">com.enigmabudget.dev</string>
+    <string name="custom_url_scheme">com.enigmabudget.dev</string>
+</resources>

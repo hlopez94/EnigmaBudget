@@ -1,0 +1,81 @@
+apply plugin: 'com.android.application'
+apply plugin: 'org.jetbrains.kotlin.android'
+apply from: rootProject.file('../../scripts/app-links-policy.gradle')
+def configuredInviteHost = validateAppLinksHost(System.getenv('ENIGMABUDGET_APP_LINKS_HOST'))
+
+android {
+    namespace = "com.enigmabudget.dev"
+    compileSdk = rootProject.ext.compileSdkVersion
+    defaultConfig {
+        applicationId "com.enigmabudget.dev"
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode 1
+        versionName "1.0"
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        def apiBase = System.getenv('ENIGMABUDGET_API_BASE_URL') ?: ''
+        def googleServerClientId = System.getenv('ENIGMABUDGET_GOOGLE_SERVER_CLIENT_ID') ?: ''
+        def inviteHostValue = configuredInviteHost ?: ''
+        def allowLocalHttp = System.getenv('ENIGMABUDGET_ALLOW_LOCAL_HTTP') == 'true'
+        buildConfigField 'String', 'API_BASE_URL', '"' + apiBase.replace('\\', '\\\\').replace('"', '\\"') + '"'
+        buildConfigField 'String', 'GOOGLE_SERVER_CLIENT_ID', '"' + googleServerClientId.replace('\\', '\\\\').replace('"', '\\"') + '"'
+        buildConfigField 'String', 'APP_LINKS_HOST', '"' + inviteHostValue.replace('\\', '\\\\').replace('"', '\\"') + '"'
+        buildConfigField 'boolean', 'ALLOW_LOCAL_HTTP', allowLocalHttp.toString()
+        manifestPlaceholders = [allowLocalHttp: allowLocalHttp.toString()]
+        aaptOptions {
+             // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
+             // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
+            ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+        }
+    }
+    buildFeatures { buildConfig true }
+    if (configuredInviteHost) {
+        flavorDimensions += 'inviteLinks'
+        productFlavors {
+            appLinks {
+                dimension 'inviteLinks'
+                manifestPlaceholders = [inviteHost: configuredInviteHost]
+            }
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+
+repositories {
+    flatDir{
+        dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
+    }
+}
+
+dependencies {
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+    implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
+    implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
+    implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+    implementation 'androidx.credentials:credentials:1.6.0'
+    implementation 'androidx.credentials:credentials-play-services-auth:1.6.0'
+    implementation 'com.google.android.libraries.identity.googleid:googleid:1.2.1'
+    implementation 'com.squareup.okhttp3:okhttp:5.4.0'
+    implementation project(':capacitor-android')
+    testImplementation "junit:junit:$junitVersion"
+    testImplementation 'org.json:json:20250517'
+    androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
+    androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
+    implementation project(':capacitor-cordova-android-plugins')
+}
+
+apply from: 'capacitor.build.gradle'
+
+try {
+    def servicesJSON = file('google-services.json')
+    if (servicesJSON.text) {
+        apply plugin: 'com.google.gms.google-services'
+    }
+} catch(Exception e) {
+    logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
+}

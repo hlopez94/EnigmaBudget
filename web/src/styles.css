@@ -1,0 +1,647 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700&display=swap');
+@import '@openng/icons/openng-icons.css';
+@import './app/finance/savings-projection-visual.css';
+:root {
+  font-family: 'DM Sans', Arial, sans-serif;
+  color: #162921;
+  background: #fafbf8;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  --ink: #162921;
+  --muted: #6c7a72;
+  --line: #e1e6e0;
+  --green: #376c4b;
+  --green-soft: #eaf2e9;
+  --canvas: #fafbf8;
+  --surface: #fff;
+  --surface-soft: #f3f6f1;
+  --status-warm: #f4eee4;
+}
+
+* {
+  box-sizing: border-box;
+}
+html {
+  scroll-padding-bottom: calc(112px + env(safe-area-inset-bottom));
+}
+body {
+  margin: 0;
+  min-width: 320px;
+  background: var(--canvas);
+}
+button,
+input,
+select {
+  font: inherit;
+}
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  box-shadow: 0 2px 10px rgba(33, 52, 38, 0.035);
+}
+.eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 10px;
+  font-weight: 700;
+  color: #5d6b61;
+  margin: 0;
+}
+.p-button {
+  font-family: 'DM Sans', sans-serif;
+}
+.p-inputtext,
+.p-select {
+  border-radius: 9px !important;
+  font-size: 13px !important;
+  min-height: 42px;
+}
+.p-inputtext {
+  padding: 10px 12px !important;
+}
+.p-select-label {
+  font-size: 12px !important;
+  padding-top: 11px !important;
+  padding-bottom: 11px !important;
+}
+.p-button-label {
+  font-size: 12px;
+  font-weight: 600;
+}
+.p-button:not(.p-button-text) {
+  background: #3e6a4b;
+  border-color: #3e6a4b;
+  color: #fff;
+}
+.p-button:not(.p-button-text).p-button-outlined,
+.p-button:not(.p-button-text).p-button-outlined .p-button-label {
+  color: #fff;
+}
+.p-button:not(.p-button-text):hover,
+.p-button:not(.p-button-text).p-button-outlined:hover {
+  background: #31583d;
+  border-color: #31583d;
+  color: #fff;
+}
+.p-message {
+  font-size: 12px !important;
+  margin-bottom: 18px;
+}
+body .finance-action-dialog.p-dialog {
+  --p-dialog-background: #fff;
+  --p-dialog-color: #202b23;
+  --p-dialog-border-color: #dfe6dd;
+  --p-dialog-border-radius: 14px;
+  --p-dialog-shadow: 0 18px 55px rgba(33, 52, 38, 0.14);
+  background: var(--p-dialog-background);
+  color: var(--p-dialog-color);
+  border: 1px solid var(--p-dialog-border-color);
+  border-radius: var(--p-dialog-border-radius);
+  box-shadow: var(--p-dialog-shadow);
+}
+body .finance-action-dialog .p-dialog-header {
+  background: #f8faf7;
+  color: #202b23;
+  border-bottom: 1px solid #e5e9e2;
+  border-radius: 14px 14px 0 0;
+}
+body .finance-action-dialog .p-dialog-content {
+  background: #fff;
+  color: #202b23;
+}
+body .finance-action-dialog .panel {
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+body .finance-action-dialog .form-grid label.check {
+  display: flex !important;
+  align-items: center;
+  gap: 10px !important;
+  min-height: 44px;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.4;
+  cursor: pointer;
+}
+body .finance-action-dialog .form-grid label.check input[type='checkbox'] {
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  min-height: 18px;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--green);
+}
+
+/* Shared finance language for accounts, operations, cards and collaboration. */
+.shell .topbar {
+  min-height: 72px;
+  border-color: var(--line);
+}
+.shell .brand {
+  gap: 11px;
+  font-size: 20px;
+  color: var(--ink);
+}
+.shell .brand-mark {
+  width: 38px;
+  height: 38px;
+  border-radius: 13px;
+  background: var(--green);
+}
+.workspace .section-heading h2,
+.workspace .management-card h3 {
+  color: var(--ink);
+  letter-spacing: -.035em;
+}
+.workspace .management-card {
+  border-color: var(--line);
+}
+.workspace .management-card .helper,
+.workspace .member-row small {
+  color: var(--muted);
+}
+.workspace .member-row,
+.workspace .operation-row,
+.workspace .list-row {
+  border-color: var(--line);
+}
+.workspace .section-heading .eyebrow,
+.workspace .panel-title .eyebrow {
+  color: #62756a;
+}
+.workspace .period-picker input,
+.workspace .form-grid input,
+.workspace .form-grid select,
+.workspace .form-grid textarea,
+.workspace .panel > label select,
+.workspace .filter-label select,
+.workspace .invite-form input,
+.workspace .invite-form select,
+.workspace .member-actions select {
+  border-color: #d3dcd3;
+  border-radius: 9px;
+  color: var(--ink);
+}
+.workspace .period-picker input:focus-visible,
+.workspace .form-grid input:focus-visible,
+.workspace .form-grid select:focus-visible,
+.workspace .form-grid textarea:focus-visible,
+.workspace .invite-form input:focus-visible,
+.workspace .invite-form select:focus-visible,
+.workspace .member-actions select:focus-visible {
+  outline: 3px solid #a7c7a7;
+  outline-offset: 1px;
+  border-color: #52835a;
+}
+.workspace .primary,
+.workspace .secondary,
+.workspace .quiet-button {
+  min-height: 44px;
+  border-radius: 9px;
+}
+.workspace .primary {
+  background: var(--green);
+  border-color: var(--green);
+}
+.workspace .primary:hover {
+  background: #2e5d40;
+  border-color: #2e5d40;
+}
+.workspace .empty,
+.workspace .empty-note {
+  color: #52645a;
+}
+.workspace .badge {
+  border-radius: 999px;
+}
+.workspace .more-screen .panel {
+  padding: 22px 26px;
+}
+.workspace .more-screen h2 {
+  margin: 0 0 7px;
+  color: var(--ink);
+  letter-spacing: -.035em;
+}
+.wizard {
+  border-color: var(--line);
+  border-radius: 16px;
+}
+.stepper {
+  border-color: var(--line);
+}
+.welcome-icon,
+.welcome-mark,
+.empty-state > span,
+.empty-symbol,
+.review-icon,
+.next-icon {
+  display: grid;
+  place-items: center;
+}
+.welcome-icon,
+.welcome-mark {
+  color: var(--green);
+}
+.welcome-icon i,
+.welcome-mark i,
+.empty-state > span i,
+.empty-symbol i,
+.review-icon i,
+.next-icon i {
+  line-height: 1;
+}
+.workspace .finance-action-dialog .p-dialog-header {
+  border-color: var(--line);
+}
+@media (max-width: 767px) {
+  .shell .topbar {
+    min-height: 58px;
+  }
+  .shell .brand {
+    font-size: 18px;
+  }
+  .shell .brand-mark {
+    width: 34px;
+    height: 34px;
+  }
+  .workspace .more-screen .panel {
+    padding: 17px 15px;
+  }
+  .workspace .invite-form input,
+  .workspace .invite-form select,
+  .workspace .member-actions select {
+    font-size: 16px;
+    min-height: 44px;
+  }
+  .workspace .mobile-navigation {
+    padding-bottom: calc(6px + env(safe-area-inset-bottom));
+  }
+}
+
+.workspace .mobile-navigation {
+  display: none;
+}
+.workspace .more-link {
+  display: flex;
+  width: 100%;
+  min-height: 62px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 4px;
+  background: white;
+  border: 0;
+  border-bottom: 1px solid #e8ece6;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.workspace .more-link b,
+.workspace .more-link small {
+  display: block;
+}
+.workspace .more-link small {
+  margin-top: 4px;
+  color: #6b756b;
+  font-size: 12px;
+}
+.workspace .more-link > span:last-child {
+  font-size: 23px;
+  color: #416c49;
+}
+.workspace .more-link > i {
+  flex: none;
+  color: var(--green);
+}
+.workspace .more-screen h2 {
+  font-size: 20px;
+}
+.accounts-workspace > .two-columns,
+.operations-workspace > .two-columns,
+.sharing-workspace > .two-columns {
+  display: contents;
+}
+.accounts-workspace > .legacy-accounts-list {
+  display: none;
+}
+.accounts-list {
+  order: -1;
+}
+.accounts-list .panel-title {
+  align-items: center;
+}
+.accounts-list .primary {
+  min-height: 44px;
+}
+.operation-history,
+.receivables-panel {
+  order: -1;
+}
+.accounts-workspace > .section-heading,
+.operations-workspace > .section-heading,
+.sharing-workspace > .section-heading {
+  order: -2;
+}
+@media (max-width: 767px) {
+  .workspace {
+    width: calc(100% - 24px);
+    margin: 12px auto calc(94px + env(safe-area-inset-bottom));
+  }
+  .workspace .workspace-heading {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+  .workspace .workspace-heading > div:first-child {
+    min-width: 0;
+    width: 100%;
+  }
+  .workspace .workspace-heading h1 {
+    font-size: 22px;
+    letter-spacing: -0.03em;
+    margin: 0;
+  }
+  .workspace .workspace-heading .eyebrow {
+    margin: 0 0 2px;
+    font-size: 9px;
+  }
+  .workspace .workspace-heading p:last-child {
+    display: none;
+  }
+  .workspace .header-actions {
+    width: auto;
+    gap: 4px;
+  }
+  .workspace .header-actions .period-picker {
+    display: flex;
+    font-size: 0;
+  }
+  .workspace .mobile-navigation {
+    position: fixed;
+    z-index: 100;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: 5px 4px calc(5px + env(safe-area-inset-bottom));
+    border-top: 1px solid #dfe6dd;
+    background: #fffffff2;
+    backdrop-filter: blur(14px);
+  }
+  .workspace .mobile-navigation button {
+    display: grid;
+    place-items: center;
+    align-content: center;
+    gap: 1px;
+    min-height: 52px;
+    border: 0;
+    border-radius: 9px;
+    background: transparent;
+    color: #687369;
+    font: inherit;
+    cursor: pointer;
+  }
+  .workspace .mobile-navigation button i {
+    font-size: 20px;
+    line-height: 24px;
+  }
+  .workspace .mobile-navigation button small {
+    font-size: 10px;
+  }
+  .workspace .mobile-navigation button.active {
+    color: #245a34;
+    background: #edf4eb;
+    font-weight: 650;
+  }
+  .workspace .header-actions p-button {
+    display: none;
+  }
+  .workspace .setup-hint {
+    padding: 11px;
+  }
+  .workspace .summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .workspace .overview-intro {
+    gap: 4px;
+  }
+  .workspace .overview-intro h2 {
+    font-size: 20px;
+  }
+  .workspace .ready-note {
+    margin: 0;
+  }
+  .workspace .quick-panel {
+    display: block;
+  }
+  .workspace .quick-actions {
+    margin-top: 12px;
+  }
+  .workspace .form-grid input,
+  .workspace .form-grid select,
+  .workspace .form-grid textarea,
+  .workspace .panel > label select,
+  .workspace .filter-label select,
+  .workspace .more-link {
+    min-height: 68px;
+  }
+  .workspace .list-row strong,
+  .workspace .operation-row > strong {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    text-align: right;
+  }
+  .shell header.topbar {
+    min-height: 56px;
+  }
+  .shell footer.footer {
+    display: none;
+  }
+  .finance-action-dialog .p-dialog-content {
+    max-height: calc(100dvh - 132px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .finance-action-dialog input:not([type='checkbox']),
+  .finance-action-dialog select,
+  .finance-action-dialog textarea,
+  .workspace .inline-payment input,
+  .workspace .inline-payment select {
+    font-size: 16px;
+    min-height: 44px;
+  }
+  .finance-action-dialog button,
+  .workspace .inline-payment button {
+    min-height: 44px;
+  }
+.finance-action-dialog button.p-dialog-close-button {
+  min-width: 44px;
+  min-height: 44px;
+}
+.finance-action-dialog .budget-source-row {
+  height: auto !important;
+}
+}
+
+@media(max-width:767px){
+  body .finance-action-dialog .p-inputtext,
+  body .finance-action-dialog .p-select,
+  body .finance-action-dialog input:not([type='checkbox']),
+  body .finance-action-dialog select,
+  body .finance-action-dialog textarea {
+    min-height:44px;
+    font-size:16px!important;
+  }
+  body .finance-action-dialog input:not([type='checkbox']),
+  body .finance-action-dialog select,
+  body .finance-action-dialog button {
+    height:44px!important;
+    box-sizing:border-box;
+  }
+}
+
+.workspace.read-only app-accounts button.primary,.workspace.read-only app-accounts button.secondary,.workspace.read-only app-accounts button.text-action,.workspace.read-only app-operations button.primary,.workspace.read-only app-operations button.secondary,.workspace.read-only app-operations button.text-action,.workspace.read-only app-cards button.primary,.workspace.read-only app-cards button.secondary,.workspace.read-only app-cards button.text-action:not(.read-action),.workspace.read-only app-sharing button.primary,.workspace.read-only app-sharing button.secondary,.workspace.read-only app-sharing button.text-action,.workspace.read-only .quick-actions button,.workspace.read-only .empty button,.workspace.read-only .setup-hint button{display:none!important}.workspace.no-resources app-accounts button.primary,.workspace.no-resources app-accounts button.text-action,.workspace.no-resources app-cards .section-heading .quick-actions button.primary{display:none!important}.context-choice,.switch-confirmation{max-width:620px;margin:16px auto}.switch-confirmation p{color:#687369;font-size:13px;line-height:1.55}.confirm-actions{display:flex;justify-content:flex-end;gap:9px;flex-wrap:wrap}.workspace.archived .setup-hint{display:none}.workspace-picker{display:grid;gap:4px;color:#647064;font-size:11px;font-weight:600;min-width:174px}.workspace-picker select{min-height:42px;border:1px solid #cfd8cd;border-radius:8px;padding:7px 9px;background:#fff;color:#263126;font:inherit;font-size:13px}.workspace-picker select:focus{outline:3px solid #bdd8be;outline-offset:1px}.workspace-picker select:disabled{opacity:.6}@media(max-width:767px){.workspace-heading .header-actions{gap:6px}.header-actions .workspace-picker{min-width:0;flex:1}.header-actions .workspace-picker select{min-height:40px;font-size:12px}.header-actions .period-picker{min-width:120px}.header-actions .period-picker input{width:120px}.header-actions p-button{display:none}}
+@media(max-width:767px){.workspace .workspace-heading{display:grid!important;grid-template-columns:minmax(0,1fr);align-items:start!important;gap:8px!important;margin:0 0 14px!important}.workspace .workspace-heading>div:first-child{width:100%;min-width:0}.workspace .workspace-heading h1{font-size:22px;line-height:1.25;letter-spacing:-.03em;overflow-wrap:normal}.workspace .workspace-heading .eyebrow{font-size:10px;line-height:1.4;letter-spacing:.1em;white-space:normal}.workspace .workspace-heading .header-actions{display:grid!important;width:100%;grid-template-columns:minmax(0,1fr);gap:8px;align-items:stretch}.workspace .workspace-heading .header-actions .workspace-picker{width:100%;min-width:0}.workspace .workspace-heading .header-actions .workspace-picker select{width:100%;min-height:44px;font-size:16px;box-sizing:border-box}.workspace .workspace-heading .header-actions .period-picker{display:grid!important;grid-template-columns:auto minmax(0,1fr);align-items:center;width:100%;min-width:0;gap:8px;font-size:12px}.workspace .workspace-heading .header-actions .period-picker input{width:100%;min-width:0;min-height:44px;font-size:16px;box-sizing:border-box}}
+
+/* Panorama sereno shared finance shell overrides. */
+
+.shell app-finance-shell .workspace .workspace-heading{margin-bottom:22px}
+.shell app-finance-shell .workspace .workspace-heading h1{font-weight:650;letter-spacing:-.045em}
+.shell app-finance-shell .workspace .workspace-heading>.header-actions{align-items:flex-end}
+.shell app-finance-shell .workspace .workspace-picker{display:grid;gap:5px;min-width:200px;color:var(--muted);font-size:11px;font-weight:650}
+.shell app-finance-shell .workspace .workspace-picker select{min-width:0;min-height:44px;border:1px solid var(--line);border-radius:9px;padding:8px 34px 8px 11px;background:var(--surface);color:var(--ink);font:inherit;font-size:14px;font-weight:500}
+.shell app-finance-shell .workspace .period-picker input{width:160px}
+.shell app-finance-shell .workspace .workspace-picker select:focus-visible,.shell app-finance-shell .workspace .period-picker input:focus-visible,.shell app-finance-shell .workspace .navigation button:focus-visible,.shell app-finance-shell .workspace .mobile-navigation button:focus-visible{outline:3px solid #a7c7a7;outline-offset:2px}
+.shell app-finance-shell .workspace .create-space button{scroll-margin-bottom:calc(120px + env(safe-area-inset-bottom))}
+.shell app-finance-shell .workspace .setup-hint{padding:11px 14px;border-radius:10px;background:#f2f6ef}
+.shell app-finance-shell .workspace .setup-hint b{font-size:12px}.setup-hint p{font-size:11px}
+.shell app-finance-shell .workspace .content.home-content{gap:14px}
+.shell app-finance-shell .workspace .home-content .overview-intro{align-items:flex-end}
+.shell app-finance-shell .workspace .home-content .overview-intro h2{font-size:15px;letter-spacing:-.01em;color:var(--muted);font-weight:550;margin:0}
+.shell app-finance-shell .workspace .home-content .overview-intro .eyebrow{font-size:12px;letter-spacing:.13em;color:#62756a;margin:0 0 5px}
+.shell app-finance-shell .workspace .home-content .period-caption{font-size:12px}
+.shell app-finance-shell .workspace .balance-summary{grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);gap:18px;align-items:end;margin:0}
+.shell app-finance-shell .workspace .balance-summary .summary-card{background:transparent;border:0;border-radius:0;padding:2px 0 13px;gap:6px}
+.shell app-finance-shell .workspace .balance-summary .summary-card span{font-size:12px;letter-spacing:.035em;color:var(--muted)}
+.shell app-finance-shell .workspace .balance-summary .balance-value-line{display:flex;align-items:baseline;flex-wrap:wrap;gap:6px;min-width:0}
+.shell app-finance-shell .workspace .balance-summary .balance-value-line span{flex:none;font-weight:650}
+.shell app-finance-shell .workspace .balance-summary .summary-card strong{font-variant-numeric:tabular-nums;line-height:1.04;letter-spacing:-.055em;overflow-wrap:anywhere}
+.shell app-finance-shell .workspace .balance-summary .summary-card.ars strong{font-size:clamp(38px,5vw,64px);font-weight:650;color:#10271e}
+.shell app-finance-shell .workspace .balance-summary .summary-card.usd strong{font-size:clamp(27px,3vw,38px);font-weight:600;color:#162921}
+.shell app-finance-shell .workspace .balance-summary .summary-card small{font-size:12px;line-height:1.4}
+.shell app-finance-shell .workspace .quick-panel{display:block}
+.shell app-finance-shell .workspace .quick-panel .quick-actions{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:10px}
+.shell app-finance-shell .workspace .quick-panel .quick-actions button{display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:48px;border-radius:9px;padding:11px 16px}
+.shell app-finance-shell .workspace .quick-panel .quick-actions .main-action{justify-content:flex-start;min-height:58px;padding:13px 20px;border-color:#376c4b;background:#376c4b;color:#fff;font-size:16px;font-weight:650;box-shadow:none}
+.shell app-finance-shell .workspace .main-action .action-arrow{margin-left:auto}
+.shell app-finance-shell .workspace .main-action:hover{background:#2e5d40;border-color:#2e5d40}
+.shell app-finance-shell .workspace .dashboard-columns{grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:start;gap:42px}
+.shell app-finance-shell .workspace .home-content .dash-panel{padding:0;background:transparent;border:0;border-radius:0;box-shadow:none}
+.shell app-finance-shell .workspace .home-content .panel-title{align-items:flex-end;margin:0 0 7px}
+.shell app-finance-shell .workspace .home-content .panel-title h3{font-size:21px;font-weight:620;margin:0}
+.shell app-finance-shell .workspace .home-content .panel-title .eyebrow{font-size:11px;letter-spacing:.12em;margin:0 0 4px}
+.shell app-finance-shell .workspace .home-content .panel-title .text-action{font-size:13px;white-space:nowrap}
+.shell app-finance-shell .workspace .finance-row{display:grid;grid-template-columns:38px minmax(0,1fr) auto;align-items:center;gap:11px;padding:13px 0;border-bottom:1px solid var(--line)}
+.shell app-finance-shell .workspace .finance-row-icon{display:grid;place-items:center;width:36px;height:36px;border-radius:50%;background:#edf4eb;color:#416c4b;font-size:16px}
+.shell app-finance-shell .workspace .finance-row-icon.warm{background:#f4eee4;color:#796448}
+.shell app-finance-shell .workspace .finance-row-label{min-width:0}
+.shell app-finance-shell .workspace .finance-row-label b{display:block;font-size:14px;font-weight:600;line-height:1.3;overflow-wrap:anywhere}
+.shell app-finance-shell .workspace .finance-row-label small{display:block;margin-top:3px;color:#68766e;font-size:12px;line-height:1.35;overflow-wrap:anywhere}
+.shell app-finance-shell .workspace .finance-row>strong,.shell app-finance-shell .workspace .finance-row-values strong{max-width:185px;font-size:14px;font-variant-numeric:tabular-nums;text-align:right;overflow-wrap:anywhere}
+.shell app-finance-shell .workspace .finance-row-values{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:1px 5px;justify-items:end;align-items:baseline;min-width:0}
+.shell app-finance-shell .workspace .finance-row-values small{color:var(--muted);font-size:12px}
+.shell app-finance-shell .workspace .credit-balances{display:flex;align-items:center;justify-content:flex-end;gap:7px 12px;padding:9px 0 3px;color:var(--muted);font-size:12px;flex-wrap:wrap}
+.shell app-finance-shell .workspace .credit-balances b{color:#6b725f;font-weight:550}
+.shell app-finance-shell .workspace .card-detail-row{grid-template-columns:38px minmax(0,1fr) minmax(105px,.65fr)}
+.shell app-finance-shell .workspace .account-row{grid-template-columns:38px minmax(0,1fr) minmax(105px,.75fr)}
+.shell app-finance-shell .workspace .month-details{padding:10px 0;border-bottom:1px solid var(--line)}
+.shell app-finance-shell .workspace .month-details summary,.shell app-finance-shell .workspace .card-details summary{color:#416c4b;font-size:13px;font-weight:600;cursor:pointer;min-height:36px;align-content:center}
+.shell app-finance-shell .workspace .month-details .month-cost{font-size:12px;padding:9px 0}
+.shell app-finance-shell .workspace .month-details .month-cost b{font-variant-numeric:tabular-nums;overflow-wrap:anywhere;text-align:right}
+.shell app-finance-shell .workspace .home-content .empty{padding:11px 0 5px}
+.shell app-finance-shell .workspace .home-content .empty p{margin-bottom:9px}
+.shell app-finance-shell .workspace .home-content .ready-note{margin:0;padding:7px 0;color:var(--muted);font-size:12px}
+.shell app-finance-shell .workspace .more-link>i{flex:none;color:var(--green)}
+.shell app-finance-shell .workspace .more-link>span:last-child{font-size:initial}
+.shell app-finance-shell .workspace .mobile-navigation button i{font-size:20px;line-height:24px}
+.shell app-finance-shell .workspace .mobile-navigation button small{font-size:10px;line-height:14px}
+.shell app-finance-shell .workspace button:focus-visible,.shell app-finance-shell .workspace a:focus-visible,.shell app-finance-shell .workspace summary:focus-visible{outline:3px solid #a7c7a7;outline-offset:2px}
+@media(max-width:850px){.shell app-finance-shell .workspace .dashboard-columns{gap:28px}}
+@media(max-width:767px){
+.shell app-finance-shell .workspace{margin:12px auto calc(150px + env(safe-area-inset-bottom));}
+.shell app-finance-shell .workspace .workspace-heading{align-items:flex-start;flex-direction:column;gap:7px;margin-bottom:0}
+.shell app-finance-shell .workspace .workspace-heading h1{font-size:28px}
+.shell app-finance-shell .workspace .workspace-heading .eyebrow{font-size:10px;max-width:100%;overflow-wrap:anywhere}
+.shell app-finance-shell .workspace .workspace-heading>.header-actions{width:100%;display:grid;grid-template-columns:minmax(134px,1fr) minmax(170px,1fr);align-items:end;gap:8px}
+.shell app-finance-shell .workspace .workspace-picker{min-width:0}
+.shell app-finance-shell .workspace .workspace-picker,.shell app-finance-shell .workspace .header-actions .period-picker{font-size:0}
+.shell app-finance-shell .workspace .workspace-picker select{width:100%;font-size:16px}
+.shell app-finance-shell .workspace .header-actions .period-picker{display:grid;grid-template-columns:1fr;gap:0;min-width:0}
+.shell app-finance-shell .workspace .period-picker input{width:100%;min-height:44px;font-size:16px}
+.shell app-finance-shell .workspace .workspace-heading p:last-child{display:block}
+.shell app-finance-shell .workspace .workspace-heading .eyebrow{margin:0 0 2px}
+.shell app-finance-shell .workspace .navigation{display:none}
+.shell app-finance-shell .workspace .setup-hint{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:9px;padding:9px 11px;margin:0 0 12px}
+.shell app-finance-shell .workspace .setup-hint p{display:none}
+.shell app-finance-shell .workspace .setup-hint b{font-size:11px;line-height:1.35}
+.shell app-finance-shell .workspace .setup-hint .quiet-button{min-height:44px;padding:7px 10px;font-size:11px;white-space:nowrap}
+.shell app-finance-shell .workspace .content.home-content{gap:6px}
+.shell app-finance-shell .workspace .home-content .overview-intro{position:static;width:auto;height:auto;align-items:flex-start;gap:1px;padding:0;margin:0;overflow:visible;clip:auto;white-space:normal;border:0}
+.shell app-finance-shell .workspace .home-content .overview-intro .eyebrow{font-size:12px}
+.shell app-finance-shell .workspace .home-content .overview-intro h2{font-size:12px}
+.shell app-finance-shell .workspace .home-content .overview-intro h2{display:none}
+.shell app-finance-shell .workspace .home-content .period-caption{font-size:10px}
+.shell app-finance-shell .workspace .balance-summary{grid-template-columns:minmax(0,1fr);gap:2px}
+.shell app-finance-shell .workspace .balance-summary .summary-card{padding:1px 0 4px;gap:2px}
+.shell app-finance-shell .workspace .balance-summary .summary-card span{font-size:12px}
+.shell app-finance-shell .workspace .balance-summary .summary-card.ars strong{font-size:clamp(39px,10vw,47px)}
+.shell app-finance-shell .workspace .balance-summary .summary-card.usd strong{font-size:30px}
+.shell app-finance-shell .workspace .balance-summary .summary-card small{font-size:12px}
+.shell app-finance-shell .workspace .quick-panel .quick-actions{grid-template-columns:minmax(0,1fr) auto auto;gap:6px}
+.shell app-finance-shell .workspace .quick-panel .quick-actions .main-action{grid-column:1/-1}
+.shell app-finance-shell .workspace .quick-panel .quick-actions .main-action{min-height:52px;font-size:16px}
+.shell app-finance-shell .workspace .quick-panel .quick-actions button:not(.main-action){min-height:44px;padding:7px 9px;font-size:12px}
+.shell app-finance-shell .workspace .dashboard-columns{grid-template-columns:minmax(0,1fr);gap:18px}
+.shell app-finance-shell .workspace .home-content .panel-title{align-items:center;flex-direction:row;gap:8px}
+.shell app-finance-shell .workspace .home-content .panel-title h3{font-size:18px}
+.shell app-finance-shell .workspace .home-content .panel-title .text-action{font-size:11px;padding-right:0}
+.shell app-finance-shell .workspace .finance-row{grid-template-columns:36px minmax(0,1fr) minmax(80px,auto);gap:9px;padding:10px 0}
+.shell app-finance-shell .workspace .debt-row{padding:8px 0}
+.shell app-finance-shell .workspace .finance-row-icon{width:34px;height:34px;font-size:15px}
+.shell app-finance-shell .workspace .finance-row-label b{font-size:14px}
+.shell app-finance-shell .workspace .finance-row-label small{font-size:12px}
+.shell app-finance-shell .workspace .finance-row>strong,.shell app-finance-shell .workspace .finance-row-values strong{max-width:135px;font-size:14px}
+.shell app-finance-shell .workspace .finance-row-values{min-width:100px}
+.shell app-finance-shell .workspace .credit-balances{justify-content:flex-end;font-size:12px;gap:4px 8px}
+.shell app-finance-shell .workspace .card-detail-row{grid-template-columns:36px minmax(0,1fr) minmax(90px,.65fr)}
+.shell app-finance-shell .workspace .account-row{grid-template-columns:36px minmax(0,1fr) minmax(140px,auto);gap:8px}
+.shell app-finance-shell .workspace .account-row>strong{max-width:none;white-space:nowrap;overflow-wrap:normal}
+.shell app-finance-shell .workspace .home-content .empty{padding:9px 0 3px}
+.shell app-finance-shell .workspace .home-content .empty b{font-size:12px}
+.shell app-finance-shell .workspace .home-content .empty p{font-size:11px;line-height:1.4}
+.shell app-finance-shell .workspace .home-content .empty button{min-height:38px}
+.shell app-finance-shell .workspace .home-content .ready-note{font-size:11px;padding:4px 0}
+.shell app-finance-shell .workspace .more-link{min-height:62px}
+}
+@media(max-width:374px){
+.shell app-finance-shell .workspace .workspace-heading>.header-actions{grid-template-columns:minmax(134px,1fr) minmax(170px,1fr)}
+.shell app-finance-shell .workspace .workspace-picker select{font-size:16px;padding-inline:8px}
+.shell app-finance-shell .workspace .period-picker input{font-size:16px}
+.shell app-finance-shell .workspace .finance-row{grid-template-columns:33px minmax(0,1fr) minmax(74px,auto);gap:7px}
+.shell app-finance-shell .workspace .finance-row-icon{width:32px;height:32px}
+.shell app-finance-shell .workspace .finance-row-label b{font-size:14px}
+.shell app-finance-shell .workspace .finance-row>strong,.shell app-finance-shell .workspace .finance-row-values strong{max-width:122px;font-size:14px}
+.shell app-finance-shell .workspace .finance-row-values{min-width:88px}
+.shell app-finance-shell .workspace .credit-balances{gap:4px 6px;font-size:12px}
+}
+
+@media(max-width:767px){.shell app-finance-shell .workspace .workspace{margin:12px auto calc(110px + env(safe-area-inset-bottom))}.workspace-heading{align-items:center;flex-direction:row;gap:10px;margin:0 0 10px}.workspace-heading h1{font-size:22px;letter-spacing:-.03em;margin:0}.header-actions .period-picker{display:flex;align-items:center;min-width:174px;gap:0}.period-picker input{width:174px;min-height:44px;font-size:16px}.navigation{display:none}.content button,.form-grid button{min-height:44px}.form-grid input:not([type="checkbox"]),.form-grid select,.form-grid textarea,.panel>label select,.filter-label select{min-height:44px;font-size:16px}.overview-intro{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}}

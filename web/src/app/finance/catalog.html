@@ -1,0 +1,44 @@
+<main class="content catalog-screen">
+  <section class="panel">
+    <div class="section-heading"><div><p class="eyebrow">Administración</p><h2>{{ view === 'sources' ? 'Fuentes del espacio' : 'Catálogo del espacio' }}</h2></div>
+      @if (loading) { <span role="status">Actualizando…</span> }
+    </div>
+    @if (!permissions?.read) { <p role="status">No tenés acceso de lectura a este espacio.</p> }
+    @if (canManage) {
+      <form class="catalog-create" (ngSubmit)="createItem()">
+        <label>Nombre<input name="newName" [(ngModel)]="newName" maxlength="80" required [disabled]="saving" /></label>
+        @if (view === 'sources') { <label>Tipo<select name="sourceKind" [(ngModel)]="newKind" [disabled]="saving"><option value="Salary">Sueldo</option><option value="Extra">Ingreso extra</option><option value="AnnualBonus">Bono anual</option><option value="IndependentWork">Trabajo independiente</option><option value="Other">Otro</option></select></label> }
+        @else { <label>Elemento<select name="newResource" [(ngModel)]="newResource" [disabled]="saving"><option value="categories">Categoría</option><option value="merchants">Comercio</option></select></label>@if (newResource === 'categories') { <label>Tipo de categoría<select name="categoryKind" [(ngModel)]="newKind" [disabled]="saving"><option value="Expense">Gasto</option><option value="Income">Ingreso</option></select></label> } }
+        <button type="submit" [disabled]="saving || !newName.trim()">Agregar</button>
+      </form>
+    }
+    @if (view === 'sources') {
+      <div class="catalog-list" aria-label="Fuentes de ingresos">
+        @for (item of sources; track item.incomeSourceId) { <article class="catalog-row" [class.archived]="item.isArchived"><div><b>{{ item.name }}</b><small>{{ sourceKindLabel(item.kind) }} · {{ item.isArchived ? 'Archivada, solo para el historial' : 'Activa' }}</small></div>
+          @if (canManage && !item.isArchived) { <div class="row-actions"><button type="button" (click)="openEdit(item)">Editar</button><button type="button" (click)="archiveItem(item)">Archivar</button></div> }
+        </article> }
+        @if (!sources.length) { <p class="empty-state">Todavía no hay fuentes de ingresos.</p> }
+      </div>
+    } @else {
+      <h3>Categorías</h3>
+      <div class="catalog-list" aria-label="Categorías">
+        @for (item of categories; track item.itemId) { <article class="catalog-row" [class.archived]="item.isArchived"><div><b>{{ item.name }}</b><small>{{ item.kind === 'Income' ? 'Ingreso' : 'Gasto' }} · {{ item.isArchived ? 'Archivada, solo para el historial' : item.isDefault ? 'Categoría base' : 'Activa' }}</small></div>
+          @if (canManage && !item.isArchived && !item.isDefault) { <div class="row-actions"><button type="button" (click)="openEdit(item)">Editar</button><button type="button" (click)="archiveItem(item)">Archivar</button></div> }
+        </article> }
+        @if (!categories.length) { <p class="empty-state">No hay categorías disponibles.</p> }
+      </div>
+      <h3>Comercios</h3>
+      <div class="catalog-list" aria-label="Comercios">
+        @for (item of merchants; track item.merchantId) { <article class="catalog-row" [class.archived]="item.isArchived"><div><b>{{ item.name }}</b><small>{{ item.isArchived ? 'Archivado, solo para el historial' : 'Activo' }}</small></div>
+          @if (canManage && !item.isArchived) { <div class="row-actions"><button type="button" (click)="openEdit(item)">Editar</button><button type="button" (click)="archiveItem(item)">Archivar</button></div> }
+        </article> }
+        @if (!merchants.length) { <p class="empty-state">Todavía no hay comercios.</p> }
+      </div>
+    }
+    @if (error) { <div class="error-message" role="alert">{{ error }} <button type="button" (click)="load()">Actualizar lista</button></div> }
+    @if (notice) { <p role="status">{{ notice }} @if (hasStaleNotice()) { <button type="button" (click)="reloadStale()">Actualizar lista</button> }</p> }
+  </section>
+</main>
+<app-action-dialog title="Editar elemento" visualVariant="savings-projection-dialog" [open]="editOpen" (closed)="closeEdit()" [dismissible]="!saving">
+  <form class="edit-form" (ngSubmit)="saveEdit()"><label>Nombre<input name="editName" [(ngModel)]="editName" maxlength="80" required [disabled]="saving" /></label>@if (error) { <p role="alert">{{ error }}</p> }<div class="dialog-actions"><button type="button" class="secondary" (click)="closeEdit()" [disabled]="saving">Cancelar</button><button type="submit" class="primary" [disabled]="saving || !editName.trim()">Guardar</button></div></form>
+</app-action-dialog>

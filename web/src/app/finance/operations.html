@@ -1,0 +1,270 @@
+@if (error) {
+  <div class="feedback error" role="alert">{{ error }}</div>
+}
+@if (notice) {
+  <div class="feedback success" role="status">{{ notice }}</div>
+}
+<main class="content operations-workspace">
+  <div class="section-heading">
+    <div>
+      <p class="eyebrow">MOVIMIENTOS</p>
+      <h2>Ingresos, gastos y transferencias</h2>
+      <p>Un gasto pendiente no cambia el saldo hasta registrar sus pagos.</p>
+    </div>
+    <div class="quick-actions">
+      <button type="button" class="primary" (click)="openForm('operation')">
+        <i class="pi pi-plus" aria-hidden="true"></i> Ingreso o gasto</button
+      ><button type="button" class="secondary" (click)="openForm('transfer')"><i class="pi pi-arrow-right-arrow-left" aria-hidden="true"></i> Transferir</button>
+    </div>
+  </div>
+  <div class="two-columns">
+    <app-action-dialog
+      title="Registrar ingreso o gasto"
+      [open]="activeForm === 'operation'"
+      (closed)="closeForm()"
+      [dismissible]="!saving"
+      ><section class="panel">
+        <form (ngSubmit)="saveOperation()" class="form-grid">
+          <label
+            >Tipo<select name="opKind" [(ngModel)]="operationDraft.kind" (ngModelChange)="changeOperationKind($event)" [disabled]="saving">
+              <option value="Expense">Gasto</option>
+              <option value="Income">Ingreso</option>
+            </select></label
+          ><label
+            >Cuenta<select
+              name="opAccount"
+              [(ngModel)]="operationDraft.accountId"
+              required
+              [disabled]="saving"
+            >
+              <option value="" disabled>Elegir cuenta</option>
+              @for (a of activeAccounts; track a.id) {
+                <option [value]="a.id">{{ a.name }} · {{ a.currency }}</option>
+              }
+            </select></label
+          ><label
+            >Fecha<input
+              name="opDate"
+              type="date"
+              [(ngModel)]="operationDraft.date"
+              required
+              [disabled]="saving" /></label
+          ><label
+            >Descripción<input
+              name="opDescription"
+              [(ngModel)]="operationDraft.description"
+              required
+              maxlength="240"
+              [disabled]="saving" /></label
+          ><label
+            >Categoría<select name="opCategory" [(ngModel)]="operationDraft.categoryId" required [disabled]="saving">
+              <option value="" disabled>Elegir categoría</option>
+              @for (category of activeCategories; track category.itemId) { <option [value]="category.itemId">{{ category.name }}</option> }
+            </select></label
+          ><label
+            >Comercio (opcional)<select name="opMerchant" [(ngModel)]="operationDraft.merchantId" [disabled]="saving">
+              <option value="">Sin comercio</option>
+              @for (merchant of activeMerchants; track merchant.merchantId) { <option [value]="merchant.merchantId">{{ merchant.name }}</option> }
+            </select></label
+          >@if (operationDraft.kind === 'Income') {
+            <label>Fuente de ingreso<select name="opIncomeSource" [(ngModel)]="operationDraft.incomeSourceId" required [disabled]="saving || !activeIncomeSources.length">
+              <option value="" disabled>Elegir fuente</option>
+              @for (source of activeIncomeSources; track source.incomeSourceId) { <option [value]="source.incomeSourceId">{{ source.name }}</option> }
+            </select></label>
+            @if (!activeIncomeSources.length) {
+              @if (permissions?.manageResources && !workspaceArchived) {
+                <div class="form-grid source-create">
+                  <p class="helper">Todavía no hay fuentes de ingreso. Creá una para continuar con este movimiento.</p>
+                  <label>Nombre de la fuente<input name="sourceCreateName" [(ngModel)]="sourceCreateName" required maxlength="80" [disabled]="saving" /></label>
+                  <label>Tipo<select name="sourceCreateKind" [(ngModel)]="sourceCreateKind" [disabled]="saving"><option value="Salary">Sueldo</option><option value="Extra">Ingreso extra</option><option value="AnnualBonus">Bono anual</option><option value="IndependentWork">Trabajo independiente</option><option value="Other">Otro</option></select></label>
+                  <button type="button" class="secondary" (click)="createSourceFromMovement()" [disabled]="saving">Crear fuente y continuar</button>
+                </div>
+              } @else { <p class="helper">No hay fuentes de ingreso. Pedile a un administrador que agregue una para poder registrar este ingreso.</p> }
+            }
+          }
+          ><label
+            >Importe<input
+              name="opAmount"
+              [(ngModel)]="operationDraft.amount"
+              inputmode="decimal"
+              placeholder="0,00"
+              required
+              [disabled]="saving" /></label
+          ><label class="check"
+            ><input
+              name="opPaid"
+              type="checkbox"
+              [(ngModel)]="operationDraft.paid"
+              [disabled]="saving"
+            />
+            Ya está cobrado o pagado</label
+          ><button class="primary" type="submit" [disabled]="saving || !activeAccounts.length">
+            Guardar movimiento
+          </button>
+        </form>
+      </section></app-action-dialog
+    >
+    <app-action-dialog
+      title="Transferir entre cuentas"
+      [open]="activeForm === 'transfer'"
+      (closed)="closeForm()"
+      [dismissible]="!saving"
+      ><section class="panel">
+        <p class="helper">
+          La transferencia no cuenta como gasto. Para monedas distintas, informá los dos importes
+          reales.
+        </p>
+        <form (ngSubmit)="transfer()" class="form-grid">
+          <label
+            >Desde<select
+              name="fromAccount"
+              [(ngModel)]="transferDraft.fromAccountId"
+              required
+              [disabled]="saving"
+            >
+              <option value="" disabled>Cuenta de origen</option>
+              @for (a of activeAccounts; track a.id) {
+                <option [value]="a.id">{{ a.name }} · {{ a.currency }}</option>
+              }
+            </select></label
+          ><label
+            >Hacia<select
+              name="toAccount"
+              [(ngModel)]="transferDraft.toAccountId"
+              required
+              [disabled]="saving"
+            >
+              <option value="" disabled>Cuenta de destino</option>
+              @for (a of activeAccounts; track a.id) {
+                <option [value]="a.id">{{ a.name }} · {{ a.currency }}</option>
+              }
+            </select></label
+          ><label
+            >Fecha<input
+              name="transferDate"
+              type="date"
+              [(ngModel)]="transferDraft.date"
+              required
+              [disabled]="saving" /></label
+          ><label
+            >Importe origen<input
+              name="transferAmount"
+              [(ngModel)]="transferDraft.amount"
+              inputmode="decimal"
+              required
+              [disabled]="saving" /></label
+          ><label
+            >Importe destino
+            @if (transferCurrenciesDiffer) {
+              (obligatorio: moneda distinta)
+            } @else {
+              (si queda vacío, se usa el mismo importe)
+            }
+            <input
+              name="transferDestination"
+              [(ngModel)]="transferDraft.destinationAmount"
+              inputmode="decimal"
+              [disabled]="saving" /></label
+          ><button class="secondary" type="submit" [disabled]="saving">
+            Registrar transferencia
+          </button>
+        </form>
+      </section></app-action-dialog
+    >
+  </div>
+  <section class="panel operation-history">
+    <div class="panel-title">
+      <div>
+        <p class="eyebrow">{{ period }}</p>
+        <h3>Historial de movimientos</h3>
+      </div>
+      <label class="filter-label"
+        >Filtrar por cuenta<select name="historyAccount" [(ngModel)]="historyFilterAccount">
+          <option value="">Todas las cuentas</option>
+          @for (a of accounts; track a.id) {
+            <option [value]="a.id">{{ a.name }}</option>
+          }
+        </select></label
+      >
+    </div>
+    @if (filteredOperations().length === 0) {
+      <div class="empty">
+        <b>No hay movimientos en este período</b>
+        <p>Registrá un ingreso, gasto o transferencia para empezar el historial.</p>
+        <button type="button" (click)="openForm('operation')">Registrar movimiento</button>
+      </div>
+    }
+    @for (op of filteredOperations(); track op.id) {
+      <article class="operation-row">
+        <div class="operation-info">
+          <b>{{ op.description }}</b
+          ><small
+            >{{ op.date }} · {{ op.category || 'Sin categoría' }} ·
+            {{ accountName(op.accountId) }} ·
+            {{
+              op.status === 'Settled'
+                ? 'Pagado/cobrado'
+                : op.status === 'Partial'
+                  ? 'Pago parcial'
+                  : op.status === 'Voided'
+                    ? 'Anulado'
+                    : 'Pendiente'
+            }}</small
+          >
+        </div>
+        <strong [class.negative]="op.kind === 'Expense'"
+          >{{ op.kind === 'Expense' ? '−' : '+' }}{{ money(op.amount, op.currency) }}</strong
+        >
+        <div class="row-actions">
+          @if ((op.status === 'Pending' || op.status === 'Partial') && permissions?.recordFinance !== false && !workspaceArchived) {
+            <button
+              type="button"
+              class="text-action"
+          (click)="payment.operationId = op.id; payment.accountId = op.accountId ?? ''"
+            >
+              Registrar pago/cobro
+            </button>
+          }
+          @if (op.status !== 'Voided' && permissions?.correctHistory !== false && !workspaceArchived) {
+            <button type="button" class="text-action danger-text history-action" (click)="voidOperation(op)">
+              Anular
+            </button>
+          }
+        </div>
+        @if (payment.operationId === op.id) {
+          <form class="inline-payment" (ngSubmit)="payOperation(op)">
+            <label
+              >Importe pendiente {{ money(op.pendingAmount, op.currency)
+              }}<input
+                name="partialAmount"
+                [(ngModel)]="payment.amount"
+                inputmode="decimal"
+                required
+                [disabled]="saving" /></label
+            ><label
+              >Cuenta<select
+                name="payAccount"
+                [(ngModel)]="payment.accountId"
+                required
+                [disabled]="saving"
+              >
+                @for (a of activeAccounts; track a.id) {
+                  @if (a.currency === op.currency) {
+                    <option [value]="a.id">{{ a.name }}</option>
+                  }
+                }
+              </select></label
+            ><label
+              >Fecha<input
+                name="paymentDate"
+                type="date"
+                [(ngModel)]="payment.date"
+                required
+                [disabled]="saving" /></label
+            ><button class="primary" type="submit" [disabled]="saving">Aplicar pago</button>
+          </form>
+        }
+      </article>
+    }
+  </section>
+</main>

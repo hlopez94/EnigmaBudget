@@ -1,0 +1,403 @@
+<div class="workspace" [class.read-only]="!canWrite" [class.no-groups]="!canReadGroups" [class.no-resources]="!canManageResources" [class.archived]="activeWorkspace?.isArchived">
+  <header class="workspace-heading">
+    <div>
+      <p class="eyebrow">{{ activeWorkspace ? workspaceLabel(activeWorkspace) : name }}</p>
+      <h1>
+        {{
+          section === 'home'
+            ? 'Inicio'
+            : section === 'operations'
+              ? 'Movimientos'
+              : section === 'accounts'
+                ? 'Cuentas'
+                : section === 'cards'
+                  ? 'Tarjetas'
+                  : section === 'sharing'
+                    ? 'Compartidos'
+                    : section === 'spaces'
+                      ? 'Espacios y privacidad'
+                      : section === 'savings'
+                        ? 'Ahorros'
+                        : section === 'projection'
+                          ? 'Proyección'
+                          : section === 'exchange'
+                            ? 'Cotizaciones'
+                            : section === 'catalog'
+                              ? 'Categorías y comercios'
+                              : section === 'sources'
+                                ? 'Fuentes de ingresos'
+                                : section === 'budgets'
+                                  ? 'Presupuesto'
+                      : 'Más'
+        }}
+      </h1>
+    </div>
+    <div class="header-actions">
+      <label class="workspace-picker">Espacio
+        <select aria-label="Cambiar espacio" [ngModel]="workspacePickerValue" (ngModelChange)="requestWorkspaceChange($event)" [disabled]="saving || workspaces.length === 0">
+          @if (!activeWorkspace) { <option value="" disabled>Elegí un espacio disponible</option> }
+          @for (space of workspaces; track space.id) { <option [value]="space.id">{{ workspaceLabel(space) }}</option> }
+        </select>
+      </label>
+      <label class="period-picker"
+        >Período
+        <input
+          aria-label="Período a consultar"
+          type="month"
+          [(ngModel)]="period"
+          name="period"
+          (change)="changePeriod()"
+          [disabled]="busy || saving" /></label
+      ><p-button
+        label="Actualizar"
+        severity="secondary"
+        [text]="true"
+        (onClick)="refresh()"
+        [disabled]="busy"
+      />
+    </div>
+  </header>
+  <nav class="navigation" aria-label="Secciones de finanzas">
+    <button type="button" [class.active]="section === 'home'" (click)="navigate('home')" [disabled]="saving">
+      Inicio
+    </button>
+    <button
+      type="button"
+      [class.active]="section === 'operations'"
+      (click)="navigate('operations')"
+      [disabled]="saving"
+    >
+      Movimientos
+    </button>
+    <button type="button" [class.active]="section === 'cards'" (click)="navigate('cards')" [disabled]="saving">
+      Tarjetas y resúmenes
+    </button>
+    @if (canReadGroups) { <button type="button" [class.active]="section === 'sharing'" (click)="navigate('sharing')" [disabled]="saving">Compartidos</button> }
+    <button type="button" [class.active]="section === 'spaces'" (click)="navigate('spaces')" [disabled]="saving">Espacios</button>
+    <button type="button" [class.active]="section === 'more' || section === 'accounts' || section === 'savings' || section === 'projection' || section === 'exchange' || section === 'catalog' || section === 'sources' || section === 'budgets'" (click)="navigate('more')" [disabled]="saving">Más</button>
+  </nav>
+  <nav class="mobile-navigation" aria-label="Navegación principal">
+    <button type="button" [class.active]="section === 'home'" (click)="navigate('home')" [disabled]="saving">
+      <i class="pi pi-home" aria-hidden="true"></i><small>Inicio</small>
+    </button>
+    <button
+      type="button"
+      [class.active]="section === 'operations'"
+      (click)="navigate('operations')"
+      [disabled]="saving"
+    >
+      <i class="pi pi-arrow-right-arrow-left" aria-hidden="true"></i><small>Movimientos</small>
+    </button>
+    <button type="button" [class.active]="section === 'cards'" (click)="navigate('cards')" [disabled]="saving">
+      <i class="pi pi-credit-card" aria-hidden="true"></i><small>Tarjetas</small>
+    </button>
+    @if (canReadGroups) {
+      <button type="button" [class.active]="section === 'sharing'" (click)="navigate('sharing')" [disabled]="saving"><i class="pi pi-users" aria-hidden="true"></i><small>Compartidos</small></button>
+    } @else {
+      <button type="button" [class.active]="section === 'accounts'" (click)="navigate('accounts')" [disabled]="saving"><i class="pi pi-wallet" aria-hidden="true"></i><small>Cuentas</small></button>
+    }
+    <button
+      type="button"
+      [class.active]="section === 'more' || section === 'accounts' || section === 'spaces' || section === 'savings' || section === 'projection' || section === 'exchange' || section === 'catalog' || section === 'sources' || section === 'budgets'"
+      (click)="navigate('more')"
+      [disabled]="saving"
+    >
+      <i class="pi pi-ellipsis-h" aria-hidden="true"></i><small>Más</small>
+    </button>
+  </nav>
+  @if (setupIncomplete) {
+    <aside class="setup-hint">
+      <div>
+        <b>Podés completar la configuración inicial cuando quieras.</b>
+        <p>Ya podés registrar cuentas y movimientos desde estas secciones.</p>
+      </div>
+      <button type="button" class="quiet-button" (click)="setupRequested.emit()" [disabled]="saving">
+        Abrir configuración
+      </button>
+    </aside>
+  }
+  @if (error) {
+    <div class="feedback error" role="alert">
+      <span>{{ error }}</span
+      ><button type="button" (click)="refresh()">Actualizar datos</button>
+    </div>
+  }
+  @if (!activeWorkspace) {
+    <section class="panel context-choice" role="status">
+      <h2>Elegí un espacio disponible</h2>
+      <p>El acceso al espacio anterior cambió. Seleccioná otro en el menú para continuar.</p>
+    </section>
+  }
+  @defer (when section === 'spaces') {
+    <app-workspace-manager
+      [workspaces]="workspaces"
+      [activeWorkspace]="activeWorkspace"
+      [personalWorkspaceId]="personalWorkspaceId"
+      [currentUserId]="currentUserId"
+      [googleConfigured]="googleConfigured"
+      [pendingInviteToken]="pendingInviteToken"
+      [open]="section === 'spaces'"
+      [contextGeneration]="workspaceGeneration"
+      [switchBlocked]="saving"
+      (workspaceSelected)="requestWorkspaceChange($event)"
+      (workspacesChanged)="workspacesChanged.emit()"
+      (pendingInviteHandled)="pendingInviteToken = null"
+      (workspaceUpdated)="workspaceUpdated.emit($event)"
+      (busyChange)="managerBusyChanged()"
+      (managerReady)="registerWorkspaceManager($event)"
+    />
+  } @placeholder {
+    @if (section === 'spaces') { <div class="loading" aria-live="polite">Abriendo espacios…</div> }
+  }
+  @if (notice) {
+    <div class="feedback success" role="status">{{ notice }}</div>
+  }
+  @if (busy && !overview) {
+    <div class="loading" aria-live="polite">Actualizando el espacio…</div>
+  }
+  @if (busy && overview) {
+    <div class="loading" aria-live="polite">Actualizando el espacio…</div>
+  }
+  @if (overview) {
+    @if (section === 'more') {
+      <main class="content more-screen">
+        <section class="panel">
+          <h2>Más</h2>
+          <p class="more-context">{{ activeWorkspace?.name || name }}</p>
+          @for (link of moreLinks; track link.section) { <button type="button" class="more-link" (click)="navigateMore(link.section)" [disabled]="saving">
+            <span><b>{{ link.label }}</b><small>{{ link.description }}</small></span
+            ><i class="pi pi-chevron-right" aria-hidden="true"></i>
+          </button> }
+          @if (setupIncomplete) {
+            <button type="button" class="more-link" (click)="navigateMore('setup')" [disabled]="saving">
+              <span><b>Configuración inicial</b><small>Continuar donde lo dejaste</small></span
+              ><i class="pi pi-chevron-right" aria-hidden="true"></i>
+            </button>
+          }
+          <button type="button" class="more-link" (click)="refresh()" [disabled]="busy">
+            <span><b>Actualizar datos</b><small>Sincronizar el resumen</small></span
+            ><i class="pi pi-refresh" aria-hidden="true"></i>
+          </button>
+        </section>
+      </main>
+    }
+    @if (section === 'home') {
+      <main class="content home-content">
+        <div class="overview-intro">
+          <p class="eyebrow">Saldo en cuentas</p>
+        </div>
+        @if (activeAccounts.length === 0 && cards.length === 0) {
+          <p class="ready-note">
+            <b>Tu base ya está lista.</b> Elegí una acción para continuar con tus finanzas.
+          </p>
+        }
+        <section class="summary-grid balance-summary" aria-label="Saldo actual en cuentas, separado por moneda">
+          <article class="summary-card cash balance-card ars" aria-label="Saldo en pesos argentinos (ARS)">
+            <div class="balance-value-line"><strong>{{ money(overview.totals.balanceArs, 'ARS') }}</strong><span>ARS</span></div>
+            <small>Dinero registrado en bancos</small>
+          </article>
+          <article class="summary-card cash balance-card usd" aria-label="Saldo en dólares estadounidenses (USD)">
+            <div class="balance-value-line"><strong>{{ money(overview.totals.balanceUsd, 'USD') }}</strong><span>USD</span></div>
+            <small>Se mantiene separado de pesos</small>
+          </article>
+        </section>
+        <section class="quick-panel" aria-label="Acciones de finanzas">
+          <div class="quick-actions">
+            @if (canWrite) {
+              <button class="primary main-action" type="button" (click)="navigate('operations')"><i class="pi pi-plus" aria-hidden="true"></i><span>Registrar movimiento</span><i class="pi pi-chevron-right action-arrow" aria-hidden="true"></i></button>
+            }
+          </div>
+        </section>
+        <div class="overview-columns dashboard-columns">
+          <section class="panel dash-panel commitments-panel">
+            <div class="panel-title">
+              <div>
+                <h3>Este mes</h3>
+              </div>
+              <button type="button" class="text-action" (click)="navigate('cards')">{{ cards.length === 0 && canManageResources ? 'Agregar tarjeta' : 'Ver tarjetas' }}</button>
+            </div>
+            <div class="finance-row">
+              <span class="finance-row-icon" aria-hidden="true"><i class="pi pi-credit-card"></i></span>
+              <div class="finance-row-label"><b>Cuotas de tarjeta del mes</b><small>{{ periodLabel }} · ARS</small></div>
+              <strong>{{ money(overview.budget.cardInstallmentsArs, 'ARS') }}</strong>
+            </div>
+            <div class="finance-row">
+              <span class="finance-row-icon" aria-hidden="true"><i class="pi pi-credit-card"></i></span>
+              <div class="finance-row-label"><b>Cuotas de tarjeta del mes</b><small>{{ periodLabel }} · USD</small></div>
+              <strong>{{ money(overview.budget.cardInstallmentsUsd, 'USD') }}</strong>
+            </div>
+            <div class="finance-row debt-row">
+              <span class="finance-row-icon warm" aria-hidden="true"><i class="pi pi-credit-card"></i></span>
+              <div class="finance-row-label"><b>Deuda total de tarjetas</b><small>Pendiente de pago</small></div>
+              <div class="finance-row-values">
+                <strong>{{ money(overview.totals.cardDebtArs, 'ARS') }}</strong><small>ARS</small>
+                <strong>{{ money(overview.totals.cardDebtUsd, 'USD') }}</strong><small>USD</small>
+              </div>
+            </div>
+            @if (cards.length > 0 && (overview.totals.cardCreditArs !== '0.00' || overview.totals.cardCreditUsd !== '0.00')) {
+              <div class="credit-balances" aria-label="Crédito a favor de tarjetas, separado por moneda">
+                <span>Crédito a favor</span>
+                <b>{{ money(overview.totals.cardCreditArs, 'ARS') }} ARS</b>
+                <b>{{ money(overview.totals.cardCreditUsd, 'USD') }} USD</b>
+              </div>
+            }
+          </section>
+          <section class="panel dash-panel accounts-panel">
+            <div class="panel-title">
+              <div><h3>Tus cuentas</h3></div>
+              <button type="button" class="text-action" (click)="navigate('accounts')">Administrar cuentas</button>
+            </div>
+            @if (activeAccounts.length === 0) {
+              <div class="empty">
+                <b>Empezá por agregar una cuenta</b>
+                <p>Vas a poder registrar ingresos, gastos y pagos desde esa cuenta.</p>
+                @if (canManageResources) { <button type="button" (click)="navigate('accounts')">Agregar cuenta</button> }
+              </div>
+            }
+            @for (account of activeAccounts; track account.id) {
+              <div class="finance-row account-row">
+                <span class="finance-row-icon" aria-hidden="true"><i class="pi pi-building-columns"></i></span>
+                <div class="finance-row-label"><b>{{ account.name }}</b><small>{{ account.bankName }} · {{ account.currency }}</small></div>
+                <strong>{{ money(account.currentBalance, account.currency) }}</strong>
+              </div>
+            }
+            @if (cards.length > 0) {
+              <details class="card-details">
+                <summary>Detalle por tarjeta</summary>
+                @for (card of cards; track card.id) {
+                  <div class="finance-row card-detail-row">
+                    <span class="finance-row-icon" aria-hidden="true"><i class="pi pi-credit-card"></i></span>
+                    <div class="finance-row-label"><b>{{ card.name }}</b><small>{{ card.bankName }} · deuda actual</small></div>
+                    <div class="finance-row-values">
+                      <strong>{{ money(card.debtArs, 'ARS') }}</strong><small>ARS</small>
+                      <strong>{{ money(card.debtUsd, 'USD') }}</strong><small>USD</small>
+                    </div>
+                  </div>
+                }
+              </details>
+            }
+            <details class="month-details">
+              <summary>Consumo y cargos del mes</summary>
+              <div class="month-cost"><span>Consumo registrado · ARS</span><b>{{ money(overview.budget.operationExpensesArs, 'ARS') }}</b></div>
+              <div class="month-cost"><span>Consumo registrado · USD</span><b>{{ money(overview.budget.operationExpensesUsd, 'USD') }}</b></div>
+              <div class="month-cost"><span>Cargos confirmados · ARS</span><b>{{ money(overview.budget.cardChargesArs, 'ARS') }}</b></div>
+              <div class="month-cost"><span>Cargos confirmados · USD</span><b>{{ money(overview.budget.cardChargesUsd, 'USD') }}</b></div>
+            </details>
+          </section>
+        </div>
+      </main>
+    }
+    @defer (when section === 'accounts') {
+      <app-accounts
+        [hidden]="section !== 'accounts'"
+        [workspaceId]="activeWorkspace?.id ?? null"
+        [contextGeneration]="workspaceGeneration"
+        [permissions]="permissions || null"
+        [workspaceArchived]="!!activeWorkspace?.isArchived"
+        [overview]="overview!"
+        [period]="appliedPeriod"
+        [refreshOverview]="refreshOverview"
+      />
+    } @placeholder {
+      <div class="loading" [hidden]="section !== 'accounts'" aria-live="polite">
+        Abriendo cuentas…
+      </div>
+    }
+    @defer (when section === 'operations') {
+      <app-operations
+        [hidden]="section !== 'operations'"
+        [workspaceId]="activeWorkspace?.id ?? null"
+        [contextGeneration]="workspaceGeneration"
+        [permissions]="permissions || null"
+        [workspaceArchived]="!!activeWorkspace?.isArchived"
+        [overview]="overview!"
+        [period]="appliedPeriod"
+        [refreshOverview]="refreshOverview"
+      />
+    } @placeholder {
+      <div class="loading" [hidden]="section !== 'operations'" aria-live="polite">
+        Abriendo movimientos…
+      </div>
+    }
+    @defer (when section === 'cards') {
+      <app-cards
+        [hidden]="section !== 'cards'"
+        [workspaceId]="activeWorkspace?.id ?? null"
+        [contextGeneration]="workspaceGeneration"
+        [permissions]="permissions || null"
+        [workspaceArchived]="!!activeWorkspace?.isArchived"
+        [overview]="overview!"
+        [period]="appliedPeriod"
+        [refreshOverview]="refreshOverview"
+      />
+    } @placeholder {
+      <div class="loading" [hidden]="section !== 'cards'" aria-live="polite">
+        Abriendo tarjetas…
+      </div>
+    }
+    @defer (when section === 'sharing') {
+      <app-sharing
+        [hidden]="section !== 'sharing'"
+        [workspaceId]="activeWorkspace?.id ?? null"
+        [contextGeneration]="workspaceGeneration"
+        [permissions]="permissions || null"
+        [workspaceArchived]="!!activeWorkspace?.isArchived"
+        [overview]="overview!"
+        [period]="appliedPeriod"
+        [refreshOverview]="refreshOverview"
+      />
+    } @placeholder {
+      <div class="loading" [hidden]="section !== 'sharing'" aria-live="polite">
+        Abriendo compartidos…
+      </div>
+    }
+    @defer (when section === 'savings') {
+      <app-savings
+        [hidden]="section !== 'savings'"
+        [workspaceId]="activeWorkspace?.id ?? null"
+        [contextGeneration]="workspaceGeneration"
+        [permissions]="permissions || null"
+        [workspaceArchived]="!!activeWorkspace?.isArchived"
+        [workspaceName]="activeWorkspace?.name || name"
+        [overview]="overview!"
+        [refreshOverview]="refreshOverview"
+      />
+    } @placeholder { @if (section === 'savings') { <div class="loading" aria-live="polite">Abriendo ahorros…</div> } }
+    @defer (when section === 'projection') {
+      <app-projection
+        [hidden]="section !== 'projection'"
+        [workspaceId]="activeWorkspace?.id ?? null"
+        [contextGeneration]="workspaceGeneration"
+        [permissions]="permissions || null"
+        [workspaceArchived]="!!activeWorkspace?.isArchived"
+        [workspaceName]="activeWorkspace?.name || name"
+      />
+    } @placeholder { @if (section === 'projection') { <div class="loading" aria-live="polite">Abriendo proyección…</div> } }
+    @defer (when section === 'exchange') {
+      <app-projection
+        [hidden]="section !== 'exchange'"
+        view="exchange"
+        [workspaceId]="activeWorkspace?.id ?? null"
+        [contextGeneration]="workspaceGeneration"
+        [permissions]="permissions || null"
+        [workspaceArchived]="!!activeWorkspace?.isArchived"
+        [workspaceName]="activeWorkspace?.name || name"
+      />
+    } @placeholder { @if (section === 'exchange') { <div class="loading" aria-live="polite">Abriendo cotizaciones…</div> } }
+    @defer (when section === 'catalog' || section === 'sources') {
+      <app-catalog [hidden]="section !== 'catalog' && section !== 'sources'" [view]="section === 'sources' ? 'sources' : 'catalog'" [workspaceId]="activeWorkspace?.id ?? null" [contextGeneration]="workspaceGeneration" [permissions]="permissions || null" [workspaceArchived]="!!activeWorkspace?.isArchived" />
+    } @placeholder { @if (section === 'catalog' || section === 'sources') { <div class="loading" aria-live="polite">Abriendo catálogo…</div> } }
+    @defer (when section === 'budgets') {
+      <app-budgets [hidden]="section !== 'budgets'" [workspaceId]="activeWorkspace?.id ?? null" [contextGeneration]="workspaceGeneration" [permissions]="permissions || null" [workspaceArchived]="!!activeWorkspace?.isArchived" [period]="appliedPeriod" />
+    } @placeholder { @if (section === 'budgets') { <div class="loading" aria-live="polite">Abriendo presupuesto…</div> } }
+  }
+  @if (requestedWorkspaceId) {
+    <app-action-dialog [title]="requestedWorkspaceId === 'setup' ? 'Abrir configuración inicial' : requestedWorkspaceId.startsWith('@section:') ? 'Cambiar de sección' : requestedWorkspaceId.startsWith('@period:') ? 'Cambiar período' : 'Cambiar de espacio'" [open]="true" (closed)="cancelWorkspaceChange()" [dismissible]="!saving">
+      <section class="panel switch-confirmation">
+        <h3>Descartar los cambios pendientes</h3>
+        <p>Hay información ingresada en un formulario de este espacio. Si confirmás, se borrarán esos borradores y {{ requestedWorkspaceId === 'setup' ? 'se abrirá la configuración' : requestedWorkspaceId.startsWith('@section:') ? 'se abrirá la sección elegida' : requestedWorkspaceId.startsWith('@period:') ? 'se consultará el período elegido' : 'se abrirá el espacio elegido' }}.</p>
+        <div class="confirm-actions"><button type="button" class="secondary" (click)="cancelWorkspaceChange()">Seguir acá</button><button type="button" class="primary" (click)="confirmWorkspaceChange()" [disabled]="saving">{{ requestedWorkspaceId === 'setup' ? 'Descartar y abrir configuración' : 'Descartar y cambiar' }}</button></div>
+      </section>
+    </app-action-dialog>
+  }
+</div>

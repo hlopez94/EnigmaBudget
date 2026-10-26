@@ -1,0 +1,58 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: enigmabudget
+      POSTGRES_USER: enigmabudget
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run scripts/local-env.sh to create a local .env}
+    ports:
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-55432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./infra/postgres/init-test-databases.sh:/docker-entrypoint-initdb.d/10-create-test-database.sh:ro,Z
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U enigmabudget -d enigmabudget"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  garage:
+    image: dxflrs/garage:v2.5.0
+    command: ["/garage", "server", "--single-node", "--default-bucket"]
+    environment:
+      GARAGE_DEFAULT_ACCESS_KEY: ${GARAGE_DEFAULT_ACCESS_KEY:?Run scripts/local-env.sh to create local Garage credentials}
+      GARAGE_DEFAULT_SECRET_KEY: ${GARAGE_DEFAULT_SECRET_KEY:?Run scripts/local-env.sh to create local Garage credentials}
+      GARAGE_DEFAULT_BUCKET: enigmabudget-private
+    ports:
+      - "127.0.0.1:${GARAGE_S3_HOST_PORT:-3900}:3900"
+    volumes:
+      - ./work/garage.toml:/etc/garage.toml:ro,Z
+      - garage-meta:/var/lib/garage/meta
+      - garage-data:/var/lib/garage/data
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+      garage:
+        condition: service_started
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      Authentication__DevelopmentLoginEnabled: "true"
+      Authentication__Google__ClientId: ${GOOGLE_CLIENT_ID:-}
+      Authentication__Google__ClientSecret: ${GOOGLE_CLIENT_SECRET:-}
+      ConnectionStrings__Default: Host=postgres;Port=5432;Database=enigmabudget;Username=enigmabudget;Password=${POSTGRES_PASSWORD:?Run scripts/local-env.sh to create a local .env}
+      Storage__S3__Endpoint: http://garage:3900
+      Storage__S3__Bucket: enigmabudget-private
+      Storage__S3__Region: garage
+      Storage__S3__ForcePathStyle: "true"
+    ports:
+      - "127.0.0.1:${APP_HOST_PORT:-5080}:8080"
+
+volumes:
+  postgres-data:
+  garage-meta:
+  garage-data:

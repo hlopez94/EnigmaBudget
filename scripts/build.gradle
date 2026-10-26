@@ -1,0 +1,37 @@
+apply from: new File(projectDir, 'app-links-policy.gradle')
+
+tasks.register('testAppLinksPolicy') {
+    doLast {
+        def sourceFile = new File(projectDir, '../web/android/app/src/appLinks/AndroidManifest.xml').canonicalFile
+        if (!sourceFile.isFile()) throw new GradleException('No se encontró el manifiesto App Links.')
+        def parser = new groovy.xml.XmlSlurper(false, false)
+        def source = parser.parse(sourceFile)
+        def filters = source.application.activity.'intent-filter'.findAll { it.@'android:autoVerify'.text() == 'true' }
+        if (filters.size() != 1) throw new GradleException('Se esperaba un filtro autoVerify único.')
+        def filter = filters[0]
+        def data = filter.data
+        if (data.size() != 1 || data[0].@'android:scheme'.text() != 'https' ||
+            data[0].@'android:host'.text() != '${inviteHost}' || data[0].@'android:path'.text() != '/invitar') {
+            throw new GradleException('El filtro debe aceptar únicamente HTTPS, el host configurado y /invitar.')
+        }
+        def validHost = validateAppLinksHost('invitaciones.example.test')
+        if (validHost != 'invitaciones.example.test') throw new GradleException('El host válido no pasó la política.')
+        def merged = parser.parseText(sourceFile.text.replace('${inviteHost}', validHost))
+        def mergedData = merged.application.activity.'intent-filter'.data[0]
+        if (mergedData.@'android:host'.text() != validHost || mergedData.@'android:path'.text() != '/invitar') {
+            throw new GradleException('El manifiesto configurado no conserva host y ruta exactos.')
+        }
+        ['*.example.test', 'https://example.test', 'example.test:443', 'example.test/invitar',
+         'example.test?x=1', 'example.test#invite', ' example.test', 'EXAMPLE.TEST',
+         'localhost', '-bad.example.test', 'bad-.example.test', 'a..example.test'].each { invalid ->
+            try {
+                validateAppLinksHost(invalid)
+                throw new GradleException("Se aceptó un host inválido: ${invalid}")
+            } catch (GradleException failure) {
+                if (!failure.message.startsWith('ENIGMABUDGET_APP_LINKS_HOST')) throw failure
+            }
+        }
+        if (validateAppLinksHost('') != null) throw new GradleException('Host vacío debe omitir el filtro.')
+        println('PASS: manifiesto App Links conserva solo HTTPS + host exacto + /invitar; host válido e inválidos comprobados.')
+    }
+}
