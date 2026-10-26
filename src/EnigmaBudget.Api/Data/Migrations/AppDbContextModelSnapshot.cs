@@ -369,6 +369,10 @@ namespace EnigmaBudget.Api.Data.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
 
+                    b.Property<string>("CommandPayloadHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
                     b.Property<string>("Currency")
                         .IsRequired()
                         .HasColumnType("text");

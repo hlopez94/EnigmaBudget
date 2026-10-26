@@ -50,6 +50,10 @@ public sealed class FinanceWorkspaceFilter : IEndpointFilter
             return WorkspacePermissions.RecordFinance;
         if (p.StartsWith("/api/savings/applications/", StringComparison.OrdinalIgnoreCase) && p.EndsWith("/reverse", StringComparison.OrdinalIgnoreCase) && method == "POST")
             return WorkspacePermissions.CorrectHistory;
+        if (p.StartsWith("/api/operations/", StringComparison.OrdinalIgnoreCase) && p.Contains("/non-cash-settlements/", StringComparison.OrdinalIgnoreCase) && p.EndsWith("/reverse", StringComparison.OrdinalIgnoreCase) && method == "POST")
+            return WorkspacePermissions.CorrectHistory;
+        if (p.StartsWith("/api/operations/", StringComparison.OrdinalIgnoreCase) && p.EndsWith("/non-cash-settlements", StringComparison.OrdinalIgnoreCase) && method == "POST")
+            return WorkspacePermissions.RecordFinance;
         if (method == "GET")
             return p.Contains("/groups", StringComparison.OrdinalIgnoreCase)
                 || p.Contains("/receivables", StringComparison.OrdinalIgnoreCase)

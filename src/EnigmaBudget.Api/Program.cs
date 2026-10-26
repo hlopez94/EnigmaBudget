@@ -41,6 +41,7 @@ builder.Services.AddScoped<CatalogService>();
 builder.Services.AddScoped<RecurringService>();
 builder.Services.AddScoped<RecurringCalendar>();
 builder.Services.AddScoped<BudgetService>();
+builder.Services.AddScoped<OperationSettlementService>();
 builder.Services.AddSingleton<ExchangeRateRefreshCoordinator>();
 if (builder.Configuration.GetValue("ExchangeRates:AutomaticRefreshEnabled", true))
     builder.Services.AddHostedService<ExchangeRateRefreshHostedService>();

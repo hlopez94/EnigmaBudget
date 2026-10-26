@@ -140,7 +140,7 @@ export interface Payment {
 export interface Operation {
   id: string;
   kind: OperationKind;
-  accountId: string;
+  accountId: string | null;
   date: string;
   description: string;
   category: string;
@@ -152,11 +152,16 @@ export interface Operation {
   amount: string;
   currency: Currency;
   paidAmount: string;
+  cashPaidAmount: string;
+  nonCashSettledAmount: string;
   pendingAmount: string;
   status: 'Pending' | 'Partial' | 'Settled' | 'Voided';
   version: number;
   payments: Payment[];
+  nonCashSettlements: NonCashSettlement[];
 }
+export interface OperationPaymentCreate { id: string; accountId: string; date: string; amount: string; operationVersion: number; }
+export interface NonCashSettlement { id: string; kind: string; currency: Currency; amount: string; healthcareComponentId: string | null; cardPurchaseId: string | null; reversesSettlementId: string | null; actorUserId: string; createdAt: string; }
 export interface Participant {
   id: string;
   name: string;

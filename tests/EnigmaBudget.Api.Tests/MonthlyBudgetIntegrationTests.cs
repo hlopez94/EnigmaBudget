@@ -46,7 +46,7 @@ public sealed class MonthlyBudgetIntegrationTests
         var cashId = Guid.NewGuid();
         using var expense = await client.PostAsJsonAsync("/api/operations", new { id = cashId, kind = "Expense", accountId = account, date = "2026-10-10", description = "Verdulería", category = "Comida", categoryId = category, amount = "30.00", paid = false });
         Assert.Equal(HttpStatusCode.OK, expense.StatusCode);
-        using var partialPayment = await client.PostAsJsonAsync($"/api/operations/{cashId}/payments", new { id = Guid.NewGuid(), accountId = account, date = "2026-10-12", amount = "10.00" });
+        using var partialPayment = await client.PostAsJsonAsync($"/api/operations/{cashId}/payments", new { id = Guid.NewGuid(), accountId = account, date = "2026-10-12", amount = "10.00", operationVersion = 1 });
         Assert.Equal(HttpStatusCode.OK, partialPayment.StatusCode);
         var purchaseId = Guid.NewGuid();
         using var purchase = await client.PostAsJsonAsync("/api/purchases", new { id = purchaseId, cardId = card, date = "2026-10-11", description = "Supermercado", category = "Comida", categoryId = category, currency = "ARS", totalAmount = "80.00", installmentCount = 2, firstPeriod = "2026-10", groupId = (Guid?)null });

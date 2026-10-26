@@ -31,9 +31,13 @@ public sealed class BudgetService(AppDbContext db, WorkspaceAccessService access
         Guid ResolveExpenseCategory(Guid? categoryId) => categoryId is Guid id && expenseCategoryIds.Contains(id) ? id : defaultCategory.Id;
         var operationData = await db.FinanceOperations.AsNoTracking()
             .Where(x => x.WorkspaceId == context.Workspace.Id && x.Kind == "Expense" && !x.IsVoided && x.Currency == currency && x.Date >= start && (end == DateOnly.MaxValue ? x.Date <= end : x.Date < end))
-            .Select(x => new { x.Id, x.CategoryId, x.Date, x.Description, x.Category, x.Amount })
             .ToListAsync(ct);
-        var operations = operationData.Select(x => new BudgetSourceRowDto("Operation", x.Id, null, x.Date.ToString("yyyy-MM-dd"), x.Description, x.Category, F(x.Amount))).ToArray();
+        var operationIds = operationData.Select(x => x.Id).ToArray();
+        var cashPayments = await db.FinancePayments.AsNoTracking().Where(x => x.WorkspaceId == context.Workspace.Id && operationIds.Contains(x.OperationId)).ToArrayAsync(ct);
+        var nonCashSettlements = await db.NonCashSettlements.AsNoTracking().Where(x => x.WorkspaceId == context.Workspace.Id && operationIds.Contains(x.OperationId)).ToArrayAsync(ct);
+        var operationContributions = operationData.ToDictionary(x => x.Id, x => OperationSettlementCalculator.Calculate(x,
+            cashPayments.Where(p => p.OperationId == x.Id).ToArray(), nonCashSettlements.Where(s => s.OperationId == x.Id).ToArray()).OperationMonthBudgetContribution);
+        var operations = operationData.Select(x => new BudgetSourceRowDto("Operation", x.Id, null, x.Date.ToString("yyyy-MM-dd"), x.Description, x.Category, F(operationContributions[x.Id]))).ToArray();
         var installmentData = await (from installment in db.Installments.AsNoTracking()
             join purchase in db.Purchases.AsNoTracking() on new { installment.WorkspaceId, installment.PurchaseId } equals new { purchase.WorkspaceId, PurchaseId = purchase.Id }
             where installment.WorkspaceId == context.Workspace.Id && installment.Period == period && installment.Currency == currency

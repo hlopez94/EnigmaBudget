@@ -247,7 +247,7 @@ public sealed class SavingsAllocationIntegrationTests
         var operationId = Guid.NewGuid();
         Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/api/operations", new { id = operationId, kind = "Expense", accountId, date = "2026-10-20", description = "Compra", category = "Casa", amount = "100.00", paid = false })).StatusCode);
         var paymentId = Guid.NewGuid();
-        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync($"/api/operations/{operationId}/payments", new { id = paymentId, accountId, date = "2026-10-21", amount = "100.00" })).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync($"/api/operations/{operationId}/payments", new { id = paymentId, accountId, date = "2026-10-21", amount = "100.00", operationVersion = 1 })).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/api/savings/applications", new { id = Guid.NewGuid(), allocationId, financePaymentId = paymentId, amount = "100.00" })).StatusCode);
         var refreshed = await client.GetFromJsonAsync<System.Text.Json.JsonElement>($"/api/savings/goals/{goalId}/details");
         var apply = refreshed!.GetProperty("movements").EnumerateArray().Single(x => x.GetProperty("financePaymentId").ValueKind == System.Text.Json.JsonValueKind.String && x.GetProperty("financePaymentId").GetGuid() == paymentId && x.GetProperty("kind").GetString() == "Apply");
@@ -277,7 +277,7 @@ public sealed class SavingsAllocationIntegrationTests
         var operationId = Guid.NewGuid();
         Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/api/operations", new { id = operationId, kind = "Expense", accountId, date = "2026-10-20", description = "Compra", category = "Casa", amount = "100.00", paid = false })).StatusCode);
         var paymentId = Guid.NewGuid();
-        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync($"/api/operations/{operationId}/payments", new { id = paymentId, accountId, date = "2026-10-21", amount = "100.00" })).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync($"/api/operations/{operationId}/payments", new { id = paymentId, accountId, date = "2026-10-21", amount = "100.00", operationVersion = 1 })).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/api/savings/applications", new { id = Guid.NewGuid(), allocationId, financePaymentId = paymentId, amount = "100.00" })).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync($"/api/savings/goals/{goalId}/close", new { requestId = Guid.NewGuid(), version = 1, confirmRelease = true })).StatusCode);
         await using var db = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>().UseNpgsql(_factory.TestConnection).Options);
@@ -300,7 +300,7 @@ public sealed class SavingsAllocationIntegrationTests
         var operationId = Guid.NewGuid();
         Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/api/operations", new { id = operationId, kind = "Expense", accountId, date = "2026-10-20", description = "Compra", category = "Casa", amount = "100.00", paid = false })).StatusCode);
         var paymentId = Guid.NewGuid();
-        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync($"/api/operations/{operationId}/payments", new { id = paymentId, accountId, date = "2026-10-21", amount = "100.00" })).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync($"/api/operations/{operationId}/payments", new { id = paymentId, accountId, date = "2026-10-21", amount = "100.00", operationVersion = 1 })).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/api/savings/applications", new { id = Guid.NewGuid(), allocationId, financePaymentId = paymentId, amount = "100.00" })).StatusCode);
         await using var db = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>().UseNpgsql(_factory.TestConnection).Options);
         var workspaceId = await db.SavingsGoals.Where(x => x.Id == goalId).Select(x => x.WorkspaceId).SingleAsync();
@@ -405,7 +405,7 @@ public sealed class SavingsAllocationIntegrationTests
         var operationId = Guid.NewGuid();
         Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/api/operations", new { id = operationId, kind = "Expense", accountId, date = "2026-10-20", description = "Compra", category = "Comida", amount = "100.00", paid = false })).StatusCode);
         var paymentId = Guid.NewGuid();
-        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync($"/api/operations/{operationId}/payments", new { id = paymentId, accountId, date = "2026-10-21", amount = "100.00" })).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync($"/api/operations/{operationId}/payments", new { id = paymentId, accountId, date = "2026-10-21", amount = "100.00", operationVersion = 1 })).StatusCode);
         var allocations = await client.GetFromJsonAsync<System.Text.Json.JsonElement[]>("/api/savings/balances");
         Assert.Equal("900.00", Assert.Single(allocations!).GetProperty("cashBalance").GetString());
         var allocationId = await AllocationIdAsync(goalId);
@@ -440,7 +440,7 @@ public sealed class SavingsAllocationIntegrationTests
         var allocationId = reloaded!.GetProperty("allocations")[0].GetProperty("id").GetGuid();
         var operationId = Guid.NewGuid();
         Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/api/operations", new { id = operationId, kind = "Expense", accountId, date = "2026-10-20", description = "Gasto", category = "Casa", amount = "1100.00", paid = false })).StatusCode);
-        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync($"/api/operations/{operationId}/payments", new { id = Guid.NewGuid(), accountId, date = "2026-10-21", amount = "1000.00" })).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync($"/api/operations/{operationId}/payments", new { id = Guid.NewGuid(), accountId, date = "2026-10-21", amount = "1000.00", operationVersion = 1 })).StatusCode);
         var goal = Assert.Single(await client.GetFromJsonAsync<System.Text.Json.JsonElement[]>("/api/savings/goals") ?? []);
         Assert.Equal("BackingDeficit", goal.GetProperty("estimateStatus").GetString());
         Assert.False(goal.GetProperty("reached").GetBoolean());

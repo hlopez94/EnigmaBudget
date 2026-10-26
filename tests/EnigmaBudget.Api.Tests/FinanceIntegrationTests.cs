@@ -13,6 +13,36 @@ public sealed class FinanceIntegrationTests : IDisposable
     public void Dispose() => _factory.Dispose();
 
     [Fact]
+    public async Task payment_rejects_stale_operation_version_after_another_payment()
+    {
+        using var client = await _factory.AuthenticatedClientAsync();
+        var accountId = Guid.NewGuid();
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/api/accounts", new
+        {
+            id = accountId, name = "Caja", bankName = "Banco", currency = "ARS",
+            openingBalance = "0.00", openingDate = "2026-10-01"
+        })).StatusCode);
+        var operationResponse = await client.PostAsJsonAsync("/api/operations", new
+        {
+            id = Guid.NewGuid(), kind = "Expense", accountId, date = "2026-10-10",
+            description = "Compra", category = "Comida", amount = "30.00", paid = false
+        });
+        Assert.Equal(HttpStatusCode.OK, operationResponse.StatusCode);
+        var operationId = (await operationResponse.Content.ReadFromJsonAsync<Operation>())!.Id;
+
+        var first = await client.PostAsJsonAsync($"/api/operations/{operationId}/payments", new
+        {
+            id = Guid.NewGuid(), accountId, date = "2026-10-11", amount = "10.00", operationVersion = 1
+        });
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        var stale = await client.PostAsJsonAsync($"/api/operations/{operationId}/payments", new
+        {
+            id = Guid.NewGuid(), accountId, date = "2026-10-12", amount = "10.00", operationVersion = 1
+        });
+        Assert.Equal(HttpStatusCode.Conflict, stale.StatusCode);
+    }
+
+    [Fact]
     public async Task Accounts_created_after_empty_onboarding_accept_income_expense_and_transfer_once()
     {
         using var client = await _factory.AuthenticatedClientAsync();
@@ -101,6 +131,7 @@ public sealed class FinanceIntegrationTests : IDisposable
                         accountId = accountA,
                         date = "2026-10-12",
                         amount = "4.00",
+                        operationVersion = 1,
                     }
                 )
             ).StatusCode
@@ -538,6 +569,7 @@ public sealed class FinanceIntegrationTests : IDisposable
                 accountId = account,
                 date = "2026-10-11",
                 amount = "75.00",
+                operationVersion = 1,
             }
         );
         var second = client.PostAsJsonAsync(
@@ -548,6 +580,7 @@ public sealed class FinanceIntegrationTests : IDisposable
                 accountId = account,
                 date = "2026-10-11",
                 amount = "75.00",
+                operationVersion = 1,
             }
         );
         var results = await Task.WhenAll(first, second);

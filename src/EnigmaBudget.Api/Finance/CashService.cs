@@ -149,39 +149,11 @@ public static partial class FinanceEndpoints
                 x.WorkspaceId == ws.Id && rows.Select(o => o.Id).Contains(x.OperationId)
             )
             .ToArrayAsync();
+        var settlementRows = await db.NonCashSettlements.Where(x => x.WorkspaceId == ws.Id && rows.Select(o => o.Id).Contains(x.OperationId)).ToArrayAsync();
         var output = rows.Select(x =>
             {
                 var ps = paymentRows.Where(p => p.OperationId == x.Id).ToArray();
-                var paid = ps.Sum(p => p.Amount);
-                return new OperationDto(
-                    x.Id,
-                    x.Kind,
-                    x.AccountId,
-                    x.Date.ToString("yyyy-MM-dd"),
-                    x.Description,
-                    x.Category,
-                    F(x.Amount),
-                    x.Currency,
-                    F(paid),
-                    F(x.Amount - paid),
-                    x.IsVoided ? "Voided"
-                        : paid == 0 ? "Pending"
-                        : paid < x.Amount ? "Partial"
-                        : "Settled",
-                    x.Version,
-                    ps.Select(p => new PaymentDto(
-                            p.Id,
-                            p.AccountId,
-                            p.Date.ToString("yyyy-MM-dd"),
-                            F(p.Amount)
-                        ))
-                        .ToArray(),
-                    x.CategoryId,
-                    x.MerchantId,
-                    x.IncomeSourceId,
-                    x.MerchantNameSnapshot,
-                    x.IncomeSourceNameSnapshot
-                );
+                return OperationSettlementMapping.Map(x, ps, settlementRows.Where(s => s.OperationId == x.Id).ToArray());
             })
             .ToArray();
         return Results.Ok(output);
@@ -192,6 +164,8 @@ public static partial class FinanceEndpoints
         AppDbContext db,
         IAntiforgery csrf,
         BusinessClock clock,
+        WorkspaceAccessService access,
+        WorkspaceMutationGate mutationGate,
         Guid id,
         PaymentCreate r
     )
@@ -211,26 +185,30 @@ public static partial class FinanceEndpoints
             || date > clock.Today
         )
             return Problem(400, "Revisá el importe y la fecha del pago.");
-        var ws = await Workspace(db, http);
-        await using var tx = await db.Database.BeginTransactionAsync();
-        var op = await db
-            .FinanceOperations.Include(x => x.Payments)
-            .FirstOrDefaultAsync(x => x.WorkspaceId == ws.Id && x.Id == id);
+        if (r.OperationVersion < 1 || r.Id == Guid.Empty) return Problem(400, "La versión del movimiento no es válida.");
+        var initial = FinanceWorkspaceFilter.Get(http)!;
+        var (lease, lockStatus) = await mutationGate.AcquireAsync(initial.Workspace.Id, http.RequestAborted);
+        if (lease is null) return Problem(lockStatus, "El espacio no está disponible.");
+        await using var mutation = lease;
+        var (context, authStatus) = await access.ResolveWithinLockedWorkspaceAsync(http.User, mutation.Workspace, WorkspacePermissions.RecordFinance, http.RequestAborted);
+        if (context is null) return Problem(authStatus, "No tenés permiso para registrar movimientos.");
+        var ws = mutation.Workspace;
+        var op = await OperationSettlementService.LockOperationAsync(db, ws.Id, id, http.RequestAborted);
         if (op is null)
             return Results.NotFound();
-        if (op.IsVoided)
-            return Problem(409, "El movimiento está anulado.");
+        var nonCash = await OperationSettlementService.LockSettlementsAsync(db, ws.Id, id, http.RequestAborted);
+        var payments = await db.FinancePayments.Where(x => x.WorkspaceId == ws.Id && x.OperationId == id).ToArrayAsync(http.RequestAborted);
+        var hash = OperationSettlementMapping.Hash(new { r.Id, r.AccountId, Date = date.ToString("yyyy-MM-dd", Invariant), Amount = F(amount), r.OperationVersion });
         var replay = await db.FinancePayments.SingleOrDefaultAsync(x =>
             x.WorkspaceId == ws.Id && x.Id == r.Id
         );
         if (replay is not null)
-            return
-                replay.OperationId == id
-                && replay.Amount == amount
-                && replay.AccountId == r.AccountId
-                && replay.Date == date
-                ? Results.Ok(await Operation(db, op))
-                : Problem(409, "El identificador ya se usó.");
+            return replay.OperationId == id && (replay.CommandPayloadHash is not null
+                ? replay.CommandPayloadHash == hash
+                : replay.Amount == amount && replay.AccountId == r.AccountId && replay.Date == date)
+                ? Results.Ok(OperationSettlementMapping.Map(op, payments, nonCash)) : Problem(409, "El identificador ya se usó con otros datos.");
+        if (op.IsVoided) return Problem(409, "El movimiento está anulado.");
+        if (op.Version != r.OperationVersion) return Problem(409, "El movimiento cambió. Actualizá la pantalla.");
         var account = await db.Accounts.SingleOrDefaultAsync(x =>
             x.WorkspaceId == ws.Id && x.Id == r.AccountId
         );
@@ -238,13 +216,10 @@ public static partial class FinanceEndpoints
             return Results.NotFound();
         if (account.IsArchived || account.Currency != op.Currency || date < account.OpeningDate)
             return Problem(400, "La cuenta no admite este pago.");
-        var paid =
-            await db
-                .FinancePayments.Where(x => x.WorkspaceId == ws.Id && x.OperationId == id)
-                .SumAsync(x => (decimal?)x.Amount)
-            ?? 0;
-        if (amount > op.Amount - paid)
+        var calculation = OperationSettlementCalculator.Calculate(op, payments, nonCash);
+        if (amount > calculation.PendingAmount)
             return Problem(400, "El importe supera el saldo pendiente.");
+        if (op.AccountId is null) op.AccountId = account.Id;
         db.FinancePayments.Add(
             new FinancePayment
             {
@@ -255,6 +230,7 @@ public static partial class FinanceEndpoints
                 Date = date,
                 Amount = amount,
                 Currency = account.Currency,
+                CommandPayloadHash = hash,
             }
         );
         db.LedgerEntries.Add(
@@ -270,15 +246,15 @@ public static partial class FinanceEndpoints
         op.Version++;
         try
         {
-            await db.SaveChangesAsync();
-            await tx.CommitAsync();
+            mutation.MarkChanged();
+            await db.SaveChangesAsync(http.RequestAborted);
+            await mutation.CommitAsync(http.RequestAborted);
         }
         catch (Exception ex) when (IsPersistenceConflict(ex))
         {
-            await tx.RollbackAsync();
             return Problem(409, "El movimiento cambió durante el pago.");
         }
-        return Results.Ok(await Operation(db, op));
+        return Results.Ok(OperationSettlementMapping.Map(op, [.. payments, new FinancePayment { Id = r.Id, WorkspaceId = ws.Id, OperationId = id, AccountId = account.Id, Date = date, Amount = amount, Currency = account.Currency, CommandPayloadHash = hash }], nonCash));
     }
 
     private static async Task<IResult> VoidOperation(
@@ -287,6 +263,7 @@ public static partial class FinanceEndpoints
         IAntiforgery csrf,
         WorkspaceMutationGate mutationGate,
         WorkspaceAccessService access,
+        TimeProvider timeProvider,
         Guid id,
         OperationVoid r
     )
@@ -300,11 +277,12 @@ public static partial class FinanceEndpoints
         if (lease is null) return Problem(gateStatus, "El espacio no está disponible.");
         await using (lease)
         {
-        var op = await db.FinanceOperations.SingleOrDefaultAsync(x =>
-            x.WorkspaceId == ws.Id && x.Id == id
-        );
+        var (fresh, authStatus) = await access.ResolveWithinLockedWorkspaceAsync(http.User, lease.Workspace, WorkspacePermissions.CorrectHistory, http.RequestAborted);
+        if (fresh is null) return Problem(authStatus, "Ya no tenés permiso para anular movimientos en este espacio.");
+        var op = await OperationSettlementService.LockOperationAsync(db, ws.Id, id, http.RequestAborted);
         if (op is null)
             return Results.NotFound();
+        var nonCash = await OperationSettlementService.LockSettlementsAsync(db, ws.Id, id, http.RequestAborted);
         if (op.IsVoided)
             return op.VoidRequestId == r.Id && op.VoidReason == r.Reason.Trim()
                 ? Results.Ok(await Operation(db, op))
@@ -320,8 +298,6 @@ public static partial class FinanceEndpoints
         await SavingsMutationLocks.LockAccountsThenAllocationsAsync(db, ws.Id, accountIds, allocationIds, http.RequestAborted);
         foreach (var goalId in allocationRows.Select(x => x.GoalId).Distinct().OrderBy(x => x))
             _ = await SavingsMutationLocks.LockGoalAsync(db, ws.Id, goalId, http.RequestAborted);
-        var (fresh, authStatus) = await access.ResolveWithinLockedWorkspaceAsync(http.User, lease.Workspace, WorkspacePermissions.CorrectHistory, http.RequestAborted);
-        if (fresh is null) return Problem(authStatus, "Ya no tenés permiso para anular movimientos en este espacio.");
         var payments = await db.FinancePayments.FromSqlInterpolated($"SELECT * FROM \"FinancePayments\" WHERE \"WorkspaceId\" = {ws.Id} AND \"OperationId\" = {id} ORDER BY \"Id\" FOR UPDATE").ToArrayAsync(http.RequestAborted);
         foreach (var p in payments)
         {
@@ -344,6 +320,21 @@ public static partial class FinanceEndpoints
                     )
                 );
         }
+        foreach (var root in nonCash.Where(x => x.Kind != "Reversal" && !nonCash.Any(y => y.ReversesSettlementId == x.Id)))
+        {
+            var requestId = DeterministicGuid($"{r.Id:D}:{root.Id:D}:void-settlement");
+            var compensation = new NonCashSettlement
+            {
+                Id = DeterministicGuid($"{requestId:D}:row"), WorkspaceId = ws.Id, OperationId = id,
+                Currency = root.Currency, Kind = "Reversal", Amount = root.Amount, ReversesSettlementId = root.Id,
+                CauseVoidRequestId = r.Id, RequestId = requestId,
+                PayloadHash = OperationSettlementMapping.Hash(new { voidRequestId = r.Id, settlementId = root.Id, reason = r.Reason.Trim() }),
+                ActorUserId = fresh.User.Id, CreatedAt = timeProvider.GetUtcNow()
+            };
+            db.NonCashSettlements.Add(compensation);
+            if (!await OperationSettlementSourceValidator.ValidateAsync(db, op, compensation, http.RequestAborted))
+                return Problem(409, "No se pudo compensar una liquidación no monetaria.");
+        }
         op.IsVoided = true;
         op.VoidRequestId = r.Id;
         op.VoidReason = r.Reason.Trim();
@@ -354,7 +345,6 @@ public static partial class FinanceEndpoints
         return Results.Ok(await Operation(db, op));
         }
     }
-
     private static async Task<IResult> Transfer(
         HttpContext http,
         AppDbContext db,
@@ -433,36 +423,8 @@ public static partial class FinanceEndpoints
         var ps = await db
             .FinancePayments.Where(x => x.WorkspaceId == op.WorkspaceId && x.OperationId == op.Id)
             .ToArrayAsync();
-        var paid = ps.Sum(x => x.Amount);
-        return new(
-            op.Id,
-            op.Kind,
-            op.AccountId,
-            op.Date.ToString("yyyy-MM-dd"),
-            op.Description,
-            op.Category,
-            F(op.Amount),
-            op.Currency,
-            F(paid),
-            F(op.Amount - paid),
-            op.IsVoided ? "Voided"
-                : paid == 0 ? "Pending"
-                : paid < op.Amount ? "Partial"
-                : "Settled",
-            op.Version,
-            ps.Select(x => new PaymentDto(
-                    x.Id,
-                    x.AccountId,
-                    x.Date.ToString("yyyy-MM-dd"),
-                    F(x.Amount)
-                ))
-                .ToArray(),
-            op.CategoryId,
-            op.MerchantId,
-            op.IncomeSourceId,
-            op.MerchantNameSnapshot,
-            op.IncomeSourceNameSnapshot
-        );
+        var settlements = await db.NonCashSettlements.Where(x => x.WorkspaceId == op.WorkspaceId && x.OperationId == op.Id).ToArrayAsync();
+        return OperationSettlementMapping.Map(op, ps, settlements);
     }
 
     private static LedgerEntry Entry(
@@ -484,4 +446,10 @@ public static partial class FinanceEndpoints
             Source = source,
             SourceId = id,
         };
+
+    private static Guid DeterministicGuid(string value)
+    {
+        var bytes = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(value));
+        return new Guid(bytes.AsSpan(0, 16));
+    }
 }

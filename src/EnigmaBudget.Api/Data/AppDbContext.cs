@@ -109,6 +109,7 @@ public sealed class FinancePayment
     public DateOnly Date { get; set; }
     public decimal Amount { get; set; }
     public string Currency { get; set; } = "";
+    public string? CommandPayloadHash { get; set; }
 }
 
 public sealed class LedgerEntry
@@ -317,6 +318,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         model.Entity<FinanceOperation>().HasOne<FinanceMerchant>().WithMany().HasForeignKey(x => new { x.WorkspaceId, x.MerchantId }).HasPrincipalKey(x => new { x.WorkspaceId, x.Id }).OnDelete(DeleteBehavior.Restrict);
         model.Entity<FinanceOperation>().HasOne<FinanceIncomeSource>().WithMany().HasForeignKey(x => new { x.WorkspaceId, x.IncomeSourceId }).HasPrincipalKey(x => new { x.WorkspaceId, x.Id }).OnDelete(DeleteBehavior.Restrict);
         model.Entity<FinancePayment>().Property(x => x.Amount).HasPrecision(18, 2);
+        model.Entity<FinancePayment>().Property(x => x.CommandPayloadHash).HasMaxLength(64);
         model.Entity<FinancePayment>().Property(x => x.LegacyFinanceOperationId).HasColumnName("FinanceOperationId");
         model.Entity<FinancePayment>().HasAlternateKey(x => new { x.WorkspaceId, x.Id });
         model.Entity<FinancePayment>().HasOne<BankAccount>().WithMany().HasForeignKey(x => new { x.WorkspaceId, x.AccountId }).HasPrincipalKey(x => new { x.WorkspaceId, x.Id }).OnDelete(DeleteBehavior.Restrict);

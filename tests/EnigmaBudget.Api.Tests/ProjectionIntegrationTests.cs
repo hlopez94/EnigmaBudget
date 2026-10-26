@@ -36,6 +36,39 @@ public sealed class ProjectionIntegrationTests : IDisposable
     }
 
     [Fact]
+    public async Task unassigned_pending_income_is_projected_once_in_currency_cash()
+    {
+        using var client = await _factory.AuthenticatedClientAsync();
+        var accountId = Guid.NewGuid();
+        var operationId = Guid.NewGuid();
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/api/accounts", new
+        {
+            id = accountId, name = "Caja", bankName = "Banco", currency = "ARS", openingBalance = "0.00", openingDate = Today().ToString("yyyy-MM-dd")
+        })).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/api/operations", new
+        {
+            id = operationId, kind = "Income", accountId, date = Today().ToString("yyyy-MM-dd"), description = "Ingreso pendiente", category = "Trabajo", amount = "125.00", paid = false
+        })).StatusCode);
+        await using (var db = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>().UseNpgsql(_factory.TestConnection).Options))
+        {
+            var operation = await db.FinanceOperations.SingleAsync(x => x.Id == operationId);
+            operation.AccountId = null;
+            await db.SaveChangesAsync();
+        }
+
+        using var response = await client.GetAsync($"/api/projection?through={Today().AddDays(1):yyyy-MM-dd}&scenario=Confirmed");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var row = Assert.Single(document.RootElement.GetProperty("rows").EnumerateArray(),
+            x => x.GetProperty("sourceKind").GetString() == "FinanceOperation" && x.GetProperty("sourceId").GetGuid() == operationId);
+        Assert.Equal("Incoming", row.GetProperty("direction").GetString());
+        Assert.Equal("125.00", row.GetProperty("amount").GetString());
+        Assert.Equal(JsonValueKind.Null, row.GetProperty("accountId").ValueKind);
+        var ars = Assert.Single(document.RootElement.GetProperty("currencies").EnumerateArray(), x => x.GetProperty("currency").GetString() == "ARS");
+        Assert.Equal("125.00", ars.GetProperty("dailyBalances").EnumerateArray().Last().GetProperty("cashBalance").GetString());
+    }
+
+    [Fact]
     public async Task estimated_or_saved_scenario_is_only_available_through_calculation()
     {
         using var client = await _factory.AuthenticatedClientAsync();
@@ -335,7 +368,7 @@ public sealed class ProjectionIntegrationTests : IDisposable
         })).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync($"/api/operations/{expenseId}/payments", new
         {
-            id = Guid.NewGuid(), accountId, date = today.ToString("yyyy-MM-dd"), amount = "75.00",
+            id = Guid.NewGuid(), accountId, date = today.ToString("yyyy-MM-dd"), amount = "75.00", operationVersion = 1,
         })).StatusCode);
         var voidedId = Guid.NewGuid();
         Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/api/operations", new

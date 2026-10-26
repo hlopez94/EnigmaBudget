@@ -110,7 +110,8 @@ export class FinanceOperations extends FinanceActions {
         !this.historyFilterAccount || operation.accountId === this.historyFilterAccount,
     );
   }
-  accountName(accountId: string): string {
+  accountName(accountId: string | null): string {
+    if (!accountId) return 'Sin cuenta asignada';
     return this.accounts.find((account) => account.id === accountId)?.name ?? 'Cuenta';
   }
 
@@ -171,10 +172,16 @@ export class FinanceOperations extends FinanceActions {
   async payOperation(operation: Operation): Promise<void> {
     if (!this.allowed('recordFinance')) return;
     const draft = { ...this.payment };
+    const accountId = draft.accountId || operation.accountId;
+    if (!accountId) {
+      this.error = 'Elegí la cuenta desde la que se realiza el pago.';
+      return;
+    }
     const payload = {
-      accountId: draft.accountId || operation.accountId,
+      accountId,
       date: draft.date,
       amount: this.decimal(draft.amount),
+      operationVersion: operation.version,
     };
     if (
       !(await this.runMutation(

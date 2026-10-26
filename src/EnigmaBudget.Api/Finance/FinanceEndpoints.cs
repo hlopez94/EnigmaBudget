@@ -27,6 +27,8 @@ public static partial class FinanceEndpoints
         finance.MapPost("/operations", CreateOperation);
         finance.MapGet("/operations", Operations);
         finance.MapPost("/operations/{id:guid}/payments", PayOperation);
+        finance.MapPost("/operations/{id:guid}/non-cash-settlements", (HttpContext http, IAntiforgery csrf, OperationSettlementService service, Guid id, NonCashSettlementCreate request) => service.CreateAsync(http, csrf, id, request));
+        finance.MapPost("/operations/{id:guid}/non-cash-settlements/{settlementId:guid}/reverse", (HttpContext http, IAntiforgery csrf, OperationSettlementService service, Guid id, Guid settlementId, NonCashSettlementReverse request) => service.ReverseAsync(http, csrf, id, settlementId, request));
         finance.MapPost("/operations/{id:guid}/void", VoidOperation);
         finance.MapPost("/transfers", Transfer);
         finance.MapPost("/cards", CreateCard);

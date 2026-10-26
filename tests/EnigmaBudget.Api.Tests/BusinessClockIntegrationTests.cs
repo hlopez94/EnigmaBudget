@@ -42,7 +42,7 @@ public sealed class BusinessClockIntegrationTests
         });
         var partialPayment = await client.PostAsJsonAsync($"/api/operations/{pendingId}/payments", new
         {
-            id = Guid.NewGuid(), accountId = account, date = "2026-11-01", amount = "1.00"
+            id = Guid.NewGuid(), accountId = account, date = "2026-11-01", amount = "1.00", operationVersion = 1
         });
         var transfer = await client.PostAsJsonAsync("/api/transfers", new
         {

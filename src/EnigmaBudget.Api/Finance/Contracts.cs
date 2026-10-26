@@ -53,7 +53,11 @@ public sealed record OperationCreate(
     Guid? IncomeSourceId = null
 );
 
-public sealed record PaymentCreate(Guid Id, Guid AccountId, string Date, string Amount);
+public sealed record PaymentCreate(Guid Id, Guid AccountId, string Date, string Amount, int OperationVersion);
+
+public sealed record NonCashSettlementCreate(Guid RequestId, int OperationVersion, string Currency, string Amount, Guid? HealthcareComponentId, Guid? CardPurchaseId);
+public sealed record NonCashSettlementReverse(Guid RequestId, int OperationVersion, string Reason);
+public sealed record NonCashSettlementDto(Guid Id, string Kind, string Currency, string Amount, Guid? HealthcareComponentId, Guid? CardPurchaseId, Guid? ReversesSettlementId, Guid ActorUserId, string CreatedAt);
 
 public sealed record OperationVoid(Guid Id, int Version, string Reason);
 
@@ -162,7 +166,10 @@ public sealed record OperationDto(
     Guid? MerchantId = null,
     Guid? IncomeSourceId = null,
     string? MerchantNameSnapshot = null,
-    string? IncomeSourceNameSnapshot = null
+    string? IncomeSourceNameSnapshot = null,
+    string? CashPaidAmount = null,
+    string? NonCashSettledAmount = null,
+    NonCashSettlementDto[]? NonCashSettlements = null
 );
 
 public sealed record CatalogCreate(Guid Id, string Name, string? Kind = null);

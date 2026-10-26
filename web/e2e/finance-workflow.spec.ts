@@ -248,7 +248,6 @@ test('runs real finance, sharing, and card acceptance from empty completed onboa
   const operationForm = page
     .locator('form')
     .filter({ has: page.locator('[name="opDescription"]') });
-  const rejectedOperation = waitForApi(page, 'POST', '/api/operations');
   await operationForm.locator('[name="opKind"]').selectOption('Income');
   await operationForm
     .locator('[name="opAccount"]')
@@ -259,11 +258,19 @@ test('runs real finance, sharing, and card acceptance from empty completed onboa
   await operationForm.locator('[name="opCategory"]').selectOption({ label: 'Sin clasificar' });
   await operationForm.locator('[name="sourceCreateName"]').fill('Ingreso E2E');
   await operationForm.locator('[name="sourceCreateKind"]').selectOption('Salary');
+  const createdSource = waitForApi(page, 'POST', '/api/finance/catalog/income-sources');
   await operationForm.getByRole('button', { name: 'Crear fuente y continuar' }).click();
+  const sourceResponse = await createdSource;
+  expect(sourceResponse.status()).toBe(201);
+  const source = (await sourceResponse.json()) as { incomeSourceId: string };
+  await expect(operationForm.locator('[name="opIncomeSource"]')).toHaveValue(source.incomeSourceId);
   await operationForm.locator('[name="opAmount"]').fill('0');
   await operationForm.locator('[name="opPaid"]').check();
+  const rejectedOperation = waitForApi(page, 'POST', '/api/operations');
   await operationForm.getByRole('button', { name: 'Guardar movimiento' }).click();
-  expect((await rejectedOperation).status()).toBe(400);
+  const rejectedResponse = await rejectedOperation;
+  expect(rejectedResponse.status()).toBe(400);
+  await expect(page.getByRole('alert')).toContainText('Revisá los datos del movimiento.');
   await expect(page.getByRole('dialog')).toBeVisible();
   await expect(operationForm.locator('[name="opKind"]')).toHaveValue('Income');
   await expect(operationForm.locator('[name="opAccount"]')).toHaveValue(rejectedAccountValue);

@@ -93,6 +93,8 @@ public sealed class RecurringHealthcareMigrationTests
         Assert.Equal(legacy.AccountId, await Scalar<Guid>(db, "SELECT \"AccountId\" FROM \"FinancePayments\" WHERE \"Id\" = @id", legacy.PaymentId));
         Assert.Equal(123.45m, await Scalar<decimal>(db, "SELECT \"Amount\" FROM \"FinancePayments\" WHERE \"Id\" = @id", legacy.PaymentId));
         Assert.Equal("ARS", await Scalar<string>(db, "SELECT \"Currency\" FROM \"FinancePayments\" WHERE \"Id\" = @id", legacy.PaymentId));
+        Assert.True(await IsNullable(db, "FinancePayments", "CommandPayloadHash"));
+        Assert.Equal(0, await Scalar<int>(db, "SELECT count(*) FROM \"FinancePayments\" WHERE \"Id\" = @id AND \"CommandPayloadHash\" IS NOT NULL", legacy.PaymentId));
         Assert.Equal(new DateOnly(2026, 10, 15), await Scalar<DateOnly>(db, "SELECT \"Date\" FROM \"FinancePayments\" WHERE \"Id\" = @id", legacy.PaymentId));
         Assert.Equal("Legacy pago sueldo", await Scalar<string>(db, "SELECT \"Description\" FROM \"FinanceOperations\" WHERE \"Id\" = @id", legacy.OperationId));
         Assert.Equal("Sueldo", await Scalar<string>(db, "SELECT \"Category\" FROM \"FinanceOperations\" WHERE \"Id\" = @id", legacy.OperationId));

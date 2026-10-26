@@ -101,15 +101,12 @@ public static partial class FinanceEndpoints
         }
         var year = int.Parse(period![..4]);
         var month = int.Parse(period[5..7]);
-        var ops = new List<object>();
-        foreach (
-            var op in await db
-                .FinanceOperations.Where(x =>
-                    x.WorkspaceId == ws.Id && x.Date.Year == year && x.Date.Month == month
-                )
-                .ToArrayAsync()
-        )
-            ops.Add(await Operation(db, op));
+        var periodOperations = await db.FinanceOperations.Where(x => x.WorkspaceId == ws.Id && x.Date.Year == year && x.Date.Month == month).ToArrayAsync();
+        var periodOperationIds = periodOperations.Select(x => x.Id).ToArray();
+        var periodPayments = await db.FinancePayments.Where(x => x.WorkspaceId == ws.Id && periodOperationIds.Contains(x.OperationId)).ToArrayAsync();
+        var periodSettlements = await db.NonCashSettlements.Where(x => x.WorkspaceId == ws.Id && periodOperationIds.Contains(x.OperationId)).ToArrayAsync();
+        var ops = periodOperations.Select(op => (object)OperationSettlementMapping.Map(op,
+            periodPayments.Where(x => x.OperationId == op.Id).ToArray(), periodSettlements.Where(x => x.OperationId == op.Id).ToArray())).ToArray();
         var installmentRows = await db
             .Installments.Where(x => x.WorkspaceId == ws.Id && x.Period == period)
             .ToArrayAsync();
@@ -134,17 +131,14 @@ public static partial class FinanceEndpoints
         var balanceUsd =
             accounts.Where(x => x.Currency == "USD" && x.OpeningDate <= clock.Today).Sum(x => x.OpeningBalance)
             + ledgerRows.Where(x => x.Currency == "USD").Sum(x => x.Amount);
-        var expenses = await db
-            .FinanceOperations.Where(x =>
-                x.WorkspaceId == ws.Id
-                && x.Date.Year == year
-                && x.Date.Month == month
-                && x.Kind == "Expense"
-                && !x.IsVoided
-            )
-            .ToArrayAsync();
-        var expenseArs = expenses.Where(x => x.Currency == "ARS").Sum(x => x.Amount);
-        var expenseUsd = expenses.Where(x => x.Currency == "USD").Sum(x => x.Amount);
+        var expenses = periodOperations.Where(x => x.Kind == "Expense").ToArray();
+        var expenseIds = expenses.Select(x => x.Id).ToArray();
+        var expensePayments = await db.FinancePayments.Where(x => x.WorkspaceId == ws.Id && expenseIds.Contains(x.OperationId)).ToArrayAsync();
+        var expenseSettlements = await db.NonCashSettlements.Where(x => x.WorkspaceId == ws.Id && expenseIds.Contains(x.OperationId)).ToArrayAsync();
+        var expenseParts = expenses.Select(x => (Operation: x, Amount: OperationSettlementCalculator.Calculate(x,
+            expensePayments.Where(p => p.OperationId == x.Id).ToArray(), expenseSettlements.Where(s => s.OperationId == x.Id).ToArray()).OperationMonthBudgetContribution)).ToArray();
+        var expenseArs = expenseParts.Where(x => x.Operation.Currency == "ARS").Sum(x => x.Amount);
+        var expenseUsd = expenseParts.Where(x => x.Operation.Currency == "USD").Sum(x => x.Amount);
         var cardChargesArs = confirmedAdjustments
             .Where(x => x.Period == period && x.Currency == "ARS")
             .Sum(x => x.Amount);

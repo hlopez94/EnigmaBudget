@@ -13,6 +13,7 @@ import {
   Group,
   OnboardingState,
   Operation,
+  OperationPaymentCreate,
   Purchase,
   Receivable,
   SaveDraftRequest,
@@ -259,7 +260,7 @@ export class ApiService {
   updateBudget(id: string, input: MonthlyBudgetUpdate): Promise<MonthlyBudgetDefinition> {
     return this.financeMutate(`/api/budgets/${id}`, { method: 'PUT', body: JSON.stringify(input) });
   }
-  payOperation(id: string, input: Record<string, unknown>): Promise<Operation> {
+  payOperation(id: string, input: OperationPaymentCreate): Promise<Operation> {
     return this.financeMutate(`/api/operations/${id}/payments`, {
       method: 'POST',
       body: JSON.stringify(input),

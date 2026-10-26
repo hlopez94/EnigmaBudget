@@ -220,7 +220,7 @@
             <button
               type="button"
               class="text-action"
-              (click)="payment.operationId = op.id; payment.accountId = op.accountId"
+          (click)="payment.operationId = op.id; payment.accountId = op.accountId ?? ''"
             >
               Registrar pago/cobro
             </button>

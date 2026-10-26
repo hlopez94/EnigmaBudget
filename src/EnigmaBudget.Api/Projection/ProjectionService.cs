@@ -32,6 +32,7 @@ public sealed class ProjectionService(AppDbContext db, BusinessClock clock, Savi
             .Where(x => x.WorkspaceId == ws.Id && !x.IsVoided).ToArrayAsync(ct);
         var financePayments = await db.FinancePayments.AsNoTracking().Where(x => x.WorkspaceId == ws.Id)
             .ToArrayAsync(ct);
+        var nonCashSettlements = await db.NonCashSettlements.AsNoTracking().Where(x => x.WorkspaceId == ws.Id).ToArrayAsync(ct);
         var cards = await db.Cards.AsNoTracking().Where(x => x.WorkspaceId == ws.Id).ToArrayAsync(ct);
         var installments = await db.Installments.AsNoTracking().Where(x => x.WorkspaceId == ws.Id).ToArrayAsync(ct);
         var statements = await db.CardStatements.AsNoTracking().Where(x => x.WorkspaceId == ws.Id).ToArrayAsync(ct);
@@ -59,13 +60,16 @@ public sealed class ProjectionService(AppDbContext db, BusinessClock clock, Savi
 
         foreach (var operation in operations)
         {
-            if (operation.Kind != "Expense" || operation.Date > through) continue;
-            var remaining = Math.Max(0m, operation.Amount - financePayments.Where(x => x.OperationId == operation.Id).Sum(x => x.Amount));
+            if (operation.Kind is not ("Expense" or "Income") || operation.Date > through) continue;
+            var calculation = OperationSettlementCalculator.Calculate(operation,
+                financePayments.Where(x => x.OperationId == operation.Id).ToArray(),
+                nonCashSettlements.Where(x => x.OperationId == operation.Id).ToArray());
+            var remaining = calculation.PendingAmount;
             if (remaining <= 0m) continue;
             var warnings = operation.Date < today ? new[] { "Vencimiento atrasado; se evalúa desde hoy." } : Array.Empty<string>();
-            rows.Add(new("FinanceOperation", operation.Id, null, Date(operation.Date),
+            rows.Add(new ProjectionRowDto("FinanceOperation", operation.Id, null, Date(operation.Date),
                 operation.Date < today ? "Overdue" : "Confirmed", operation.Currency, F(remaining), "Outgoing", "Confirmed",
-                operation.AccountId, operation.Description, null, warnings));
+                operation.AccountId, operation.Description, null, warnings) with { Direction = operation.Kind == "Income" ? "Incoming" : "Outgoing" });
         }
 
         foreach (var card in cards)
@@ -128,12 +132,16 @@ public sealed class ProjectionService(AppDbContext db, BusinessClock clock, Savi
                     var amount = account.OpeningDate <= date ? account.OpeningBalance : 0m;
                     amount += ledger.Where(x => x.AccountId == account.Id && x.Date <= date).Sum(x => x.Amount);
                     var dailyOperations = rows.Where(x => x.SourceKind == "FinanceOperation" && x.AccountId == account.Id && EventDate(x, today) <= date)
-                        .Sum(x => -decimal.Parse(x.Amount, Inv));
+                        .Sum(x => x.Direction == "Incoming" ? decimal.Parse(x.Amount, Inv) : -decimal.Parse(x.Amount, Inv));
                     amount += dailyOperations;
                     cash += amount;
                     var availableFrom = account.FundsAvailableFrom is { } from ? (from > account.OpeningDate ? from : account.OpeningDate) : account.OpeningDate;
                     if (availableFrom <= date) available += amount;
                 }
+                var unassignedOperations = rows.Where(x => x.SourceKind == "FinanceOperation" && x.AccountId is null && x.Currency == currency && EventDate(x, today) <= date)
+                    .Sum(x => x.Direction == "Incoming" ? decimal.Parse(x.Amount, Inv) : -decimal.Parse(x.Amount, Inv));
+                cash += unassignedOperations;
+                available += unassignedOperations;
                 var cardDelta = rows.Where(x => x.SourceKind == "CardObligation" && x.Currency == currency && EventDate(x, today) <= date)
                     .Sum(x => -decimal.Parse(x.Amount, Inv));
                 cash += cardDelta;
